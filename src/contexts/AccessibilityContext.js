@@ -3,7 +3,7 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 // Initial accessibility state
 const initialState = {
   mode: 'visual', // 'visual' | 'audio' | 'hybrid' | 'simplified'
-  preferences: {
+  preferences: { //prefs- this is the heart of accessibility system
     visualSettings: {
       fontSize: 16,
       contrast: 'normal',
@@ -65,11 +65,11 @@ const AccessibilityContext = createContext();
 
 // Context provider component
 export function AccessibilityProvider({ children }) {
-  const [state, dispatch] = useReducer(accessibilityReducer, initialState);
+  const [state, dispatch] = useReducer(accessibilityReducer, initialState); //state is initial/default and reducer is function that handles state transitions
 
-  // Load preferences and mode from localStorage on mount
+  // Load preferences and mode from localStorage on start
   useEffect(() => {
-    const savedPreferences = localStorage.getItem('healthvis-accessibility-preferences');
+    const savedPreferences = localStorage.getItem('healthvis-accessibility-preferences'); 
     const savedMode = localStorage.getItem('healthvis-accessibility-mode');
     
     if (savedPreferences) {
@@ -92,7 +92,7 @@ export function AccessibilityProvider({ children }) {
     }
   }, []);
 
-  // Save preferences to localStorage when they change
+  // Save preferences to localStorage when they change so next startup begins on same accessibility prefs
   useEffect(() => {
     localStorage.setItem(
       'healthvis-accessibility-preferences',
@@ -105,7 +105,7 @@ export function AccessibilityProvider({ children }) {
     localStorage.setItem('healthvis-accessibility-mode', state.mode);
   }, [state.mode]);
 
-  // Mode-specific feature toggles
+  // Mode-specific feature toggles -> feature flags are boolean flags act as switches that turn accessibility features on/off based on the user's chosen mode
   const getModeFeatures = (mode) => {
     switch (mode) {
       case 'audio':

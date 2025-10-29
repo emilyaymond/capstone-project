@@ -5,7 +5,14 @@ import screenReaderService from '../services/ScreenReaderService';
 /**
  * Custom hook for managing screen reader announcements
  * Provides methods to announce messages to screen readers via ARIA live regions
+ *  ex:
+ *  announcePolite,       "Data loaded successfully"
+ *  announceAssertive,    "Error! Action failed"
+ *  announceDataPoint,    "Blood pressure: 120/80 at 2:30 PM"
+ *  announceNavigation,   "Navigated to Dashboard"
+ *  isScreenReaderActive  true/false
  */
+
 export function useScreenReader() {
     const accessibilityContext = useAccessibility();
     const isScreenReaderActive = accessibilityContext?.isScreenReaderActive || false;
