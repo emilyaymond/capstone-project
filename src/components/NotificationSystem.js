@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import './NotificationSystem.css';
+import '../styles/components/NotificationSystem.css';
 
 const NotificationSystem = () => {
   const [notifications, setNotifications] = useState([]);

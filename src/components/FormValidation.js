@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import './FormValidation.css';
+import '../styles/components/FormValidation.css';
 
 const FormValidation = ({ 
   children, 

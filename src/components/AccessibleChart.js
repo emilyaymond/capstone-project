@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import { useScreenReader } from '../hooks/useScreenReader';
-import './AccessibleChart.css';
+import '../styles/components/AccessibleChart.css';
 
 const AccessibleChart = ({ 
   data = [], 

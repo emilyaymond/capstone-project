@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
-import './SimplifiedChart.css';
+import '../styles/components/SimplifiedChart.css';
 
 const SimplifiedChart = ({ data, title, description }) => {
   const { announceToScreenReader } = useAccessibility();

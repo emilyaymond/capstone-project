@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import './LoadingIndicator.css';
+import '../styles/components/LoadingIndicator.css';
 
 const LoadingIndicator = ({
   type = 'spinner', // 'spinner', 'progress', 'dots'

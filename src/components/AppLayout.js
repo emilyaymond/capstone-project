@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useScreenReader } from '../hooks/useScreenReader';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import MainNavigation from './MainNavigation';
-import './AppLayout.css';
+import '../styles/components/AppLayout.css';
 
 /**
  * AppLayout component provides the main application layout with proper

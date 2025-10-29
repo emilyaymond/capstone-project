@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import './KeyboardOptimizedNavigation.css';
+import '../styles/components/KeyboardOptimizedNavigation.css';
 
 const KeyboardOptimizedNavigation = ({ items, onNavigate, currentPath }) => {
   const { modeFeatures, announceToScreenReader } = useAccessibility();

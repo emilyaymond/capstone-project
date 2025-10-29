@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
-import './AccessibilityModeSelector.css';
+import '../styles/components/AccessibilityModeSelector.css';
 
 const AccessibilityModeSelector = () => {
   const { mode, setMode, announceToScreenReader } = useAccessibility();

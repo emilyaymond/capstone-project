@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useScreenReader } from '../hooks/useScreenReader';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import './ProgressiveDisclosure.css';
+import '../styles/components/ProgressiveDisclosure.css';
 
 /**
  * ProgressiveDisclosure component provides step-by-step revelation of complex data

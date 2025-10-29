@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useScreenReader } from '../hooks/useScreenReader';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import './TextChart.css';
+import '../styles/components/TextChart.css';
 
 const TextChart = ({ 
   data = [], 

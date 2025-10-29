@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
-import './ModeOptimizedWrapper.css';
+import '../styles/components/ModeOptimizedWrapper.css';
 
 const ModeOptimizedWrapper = ({ children, className = '', ...props }) => {
   const { mode, modeFeatures } = useAccessibility();

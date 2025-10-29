@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useScreenReader } from '../hooks/useScreenReader';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import './MainNavigation.css';
+import '../styles/components/MainNavigation.css';
 
 /**
  * MainNavigation component provides accessible navigation with semantic HTML,

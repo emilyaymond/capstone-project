@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useScreenReader } from '../hooks/useScreenReader';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
-import './DataSummary.css';
+import '../styles/components/DataSummary.css';
 
 /**
  * DataSummary component provides high-level overviews with drill-down navigation

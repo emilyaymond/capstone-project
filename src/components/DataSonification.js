@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { calculateTrend } from '../models/HealthDataPoint';
-import './DataSonification.css';
+import '../styles/components/DataSonification.css';
 
 /**
  * Audio mapping configurations for different data types

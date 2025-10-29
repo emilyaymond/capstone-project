@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { calculateTrend } from '../models/HealthDataPoint';
 import DataSonification, { AUDIO_MAPPINGS } from './DataSonification';
-import './InteractiveAudioExplorer.css';
+import '../styles/components/InteractiveAudioExplorer.css';
 
 /**
  * Audio exploration modes

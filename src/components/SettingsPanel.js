@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { PreferencesStorageService } from '../services/PreferencesStorageService';
 import { DEFAULT_USER_PREFERENCES } from '../models/UserPreferences';
-import './SettingsPanel.css';
+import '../styles/components/SettingsPanel.css';
 
 const SettingsPanel = ({ onPreferencesChange, onClose }) => {
   const [preferences, setPreferences] = useState(DEFAULT_USER_PREFERENCES);

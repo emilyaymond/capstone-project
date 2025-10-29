@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import './ConfirmationDialog.css';
+import '../styles/components/ConfirmationDialog.css';
 
 const ConfirmationDialog = ({
   isOpen,

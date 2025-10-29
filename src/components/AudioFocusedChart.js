@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useAudioFeedback } from '../hooks/useAudioFeedback';
 import DataSonification from './DataSonification';
-import './AudioFocusedChart.css';
+import '../styles/components/AudioFocusedChart.css';
 
 const AudioFocusedChart = ({ data, title, description, onDataPointFocus }) => {
   const { modeFeatures, announceToScreenReader } = useAccessibility();
