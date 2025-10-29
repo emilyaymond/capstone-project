@@ -1,0 +1,334 @@
+/**
+ * Accessible Settings Panel Styles
+ * Follows WCAG guidelines for color contrast, touch targets, and focus indicators
+ */
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: #ffffff;
+  border-left: 2px solid #e0e0e0;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow-y: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.settings-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 18px;
+  color: #666;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-close {
+  background: none;
+  border: 2px solid transparent;
+  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.settings-close:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+.settings-close:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.settings-content {
+  padding: 20px;
+}
+
+.settings-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  background: #fafbfc;
+}
+
+.settings-section legend {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  padding: 0 8px;
+  background: #ffffff;
+}
+
+.setting-group {
+  margin-bottom: 20px;
+}
+
+.setting-group:last-child {
+  margin-bottom: 0;
+}
+
+.setting-group label {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  margin-bottom: 0 !important;
+  cursor: pointer;
+}
+
+.setting-group input[type="range"] {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #e0e0e0;
+  outline: none;
+  margin: 8px 0;
+  cursor: pointer;
+}
+
+.setting-group input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0066cc;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.setting-group input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0066cc;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.setting-group input[type="range"]:focus {
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.setting-group select {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #333;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.setting-group select:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.setting-group input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+  position: relative;
+}
+
+.setting-group input[type="checkbox"]:checked {
+  background: #0066cc;
+  border-color: #0066cc;
+}
+
+.setting-group input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.setting-help {
+  font-size: 14px;
+  color: #666;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.settings-footer {
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settings-button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 120px;
+  transition: all 0.2s ease;
+}
+
+.settings-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-button-primary {
+  background: #0066cc;
+  color: #ffffff;
+  border-color: #0066cc;
+}
+
+.settings-button-primary:hover:not(:disabled) {
+  background: #0052a3;
+  border-color: #0052a3;
+}
+
+.settings-button-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.settings-button-secondary {
+  background: #ffffff;
+  color: #333;
+  border-color: #e0e0e0;
+}
+
+.settings-button-secondary:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #ccc;
+}
+
+.settings-button-secondary:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.settings-status {
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.settings-status.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.settings-status.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .settings-panel {
+    border-left-color: #000000;
+  }
+  
+  .settings-section {
+    border-color: #000000;
+  }
+  
+  .settings-button-primary {
+    background: #000000;
+    border-color: #000000;
+  }
+  
+  .settings-button-secondary {
+    border-color: #000000;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .settings-close,
+  .settings-button {
+    transition: none;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .settings-panel {
+    width: 100%;
+    right: 0;
+  }
+}
+
+/* Focus Management for Screen Readers */
+.settings-panel:focus-within {
+  /* Ensure focus is visible within the panel */
+}
+
+/* Ensure minimum touch target sizes */
+.settings-panel input,
+.settings-panel select,
+.settings-panel button {
+  min-height: 44px;
+}
+
+.settings-panel input[type="checkbox"] {
+  min-width: 20px;
+  min-height: 20px;
+}

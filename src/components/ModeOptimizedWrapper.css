@@ -1,0 +1,225 @@
+/* Base mode optimized wrapper styles */
+.mode-optimized-wrapper {
+  transition: all 0.2s ease;
+}
+
+/* Audio-focused mode optimizations */
+.mode-optimized-wrapper.mode-audio {
+  /* Reduce visual distractions */
+  --chart-opacity: 0.3;
+  --animation-duration: 0s;
+}
+
+.mode-optimized-wrapper.mode-audio .visual-chart {
+  opacity: var(--chart-opacity);
+  pointer-events: none;
+}
+
+.mode-optimized-wrapper.mode-audio .audio-controls {
+  display: block !important;
+  position: relative;
+  z-index: 10;
+}
+
+.mode-optimized-wrapper.mode-audio .sonification-panel {
+  border: 3px solid var(--primary-color, #007acc);
+  background-color: var(--highlight-background, #f0f8ff);
+}
+
+/* Simplified mode optimizations */
+.mode-optimized-wrapper.mode-simplified {
+  --font-size-multiplier: 1.2;
+  --spacing-multiplier: 1.5;
+  --border-width: 2px;
+}
+
+.mode-optimized-wrapper.mode-simplified * {
+  font-size: calc(1rem * var(--font-size-multiplier));
+  line-height: 1.6;
+}
+
+.mode-optimized-wrapper.mode-simplified .advanced-feature {
+  display: none !important;
+}
+
+.mode-optimized-wrapper.mode-simplified .complex-chart {
+  display: none;
+}
+
+.mode-optimized-wrapper.mode-simplified .simple-chart {
+  display: block;
+}
+
+/* Hybrid mode optimizations */
+.mode-optimized-wrapper.mode-hybrid {
+  /* Balance visual and audio elements */
+  --chart-opacity: 0.8;
+}
+
+.mode-optimized-wrapper.mode-hybrid .audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.mode-optimized-wrapper.mode-hybrid .visual-chart {
+  opacity: var(--chart-opacity);
+}
+
+/* Visual mode (default) */
+.mode-optimized-wrapper.mode-visual {
+  /* Standard visual presentation */
+  --chart-opacity: 1;
+}
+
+.mode-optimized-wrapper.mode-visual .audio-controls {
+  display: none;
+}
+
+/* Feature-specific optimizations */
+
+/* Audio priority */
+.mode-optimized-wrapper.audio-priority .audio-feedback {
+  volume: 1;
+  priority: high;
+}
+
+.mode-optimized-wrapper.audio-priority .visual-elements {
+  opacity: 0.5;
+}
+
+/* Reduced visual complexity */
+.mode-optimized-wrapper.reduced-complexity {
+  --animation-duration: 0s;
+  --shadow-intensity: 0;
+  --gradient-complexity: 0;
+}
+
+.mode-optimized-wrapper.reduced-complexity .decorative-element {
+  display: none;
+}
+
+.mode-optimized-wrapper.reduced-complexity .complex-animation {
+  animation: none !important;
+}
+
+.mode-optimized-wrapper.reduced-complexity .gradient-background {
+  background: solid var(--background-color, #ffffff) !important;
+}
+
+/* Hide advanced features */
+.mode-optimized-wrapper.hide-advanced .advanced-setting {
+  display: none;
+}
+
+.mode-optimized-wrapper.hide-advanced .expert-mode-toggle {
+  display: none;
+}
+
+.mode-optimized-wrapper.hide-advanced .detailed-configuration {
+  display: none;
+}
+
+/* Larger targets */
+.mode-optimized-wrapper.larger-targets button,
+.mode-optimized-wrapper.larger-targets input,
+.mode-optimized-wrapper.larger-targets .interactive-element {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 12px 16px;
+  font-size: 1.125rem;
+}
+
+.mode-optimized-wrapper.larger-targets .chart-data-point {
+  min-width: 20px;
+  min-height: 20px;
+}
+
+/* Keyboard optimized */
+.mode-optimized-wrapper.keyboard-optimized *:focus {
+  outline: 3px solid var(--focus-color, #005999);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px var(--focus-background, #ffffff);
+}
+
+.mode-optimized-wrapper.keyboard-optimized .skip-link {
+  display: block;
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--focus-color, #005999);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 1000;
+  border-radius: 4px;
+}
+
+.mode-optimized-wrapper.keyboard-optimized .skip-link:focus {
+  top: 6px;
+}
+
+.mode-optimized-wrapper.keyboard-optimized .keyboard-shortcut-hint {
+  display: inline-block;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #666666);
+  margin-left: 0.5rem;
+}
+
+/* High contrast support for all modes */
+@media (prefers-contrast: high) {
+  .mode-optimized-wrapper {
+    --border-width: 3px;
+    --focus-outline-width: 4px;
+  }
+  
+  .mode-optimized-wrapper * {
+    border-width: var(--border-width);
+  }
+  
+  .mode-optimized-wrapper *:focus {
+    outline-width: var(--focus-outline-width);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .mode-optimized-wrapper {
+    --animation-duration: 0s;
+    transition: none;
+  }
+  
+  .mode-optimized-wrapper * {
+    animation-duration: var(--animation-duration) !important;
+    transition: none !important;
+  }
+}
+
+/* Dark mode adaptations */
+@media (prefers-color-scheme: dark) {
+  .mode-optimized-wrapper.mode-audio {
+    --highlight-background: #003d66;
+  }
+  
+  .mode-optimized-wrapper.keyboard-optimized .skip-link {
+    background: var(--primary-color, #4da6ff);
+    color: #000000;
+  }
+}
+
+/* Print styles - ensure accessibility in print */
+@media print {
+  .mode-optimized-wrapper .audio-controls {
+    display: none !important;
+  }
+  
+  .mode-optimized-wrapper .interactive-element {
+    border: 1px solid #000000;
+  }
+  
+  .mode-optimized-wrapper .chart-description {
+    display: block !important;
+    font-size: 12pt;
+    margin: 1em 0;
+  }
+}

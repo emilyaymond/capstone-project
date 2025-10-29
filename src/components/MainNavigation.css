@@ -1,0 +1,280 @@
+/* MainNavigation Component Styles */
+
+.main-navigation-container {
+  width: 100%;
+  background-color: var(--nav-bg-color, #ffffff);
+  border-bottom: 2px solid var(--nav-border-color, #e0e0e0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumb Navigation */
+.breadcrumb-nav {
+  padding: 0.75rem 1rem;
+  background-color: var(--breadcrumb-bg-color, #f8f9fa);
+  border-bottom: 1px solid var(--breadcrumb-border-color, #dee2e6);
+}
+
+.breadcrumb-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-link {
+  background: none;
+  border: none;
+  color: var(--breadcrumb-link-color, #007bff);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: inherit;
+  font-family: inherit;
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.breadcrumb-link:hover,
+.breadcrumb-link:focus {
+  background-color: var(--breadcrumb-link-hover-bg, #e3f2fd);
+  outline: 2px solid var(--focus-color, #007bff);
+  outline-offset: 2px;
+}
+
+.breadcrumb-separator {
+  margin: 0 0.5rem;
+  color: var(--breadcrumb-separator-color, #6c757d);
+  font-weight: bold;
+}
+
+.breadcrumb-current {
+  color: var(--breadcrumb-current-color, #6c757d);
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Main Navigation */
+.main-navigation {
+  padding: 1rem;
+}
+
+.nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-items: center;
+}
+
+.nav-item {
+  position: relative;
+}
+
+/* Navigation Buttons - Minimum 44px touch targets */
+.nav-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 120px;
+  padding: 0.75rem 1rem;
+  background-color: var(--nav-button-bg, #ffffff);
+  border: 2px solid var(--nav-button-border, #dee2e6);
+  border-radius: 0.5rem;
+  color: var(--nav-button-color, #495057);
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  position: relative;
+}
+
+.nav-button:hover {
+  background-color: var(--nav-button-hover-bg, #f8f9fa);
+  border-color: var(--nav-button-hover-border, #007bff);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.nav-button:focus {
+  outline: 3px solid var(--focus-color, #007bff);
+  outline-offset: 2px;
+  background-color: var(--nav-button-focus-bg, #e3f2fd);
+}
+
+.nav-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Active navigation button */
+.nav-button--active {
+  background-color: var(--nav-button-active-bg, #007bff);
+  border-color: var(--nav-button-active-border, #0056b3);
+  color: var(--nav-button-active-color, #ffffff);
+  font-weight: 600;
+}
+
+.nav-button--active:hover {
+  background-color: var(--nav-button-active-hover-bg, #0056b3);
+  border-color: var(--nav-button-active-hover-border, #004085);
+}
+
+/* Navigation button text */
+.nav-button-text {
+  font-size: 1rem;
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
+}
+
+/* Keyboard shortcut display */
+.nav-button-shortcut {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  font-weight: 400;
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.nav-button--active .nav-button-shortcut {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Navigation help */
+.nav-help {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background-color: var(--nav-help-bg, #f8f9fa);
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--nav-help-color, #6c757d);
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .nav-list {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .nav-button {
+    width: 100%;
+    min-width: unset;
+    justify-content: flex-start;
+    text-align: left;
+  }
+  
+  .breadcrumb-list {
+    font-size: 0.75rem;
+  }
+  
+  .breadcrumb-link,
+  .breadcrumb-current {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-navigation {
+    padding: 0.5rem;
+  }
+  
+  .nav-button {
+    min-height: 48px; /* Slightly larger for mobile */
+    padding: 1rem;
+  }
+  
+  .nav-button-text {
+    font-size: 1.1rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .nav-button {
+    border-width: 3px;
+  }
+  
+  .nav-button:focus {
+    outline-width: 4px;
+  }
+  
+  .nav-button--active {
+    border-width: 4px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .nav-button {
+    transition: none;
+  }
+  
+  .nav-button:hover {
+    transform: none;
+  }
+  
+  .nav-button:active {
+    transform: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .main-navigation-container {
+    --nav-bg-color: #1a1a1a;
+    --nav-border-color: #404040;
+    --breadcrumb-bg-color: #2d2d2d;
+    --breadcrumb-border-color: #404040;
+    --breadcrumb-link-color: #66b3ff;
+    --breadcrumb-link-hover-bg: #1a365d;
+    --breadcrumb-separator-color: #a0a0a0;
+    --breadcrumb-current-color: #a0a0a0;
+    --nav-button-bg: #2d2d2d;
+    --nav-button-border: #404040;
+    --nav-button-color: #ffffff;
+    --nav-button-hover-bg: #404040;
+    --nav-button-hover-border: #66b3ff;
+    --nav-button-focus-bg: #1a365d;
+    --nav-button-active-bg: #0066cc;
+    --nav-button-active-border: #004499;
+    --nav-button-active-color: #ffffff;
+    --nav-button-active-hover-bg: #004499;
+    --nav-button-active-hover-border: #003366;
+    --nav-help-bg: #2d2d2d;
+    --nav-help-color: #a0a0a0;
+    --focus-color: #66b3ff;
+  }
+}
