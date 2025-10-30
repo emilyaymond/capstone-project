@@ -1,70 +1,76 @@
-# Getting Started with Create React App
+# HealthVis - Accessible Health Data Visualization
+
+**Capstone Project: Making Health Data Visualization Accessible to All Users**
+
+HealthVis is a React-based web application designed to make health data visualization accessible to users with varying visual abilities, particularly blind and visually impaired users. The application provides multiple interaction modes including visual, audio-focused, hybrid, and simplified interfaces.
+
+## Features
+
+- **Multi-Modal Interface**: Visual, audio, hybrid, and simplified interaction modes
+- **Comprehensive Accessibility**: Screen reader support, keyboard navigation, and ARIA compliance
+- **Data Sonification**: Audio representation of health data trends
+- **Progressive Disclosure**: Information presented in digestible layers
+- **Persistent Preferences**: User accessibility settings saved across sessions
+
+## Getting Started
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Available Scripts
+### Prerequisites
+
+- Node.js (version 14 or higher)
+- npm or yarn
+
+### Installation
+
+```bash
+npm install
+```
+
+### Available Scripts
 
 In the project directory, you can run:
 
-### `npm start`
+#### `npm start`
 
-Runs the app in the development mode.\
+Runs the app in development mode.\
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 The page will reload when you make changes.\
 You may also see any lint errors in the console.
 
-### `npm test`
+#### `npm test`
 
-Launches the test runner in the interactive watch mode.\
+Launches the test runner in interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `npm run build`
+#### `npm run build`
 
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Project Structure
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- `src/components/` - React components including accessibility-focused chart components
+- `src/contexts/` - React contexts for accessibility and application state
+- `src/hooks/` - Custom hooks for keyboard navigation and accessibility features  
+- `src/services/` - Services for audio feedback, data processing, and mock data
+- `src/styles/` - CSS modules and styling
 
-### `npm run eject`
+## Accessibility Features
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- **Screen Reader Support**: Full ARIA labeling and live regions
+- **Keyboard Navigation**: Complete keyboard-only navigation support
+- **Audio Feedback**: Data sonification and voice descriptions
+- **High Contrast**: Visual accessibility options
+- **Customizable Interface**: User-configurable accessibility preferences
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Development Status
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+This project is currently in active development. See `HealthVis_Codebase_Analysis.md` for detailed information about current implementation status and development roadmap.
 
 ## Learn More
 
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
