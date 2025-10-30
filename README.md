@@ -65,9 +65,6 @@ It correctly bundles React in production mode and optimizes the build for the be
 - **High Contrast**: Visual accessibility options
 - **Customizable Interface**: User-configurable accessibility preferences
 
-## Development Status
-
-This project is currently in active development. See `HealthVis_Codebase_Analysis.md` for detailed information about current implementation status and development roadmap.
 
 ## Learn More
 
