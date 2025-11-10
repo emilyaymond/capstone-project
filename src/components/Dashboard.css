@@ -1,0 +1,46 @@
+.dashboard h2 {
+  margin-bottom: 1.5rem;
+  color: #212529;
+}
+
+.visualization-placeholder {
+  border: 2px dashed #6c757d;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  background-color: #f8f9fa;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.visualization-placeholder:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+  border-color: #007bff;
+}
+
+.visualization-placeholder h3 {
+  margin-top: 0;
+  color: #495057;
+}
+
+.visualization-placeholder ul {
+  text-align: left;
+  max-width: 500px;
+  margin: 1rem auto;
+}
+
+.visualization-placeholder #viz-placeholder-features {
+  margin: 1.5rem 0;
+}
+
+.status-message {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  font-style: italic;
+  border-left: 4px solid #007bff;
+}
