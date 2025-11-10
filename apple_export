@@ -25,39 +25,48 @@ for type_value in types_set:
 
 records = []
 
-for record in root.findall(".//Record[@type='HKQuantityTypeIdentifierBasalEnergyBurned']"):
-    records.append({
-        'start_date': record.get('startDate'),
-        'end_date': record.get('endDate'),
-        'value': record.get('value'),
-        'unit': record.get('unit'),
+# for record in root.findall(".//Record[@type='HKQuantityTypeIdentifierBasalEnergyBurned']"):
+#     records.append({
+#         'start_date': record.get('startDate'),
+#         'end_date': record.get('endDate'),
+#         'value': record.get('value'),
+#         'unit': record.get('unit'),
+#     })
+
+# print(records[:1])
+
+heart_rate_records = []
+
+for record in root.findall(".//Record[@type='HKQuantityTypeIdentifierHeartRate']"):
+    value = record.get('value')
+    start_date = record.get('startDate')
+
+    # Convert the date string to a datetime object
+    try:
+        dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S %z")
+    except ValueError:
+        continue
+
+    heart_rate_records.append({
+        'datetime': dt,
+        'heart_rate': float(value)
     })
 
-print(records[:1])
+# Sort records by time
+heart_rate_records.sort(key=lambda x: x['datetime'])
 
-for record in root.findall(".//Record[@type='HKQuantityTypeIdentifierStepCount']"):
-    start_date = record.get('startDate')
-    value = int(record.get('value'))
-    date_obj = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S %z')
-    records.append((date_obj, value))
+# --- Plot the heart rate data ---
+if heart_rate_records:
+    dates = [r['datetime'] for r in heart_rate_records]
+    values = [r['heart_rate'] for r in heart_rate_records]
 
-records.sort(key=lambda x: x[0])
-
-dates = []
-cumulative_steps = []
-total_steps = 0
-
-for record in records:
-    date, steps = record
-    total_steps += steps
-    dates.append(date)
-    cumulative_steps.append(total_steps)
-
-plt.figure(figsize=(10, 6))
-plt.plot(dates, cumulative_steps, linestyle='-', color='blue')
-plt.xlabel('Date')
-plt.ylabel('Cumulative Step Count')
-plt.title('Cumulative Daily Step Count')
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+    plt.figure(figsize=(12, 6))
+    plt.plot(dates, values, color='red', linewidth=0.8)
+    plt.title("Heart Rate Over Time (Apple Health Data)")
+    plt.xlabel("Date")
+    plt.ylabel("Heart Rate (BPM)")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("No heart rate data found.")      
