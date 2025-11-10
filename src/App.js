@@ -1,279 +1,243 @@
-import React, { useState, useEffect } from 'react';
-import { AccessibilityProvider, useAccessibility } from './contexts/AccessibilityContext';
-import { useScreenReader } from './hooks/useScreenReader';
-import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
-import { useAudioFeedback } from './hooks/useAudioFeedback';
+import { useState, useEffect, useCallback } from 'react';
+import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
+import { useKeyboard } from './hooks/useKeyboard';
+import { useAudio } from './hooks/useAudio';
+import { useModeSpecificBehavior } from './hooks/useModeSpecificBehavior';
 
 // Components
+import Layout from './components/Layout';
+import Navigation from './components/Navigation';
+import ModeSelector from './components/ModeSelector';
+import Dashboard from './components/Dashboard';
+import DataInput from './components/DataInput';
+import Settings from './components/Settings';
 import ErrorBoundary from './components/ErrorBoundary';
-import AppLayout from './components/AppLayout';
-import NotificationSystem from './components/NotificationSystem';
-import ModeOptimizedWrapper from './components/ModeOptimizedWrapper';
-import AccessibilityModeSelector from './components/AccessibilityModeSelector';
-import SettingsPanel from './components/SettingsPanel';
-import AccessibleChart from './components/AccessibleChart';
-import DataSummary from './components/DataSummary';
-import ProgressiveDisclosure from './components/ProgressiveDisclosure';
-import LoadingIndicator from './components/LoadingIndicator';
-
-// Services
-import { MockDataService } from './services/MockDataService';
+import { ErrorFeedback, SuccessFeedback, LoadingFeedback } from './components/UserFeedback';
+import ScreenReaderAnnouncements, { useScreenReaderAnnouncements } from './components/ScreenReaderAnnouncements';
 
 import './App.css';
 
 // Main app content component
 function AppContent() {
-  const { announcePolite } = useScreenReader();
-  const { registerKeyboardShortcuts } = useKeyboardNavigation();
-  const { playSuccessSound, playErrorSound } = useAudioFeedback();
-  const { mode, modeFeatures, updatePreferences } = useAccessibility();
+  const { mode, setMode, settings, updateSettings, error, clearError, isLoading } = useAccessibility();
+  const { registerShortcuts, announceToScreenReader } = useKeyboard();
+  const { playSuccessSound, playClickSound, playModeChangeSound, playEnhancedFeedback } = useAudio();
+  const { getModeSpecificClasses } = useModeSpecificBehavior();
+  const { 
+    announceNavigation, 
+    announceModeChange, 
+    announceSettingsChange, 
+    announceSuccess, 
+    announceError,
+    announceLoading 
+  } = useScreenReaderAnnouncements();
 
   // Application state
-  const [currentSection, setCurrentSection] = useState('dashboard');
-  const [showSettings, setShowSettings] = useState(false);
-  const [healthData, setHealthData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [breadcrumbs, setBreadcrumbs] = useState([]);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [feedbackMessage, setFeedbackMessage] = useState(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-  // Load initial data
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const data = await MockDataService.generateHealthData('vitals', 30);
-        setHealthData(data);
-        playSuccessSound();
-        announcePolite('Health data loaded successfully');
-      } catch (error) {
-        console.error('Failed to load health data:', error);
-        playErrorSound();
-        announcePolite('Failed to load health data. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
+  // Handle navigation with enhanced feedback
+  const handleNavigation = useCallback((pageId) => {
+    setCurrentPage(pageId);
+    
+    // Enhanced navigation feedback
+    if (settings.audioEnabled || mode === 'audio' || mode === 'hybrid') {
+      playEnhancedFeedback('navigation', mode);
+    } else {
+      playClickSound();
+    }
+    
+    // Enhanced screen reader announcement
+    const pageNames = {
+      'dashboard': 'Dashboard',
+      'data-input': 'Data Input',
+      'settings': 'Settings'
     };
+    const pageName = pageNames[pageId] || pageId.replace('-', ' ');
+    const context = pageId === 'settings' ? 'Customize your accessibility preferences here' : 
+                   pageId === 'data-input' ? 'Data entry features coming soon' :
+                   'View your health data visualization';
+    
+    announceNavigation(pageName, context);
+  }, [settings.audioEnabled, mode, playEnhancedFeedback, playClickSound, announceNavigation]);
 
-    loadData();
-  }, [announcePolite, playSuccessSound, playErrorSound]);
-
-  // Register global keyboard shortcuts
+  // Register keyboard shortcuts
   useEffect(() => {
     const shortcuts = {
       'Alt+1': () => handleNavigation('dashboard'),
       'Alt+2': () => handleNavigation('data-input'),
       'Alt+3': () => handleNavigation('settings'),
-      'Alt+4': () => handleNavigation('help'),
-      'Ctrl+,': () => setShowSettings(true),
-      'Escape': () => setShowSettings(false)
+      'Escape': () => setCurrentPage('dashboard')
     };
 
-    registerKeyboardShortcuts(shortcuts);
-  }, [registerKeyboardShortcuts]);
+    const cleanup = registerShortcuts(shortcuts);
+    return cleanup;
+  }, [registerShortcuts, handleNavigation]);
 
-  // Announce app load to screen readers
+  // Announce app load with comprehensive information
   useEffect(() => {
-    announcePolite(`HealthVis application loaded in ${mode} mode. Navigate using tab key or screen reader commands.`);
-  }, [announcePolite, mode]);
+    const welcomeMessage = `HealthVis application loaded in ${mode} mode. Use tab key to navigate between sections. Press Alt+1 for dashboard, Alt+2 for data input, Alt+3 for settings, or Escape to return to dashboard.`;
+    announceToScreenReader(welcomeMessage);
+    
+    // Also announce available features
+    setTimeout(() => {
+      announceSuccess('Application ready', 'All accessibility features are active and ready to use');
+    }, 1000);
+  }, [announceToScreenReader, announceSuccess, mode]);
 
-  // Handle navigation between sections
-  const handleNavigation = (sectionId, item) => {
-    setCurrentSection(sectionId);
-    
-    // Update breadcrumbs based on section
-    const sectionBreadcrumbs = {
-      'dashboard': [
-        { id: 'home', label: 'Home' },
-        { id: 'dashboard', label: 'Dashboard' }
-      ],
-      'data-input': [
-        { id: 'home', label: 'Home' },
-        { id: 'data-input', label: 'Data Input' }
-      ],
-      'settings': [
-        { id: 'home', label: 'Home' },
-        { id: 'settings', label: 'Settings' }
-      ],
-      'help': [
-        { id: 'home', label: 'Home' },
-        { id: 'help', label: 'Help' }
-      ]
-    };
-    
-    setBreadcrumbs(sectionBreadcrumbs[sectionId] || []);
-    
-    // Announce navigation
-    if (item) {
-      announcePolite(`Navigated to ${item.label}. ${item.description || ''}`);
+  // Handle mode changes with enhanced feedback
+  const handleModeChange = useCallback((newMode) => {
+    try {
+      announceLoading(`Switching to ${newMode} mode`, true);
+      
+      setMode(newMode);
+      
+      // Enhanced audio feedback based on mode
+      if (settings.audioEnabled || newMode === 'audio') {
+        playModeChangeSound(newMode);
+      } else {
+        playSuccessSound();
+      }
+      
+      // Enhanced screen reader announcement with mode description
+      const modeDescriptions = {
+        'visual': 'Standard visual interface with full color and styling',
+        'audio': 'Enhanced audio feedback and screen reader support with simplified visuals',
+        'hybrid': 'Combination of visual and audio features for flexible interaction',
+        'simplified': 'Minimal complexity with larger elements and high contrast'
+      };
+      
+      announceModeChange(newMode, modeDescriptions[newMode]);
+      announceSuccess('Mode change', `Now using ${newMode} mode for optimal accessibility`);
+      
+      // Show success feedback
+      setFeedbackMessage(`Successfully switched to ${newMode} mode`);
+      setShowSuccessMessage(true);
+      
+    } catch (err) {
+      console.error('Failed to change mode:', err);
+      announceError('Mode change', 'Unable to switch accessibility mode', 'Please try again or refresh the page');
     }
-  };
+  }, [setMode, settings.audioEnabled, playModeChangeSound, playSuccessSound, announceModeChange, announceSuccess, announceError, announceLoading]);
 
-  // Handle settings panel
-  const handleSettingsToggle = () => {
-    setShowSettings(!showSettings);
-    announcePolite(showSettings ? 'Settings panel closed' : 'Settings panel opened');
-  };
-
-  const handlePreferencesChange = (newPreferences) => {
-    updatePreferences(newPreferences);
-    announcePolite('Accessibility preferences updated');
-    playSuccessSound();
-  };
-
-  // Render main content based on current section
-  const renderMainContent = () => {
-    if (isLoading) {
-      return (
-        <LoadingIndicator 
-          message="Loading health data visualization..."
-          showProgress={true}
-        />
-      );
+  // Handle settings changes with enhanced feedback
+  const handleSettingsChange = useCallback((newSettings) => {
+    try {
+      announceLoading('Saving settings', true);
+      
+      updateSettings(newSettings);
+      
+      // Enhanced feedback for settings changes
+      if (newSettings.audioEnabled || mode === 'audio' || mode === 'hybrid') {
+        playEnhancedFeedback('settings-change', mode);
+      } else {
+        playSuccessSound();
+      }
+      
+      // Detailed announcements for specific setting changes
+      const changedSettings = [];
+      if (newSettings.fontSize !== settings.fontSize) {
+        changedSettings.push(`Font size: ${newSettings.fontSize}`);
+      }
+      if (newSettings.contrast !== settings.contrast) {
+        changedSettings.push(`Contrast: ${newSettings.contrast}`);
+      }
+      if (newSettings.audioEnabled !== settings.audioEnabled) {
+        changedSettings.push(`Audio feedback: ${newSettings.audioEnabled ? 'enabled' : 'disabled'}`);
+      }
+      
+      if (changedSettings.length > 0) {
+        announceSettingsChange('Settings updated', changedSettings.join(', '), 'Changes applied immediately');
+      }
+      
+      announceSuccess('Settings saved', 'Your accessibility preferences have been updated and saved');
+      
+      // Show success feedback
+      setFeedbackMessage('Settings saved successfully');
+      setShowSuccessMessage(true);
+      
+    } catch (err) {
+      console.error('Failed to update settings:', err);
+      announceError('Settings save', 'Unable to save your preferences', 'Please try again or check your browser settings');
     }
+  }, [updateSettings, mode, settings, playEnhancedFeedback, playSuccessSound, announceSettingsChange, announceSuccess, announceError, announceLoading]);
 
-    switch (currentSection) {
+  // Render current page content
+  const renderPageContent = () => {
+    switch (currentPage) {
       case 'dashboard':
         return (
-          <div className="dashboard-content">
-            <h2 id="dashboard-heading">Health Data Dashboard</h2>
-            
-            {/* Mode selector for accessibility */}
-            <section aria-labelledby="mode-selector-heading" className="mode-selector-section">
-              <AccessibilityModeSelector />
-            </section>
-
-            {/* Progressive disclosure of health data */}
-            <section aria-labelledby="health-data-heading" className="health-data-section">
-              <ProgressiveDisclosure
-                title="Your Health Data"
-                data={{
-                  summary: {
-                    title: 'Health Overview',
-                    content: <DataSummary data={healthData} />
-                  },
-                  detailed: {
-                    title: 'Detailed Charts',
-                    content: (
-                      <AccessibleChart
-                        data={healthData}
-                        chartType="line"
-                        title="Health Trends Over Time"
-                        description="Your vital signs and health metrics over the past 30 days"
-                      />
-                    )
-                  }
-                }}
-                currentLevel={modeFeatures.progressiveDisclosure ? 0 : 1}
-              />
-            </section>
-          </div>
+          <>
+            <ModeSelector currentMode={mode} onModeChange={handleModeChange} />
+            <Dashboard />
+          </>
         );
-
       case 'data-input':
-        return (
-          <div className="data-input-content">
-            <h2 id="data-input-heading">Health Data Input</h2>
-            <p>Enter new health data or upload from your devices.</p>
-            {/* Data input components would go here */}
-          </div>
-        );
-
+        return <DataInput />;
       case 'settings':
-        return (
-          <div className="settings-content">
-            <h2 id="settings-heading">Application Settings</h2>
-            <SettingsPanel
-              onPreferencesChange={handlePreferencesChange}
-              onClose={() => setCurrentSection('dashboard')}
-            />
-          </div>
-        );
-
-      case 'help':
-        return (
-          <div className="help-content">
-            <h2 id="help-heading">Help & Documentation</h2>
-            <section aria-labelledby="keyboard-shortcuts-heading">
-              <h3 id="keyboard-shortcuts-heading">Keyboard Shortcuts</h3>
-              <ul>
-                <li><kbd>Alt+1</kbd> - Navigate to Dashboard</li>
-                <li><kbd>Alt+2</kbd> - Navigate to Data Input</li>
-                <li><kbd>Alt+3</kbd> - Navigate to Settings</li>
-                <li><kbd>Alt+4</kbd> - Navigate to Help</li>
-                <li><kbd>Ctrl+,</kbd> - Open Settings Panel</li>
-                <li><kbd>Escape</kbd> - Close Settings Panel</li>
-              </ul>
-            </section>
-            
-            <section aria-labelledby="accessibility-features-heading">
-              <h3 id="accessibility-features-heading">Accessibility Features</h3>
-              <ul>
-                <li>Screen reader support with ARIA labels</li>
-                <li>Keyboard navigation for all functionality</li>
-                <li>Audio feedback and data sonification</li>
-                <li>Customizable visual settings</li>
-                <li>Progressive disclosure for complex data</li>
-                <li>Multiple accessibility modes</li>
-              </ul>
-            </section>
-          </div>
-        );
-
+        return <Settings settings={settings} onSettingsChange={handleSettingsChange} />;
       default:
-        return (
-          <div className="default-content">
-            <h2>Welcome to HealthVis</h2>
-            <p>Select a section from the navigation to get started.</p>
-          </div>
-        );
+        return <Dashboard />;
     }
   };
 
   return (
-    <ModeOptimizedWrapper className="app-wrapper">
-      <AppLayout
-        currentSection={currentSection}
-        onNavigate={handleNavigation}
-        breadcrumbs={breadcrumbs}
-        className={`app-mode-${mode}`}
-      >
-        {renderMainContent()}
-      </AppLayout>
+    <div className={getModeSpecificClasses(`app app-mode-${mode}`)}>
+      <Layout currentPage={currentPage}>
+        <Navigation currentPage={currentPage} onNavigate={handleNavigation} />
+        {renderPageContent()}
+      </Layout>
 
-      {/* Settings Panel Overlay */}
-      {showSettings && (
-        <div className="settings-overlay" role="dialog" aria-modal="true">
-          <SettingsPanel
-            onPreferencesChange={handlePreferencesChange}
-            onClose={() => setShowSettings(false)}
-          />
-        </div>
-      )}
-
-      {/* Global Notification System */}
-      <NotificationSystem />
-
-      {/* Screen Reader Live Region for Dynamic Announcements */}
-      <div
-        id="sr-live-region"
-        className="sr-only"
-        aria-live="polite"
-        aria-atomic="true"
-        role="status"
+      {/* User Feedback Messages */}
+      <LoadingFeedback 
+        message="Updating accessibility settings..."
+        isVisible={isLoading}
+      />
+      
+      <SuccessFeedback
+        message={feedbackMessage}
+        isVisible={showSuccessMessage}
+        onDismiss={() => setShowSuccessMessage(false)}
+      />
+      
+      <ErrorFeedback
+        message={error?.message}
+        isVisible={!!error}
+        onDismiss={clearError}
+        actionButton={
+          error?.type === 'mode-change' ? (
+            <button 
+              onClick={() => {
+                clearError();
+                handleModeChange('visual');
+              }}
+              className="error-action-button"
+            >
+              Switch to Visual Mode
+            </button>
+          ) : null
+        }
       />
 
-      {/* Assertive Live Region for Critical Announcements */}
-      <div
-        id="sr-assertive-region"
-        className="sr-only"
-        aria-live="assertive"
-        aria-atomic="true"
-        role="alert"
-      />
-    </ModeOptimizedWrapper>
+      {/* Enhanced Screen Reader Announcements */}
+      <ScreenReaderAnnouncements />
+
+      {/* Mode-Specific Helper Text */}
+      <div id="audio-mode-help" className="sr-only">
+        Audio mode active. Enhanced audio feedback enabled for all interactions.
+      </div>
+      <div id="simplified-mode-help" className="sr-only">
+        Simplified mode active. Interface uses larger buttons and clearer layouts.
+      </div>
+      <div id="simplified-mode-description" className="sr-only">
+        This element has been optimized for simplified interaction with larger touch targets.
+      </div>
+    </div>
   );
 }
 
-// Main App component with error boundary and accessibility provider
+// Main App component with accessibility provider and error boundary
 function App() {
   return (
     <ErrorBoundary>
