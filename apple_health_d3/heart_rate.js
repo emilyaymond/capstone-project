@@ -13,7 +13,7 @@ function movingAverage(data, windowSize = 40) {
 
 //------------------------------------------------------------
 // ✅ Load data
-d3.csv("data/HeartRate.csv").then(raw => {
+d3.csv("data/RestingHeartRate.csv").then(raw => {
 
   const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
 
