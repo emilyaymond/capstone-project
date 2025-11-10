@@ -1,0 +1,50 @@
+import xml.etree.ElementTree as ET
+import csv
+import os
+from collections import defaultdict
+
+# --- 1️⃣ Load the Apple Health export ---
+xml_path = "/Users/madelinedavis/Library/Mobile Documents/com~apple~CloudDocs/Desktop/apple_health_export 4/export.xml"
+tree = ET.parse(xml_path)
+root = tree.getroot()
+
+# --- 2️⃣ Automatically detect all heart-related types ---
+heart_rate_records = [r for r in root.findall(".//Record") if "HeartRate" in (r.get("type") or "")]
+heart_rate_types = sorted(set(r.get("type") for r in heart_rate_records))
+
+print("📋 Found the following heart-related record types:")
+for t in heart_rate_types:
+    print("  -", t)
+
+# --- 3️⃣ Group by type and collect all attribute keys dynamically ---
+records_by_type = defaultdict(list)
+all_keys_by_type = defaultdict(set)
+
+for record in heart_rate_records:
+    record_type = record.get("type")
+    attribs = record.attrib
+    for k in attribs.keys():
+        all_keys_by_type[record_type].add(k)
+    records_by_type[record_type].append(attribs)
+
+# --- 4️⃣ Create output folder ---
+output_dir = "/Users/madelinedavis/Library/Mobile Documents/com~apple~CloudDocs/Desktop/capstone/apple_health_d3/data/"
+
+os.makedirs(output_dir, exist_ok=True)
+
+# --- 5️⃣ Write each heart rate type to a separate CSV ---
+for record_type, records in records_by_type.items():
+    # Build dynamic header list
+    fieldnames = sorted(all_keys_by_type[record_type])
+    filename = record_type.replace("HKQuantityTypeIdentifier", "") + ".csv"
+    csv_path = os.path.join(output_dir, filename)
+
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(records)
+
+    print(f"✅ Saved {len(records)} rows with {len(fieldnames)} columns → {csv_path}")
+
+print("\n🎉 Export complete! All heart-rate–related data (with every column) are saved separately.")
+

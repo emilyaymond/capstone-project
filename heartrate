@@ -1,0 +1,31 @@
+import xml.etree.ElementTree as ET
+import csv
+
+xml_path = "/Users/madelinedavis/Library/Mobile Documents/com~apple~CloudDocs/Desktop/apple_health_export 4/export.xml"
+tree = ET.parse(xml_path)
+root = tree.getroot()
+
+records = []
+
+for record in root.findall(".//Record[@type='HKQuantityTypeIdentifierHeartRate']"):
+    records.append({
+        'type': record.get('type'),
+        'sourceName': record.get('sourceName'),
+        'sourceVersion': record.get('sourceVersion'),
+        'device': record.get('device'),
+        'unit': record.get('unit'),
+        'creationDate': record.get('creationDate'),
+        'startDate': record.get('startDate'),
+        'endDate': record.get('endDate'),
+        'value': record.get('value'),
+    })
+
+csv_path = "/Users/madelinedavis/Library/Mobile Documents/com~apple~CloudDocs/Desktop/heart_rate_data_full.csv"
+
+with open(csv_path, 'w', newline='') as file:
+    writer = csv.DictWriter(file, fieldnames=records[0].keys())
+    writer.writeheader()
+    writer.writerows(records)
+
+print(f"✅ Full heart rate dataset exported to {csv_path}")
+
