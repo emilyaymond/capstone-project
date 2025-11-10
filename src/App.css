@@ -1,181 +1,510 @@
-/* Base application styles with accessibility focus */
-.App {
-  text-align: left;
+/* Base App Styles */
+.app {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Skip links for keyboard navigation */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 6px;
-  background: #000;
-  color: #fff;
-  padding: 8px;
-  text-decoration: none;
-  border-radius: 0 0 4px 4px;
-  z-index: 1000;
-  font-weight: bold;
-}
-
-.skip-link:focus {
-  top: 0;
-}
-
-/* Header styles */
-.App-header {
-  background-color: #282c34;
-  padding: 20px;
-  color: white;
-  text-align: center;
-}
-
-.App-header h1 {
-  margin: 0 0 10px 0;
-  font-size: 2rem;
-}
-
-.App-header p {
-  margin: 0;
-  font-size: 1.1rem;
-  opacity: 0.9;
-}
-
-/* Navigation styles */
-nav {
-  background-color: #f5f5f5;
-  padding: 15px 20px;
-  border-bottom: 2px solid #ddd;
-}
-
-nav ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 20px;
-}
-
-nav li {
-  margin: 0;
-}
-
-nav a {
-  color: #333;
-  text-decoration: none;
-  padding: 10px 15px;
-  border-radius: 4px;
-  font-weight: 500;
-  min-height: 44px;
-  /* Minimum touch target size */
-  display: inline-block;
-  line-height: 24px;
-}
-
-nav a:hover,
-nav a:focus {
-  background-color: #007cba;
-  color: white;
-  outline: 2px solid #005a87;
-  outline-offset: 2px;
-}
-
-/* Main content area */
-.App-main {
-  flex: 1;
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.App-main section {
-  margin-bottom: 30px;
-}
-
-.App-main h2 {
-  color: #333;
-  margin-bottom: 15px;
-  font-size: 1.5rem;
-}
-
-.App-main p {
-  line-height: 1.6;
-  color: #555;
-  max-width: 70ch;
-  /* Optimal reading width */
-}
-
-/* Footer styles */
-.App-footer {
-  background-color: #f8f9fa;
-  padding: 20px;
-  text-align: center;
-  border-top: 1px solid #ddd;
-  margin-top: auto;
-}
-
-.App-footer p {
-  margin: 0;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-/* Focus indicators for accessibility */
-*:focus {
-  outline: 2px solid #007cba;
-  outline-offset: 2px;
-}
-
-/* Screen reader only content */
+/* Screen Reader Only Content */
 .sr-only {
   position: absolute;
-  left: -10000px;
   width: 1px;
   height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* High contrast mode support */
-@media (prefers-contrast: high) {
+/* Font Size Variations with Mode-Specific Scaling */
+.font-small {
+  font-size: 14px;
+}
 
-  nav a:hover,
-  nav a:focus {
-    outline: 3px solid;
+.font-medium {
+  font-size: 16px;
+}
+
+.font-large {
+  font-size: 18px;
+}
+
+/* Enhanced font scaling for different modes */
+.app-mode-audio.font-small {
+  font-size: 15px;
+}
+
+.app-mode-audio.font-medium {
+  font-size: 17px;
+}
+
+.app-mode-audio.font-large {
+  font-size: 20px;
+}
+
+.app-mode-simplified.font-small {
+  font-size: 16px;
+}
+
+.app-mode-simplified.font-medium {
+  font-size: 18px;
+}
+
+.app-mode-simplified.font-large {
+  font-size: 22px;
+}
+
+/* Button and input scaling with font sizes */
+.font-large button,
+.font-large input,
+.font-large select {
+  font-size: 1.1em;
+  padding: 1rem 1.75rem;
+}
+
+.app-mode-simplified.font-large button,
+.app-mode-simplified.font-large input,
+.app-mode-simplified.font-large select {
+  font-size: 1.3em;
+  padding: 1.5rem 2.25rem;
+  min-height: 60px;
+}
+
+/* Contrast Variations with Mode-Specific Enhancements */
+.contrast-normal {
+  background-color: #ffffff;
+  color: #212529;
+}
+
+.contrast-high {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.contrast-high button {
+  background-color: #ffffff;
+  color: #000000;
+  border: 2px solid #ffffff;
+}
+
+.contrast-high button:hover {
+  background-color: #f0f0f0;
+}
+
+.contrast-high button:focus {
+  outline: 3px solid #ffff00;
+  outline-offset: 2px;
+}
+
+/* High contrast mode-specific adjustments */
+.app-mode-audio.contrast-high button {
+  background-color: #ffff00;
+  color: #000000;
+  border: 3px solid #ffffff;
+}
+
+.app-mode-simplified.contrast-high button {
+  background-color: #ffffff;
+  color: #000000;
+  border: 4px solid #ffff00;
+}
+
+.app-mode-simplified.contrast-high button:focus {
+  outline: 4px solid #ffff00;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px rgba(255, 255, 0, 0.3);
+}
+
+/* High contrast text and backgrounds */
+.contrast-high h1,
+.contrast-high h2,
+.contrast-high h3,
+.contrast-high h4,
+.contrast-high h5,
+.contrast-high h6 {
+  color: #ffffff;
+}
+
+.contrast-high .visualization-placeholder,
+.contrast-high .input-placeholder {
+  background-color: #333333;
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.contrast-high .settings-section,
+.contrast-high .mode-selector {
+  background-color: #111111;
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+/* Mode-Specific Styles */
+
+/* Visual Mode - Standard visual interface with full styling */
+.app-mode-visual {
+  --primary-color: #007bff;
+  --secondary-color: #6c757d;
+  --success-color: #28a745;
+  --warning-color: #ffc107;
+  --danger-color: #dc3545;
+  --info-color: #17a2b8;
+  --button-padding: 0.75rem 1.5rem;
+  --button-font-size: 1rem;
+  --button-min-height: 44px;
+  --spacing-unit: 1rem;
+}
+
+.app-mode-visual button,
+.app-mode-visual input,
+.app-mode-visual select {
+  min-height: var(--button-min-height);
+  padding: var(--button-padding);
+  font-size: var(--button-font-size);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.app-mode-visual button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Audio Mode - Enhanced for screen reader and audio users */
+.app-mode-audio {
+  --primary-color: #ffc107;
+  --secondary-color: #495057;
+  --button-padding: 1rem 2rem;
+  --button-font-size: 1.1rem;
+  --button-min-height: 48px;
+  --spacing-unit: 1.25rem;
+}
+
+.app-mode-audio button,
+.app-mode-audio input,
+.app-mode-audio select {
+  min-height: var(--button-min-height);
+  min-width: var(--button-min-height);
+  padding: var(--button-padding);
+  font-size: var(--button-font-size);
+  font-weight: 600;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  background-color: var(--primary-color);
+  color: #000;
+}
+
+.app-mode-audio button:focus,
+.app-mode-audio input:focus,
+.app-mode-audio select:focus {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.3);
+}
+
+.app-mode-audio .main-navigation ul {
+  gap: var(--spacing-unit);
+}
+
+/* Hybrid Mode - Balanced visual and audio features */
+.app-mode-hybrid {
+  --primary-color: #17a2b8;
+  --secondary-color: #495057;
+  --button-padding: 0.875rem 1.75rem;
+  --button-font-size: 1.05rem;
+  --button-min-height: 46px;
+  --spacing-unit: 1.125rem;
+}
+
+.app-mode-hybrid button,
+.app-mode-hybrid input,
+.app-mode-hybrid select {
+  min-height: var(--button-min-height);
+  padding: var(--button-padding);
+  font-size: var(--button-font-size);
+  font-weight: 500;
+  border: 2px solid transparent;
+  border-radius: 5px;
+  background-color: var(--primary-color);
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.app-mode-hybrid button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.app-mode-hybrid button:focus,
+.app-mode-hybrid input:focus,
+.app-mode-hybrid select:focus {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-color: #fff;
+  box-shadow: 0 0 0 4px rgba(23, 162, 184, 0.3);
+}
+
+/* Simplified Mode - Large, clear interface elements */
+.app-mode-simplified {
+  --primary-color: #6f42c1;
+  --secondary-color: #495057;
+  --button-padding: 1.25rem 2rem;
+  --button-font-size: 1.2rem;
+  --button-min-height: 52px;
+  --spacing-unit: 1.5rem;
+}
+
+.app-mode-simplified button,
+.app-mode-simplified input,
+.app-mode-simplified select {
+  min-height: var(--button-min-height);
+  min-width: var(--button-min-height);
+  padding: var(--button-padding);
+  font-size: var(--button-font-size);
+  font-weight: 600;
+  border: 3px solid var(--primary-color);
+  border-radius: 8px;
+  background-color: var(--primary-color);
+  color: white;
+  letter-spacing: 0.5px;
+}
+
+.app-mode-simplified button:focus,
+.app-mode-simplified input:focus,
+.app-mode-simplified select:focus {
+  outline: 4px solid #000;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px rgba(111, 66, 193, 0.2);
+}
+
+.app-mode-simplified .main-navigation ul {
+  flex-direction: column;
+  gap: var(--spacing-unit);
+}
+
+.app-mode-simplified h1,
+.app-mode-simplified h2,
+.app-mode-simplified h3 {
+  font-size: 1.5em;
+  line-height: 1.3;
+  margin-bottom: var(--spacing-unit);
+}
+
+.app-mode-simplified p,
+.app-mode-simplified li {
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+/* Focus Indicators - Base */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[tabindex]:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+/* Mode-Specific Focus Indicators */
+.app-mode-visual button:focus,
+.app-mode-visual input:focus,
+.app-mode-visual select:focus,
+.app-mode-visual [tabindex]:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+}
+
+.app-mode-audio button:focus,
+.app-mode-audio input:focus,
+.app-mode-audio select:focus,
+.app-mode-audio [tabindex]:focus {
+  outline: 3px solid #000000;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.4);
+  border-color: #000000;
+}
+
+.app-mode-hybrid button:focus,
+.app-mode-hybrid input:focus,
+.app-mode-hybrid select:focus,
+.app-mode-hybrid [tabindex]:focus {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(23, 162, 184, 0.3);
+  border-color: #ffffff;
+}
+
+.app-mode-simplified button:focus,
+.app-mode-simplified input:focus,
+.app-mode-simplified select:focus,
+.app-mode-simplified [tabindex]:focus {
+  outline: 4px solid #000000;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px rgba(111, 66, 193, 0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .main-navigation ul {
+    flex-direction: column;
+    gap: 1rem;
   }
-
-  *:focus {
-    outline-width: 3px;
+  
+  .font-large {
+    font-size: 20px;
   }
 }
 
-/* Reduced motion support */
+/* Mode-Specific Focus Classes */
+.focus-visual:focus {
+  outline: 2px solid var(--primary-color, #007bff);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+}
+
+.focus-audio:focus {
+  outline: 3px solid #000000;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.4);
+  border-color: #000000 !important;
+}
+
+.focus-hybrid:focus {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(23, 162, 184, 0.3);
+  border-color: #ffffff !important;
+}
+
+.focus-simplified:focus {
+  outline: 4px solid #000000;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px rgba(111, 66, 193, 0.2);
+}
+
+/* Mode-Specific Interactive Element Enhancements */
+.app-mode-audio button:hover,
+.app-mode-audio input:hover,
+.app-mode-audio select:hover {
+  background-color: #e0a800;
+  transform: scale(1.02);
+  transition: all 0.1s ease;
+}
+
+.app-mode-hybrid button:hover,
+.app-mode-hybrid input:hover,
+.app-mode-hybrid select:hover {
+  background-color: #138496;
+  transform: translateY(-1px) scale(1.01);
+  transition: all 0.15s ease;
+}
+
+.app-mode-simplified button:hover,
+.app-mode-simplified input:hover,
+.app-mode-simplified select:hover {
+  background-color: #5a2d91;
+  transform: scale(1.03);
+  transition: all 0.2s ease;
+}
+
+/* Simplified Mode Interface Enhancements */
+.app-mode-simplified .settings-section,
+.app-mode-simplified .mode-selector,
+.app-mode-simplified .visualization-placeholder,
+.app-mode-simplified .input-placeholder {
+  padding: 2rem;
+  border-width: 3px;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.app-mode-simplified .radio-option,
+.app-mode-simplified .checkbox-option {
+  padding: 1.5rem;
+  border-width: 3px;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.app-mode-simplified .option-label {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.app-mode-simplified .option-description {
+  font-size: 1.1rem;
+  margin-left: 2.5rem;
+}
+
+/* Audio Mode Visual Simplifications */
+.app-mode-audio .visualization-placeholder,
+.app-mode-audio .input-placeholder {
+  border-style: solid;
+  border-width: 3px;
+  background-color: #fff8e1;
+}
+
+.app-mode-audio h1,
+.app-mode-audio h2,
+.app-mode-audio h3 {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Hybrid Mode Balanced Styling */
+.app-mode-hybrid button {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app-mode-hybrid .settings-section,
+.app-mode-hybrid .mode-selector {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  
+  .app-mode-audio button:hover,
+  .app-mode-hybrid button:hover,
+  .app-mode-simplified button:hover {
+    transform: none;
+  }
+}/* Error act
+ion button styling */
+.error-action-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  min-height: 36px;
+  transition: background-color 0.2s ease;
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  nav ul {
-    flex-direction: column;
-    gap: 10px;
-  }
+.error-action-button:hover {
+  background-color: #0056b3;
+}
 
-  .App-main {
-    padding: 15px;
-  }
+.error-action-button:focus {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
 
-  .App-header {
-    padding: 15px;
-  }
-
-  .App-header h1 {
-    font-size: 1.5rem;
-  }
+.error-action-button:active {
+  background-color: #004085;
 }

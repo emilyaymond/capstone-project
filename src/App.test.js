@@ -18,7 +18,7 @@ describe('App Component', () => {
     
     // Check for main landmarks
     expect(screen.getByRole('banner')).toBeInTheDocument(); // header
-    expect(screen.getByRole('navigation')).toBeInTheDocument(); // nav
+    expect(screen.getAllByRole('navigation')).toHaveLength(2); // header nav + main nav
     expect(screen.getByRole('main')).toBeInTheDocument(); // main
     expect(screen.getByRole('contentinfo')).toBeInTheDocument(); // footer
   });
@@ -27,33 +27,65 @@ describe('App Component', () => {
     render(<App />);
     
     const skipToMain = screen.getByText('Skip to main content');
-    const skipToNav = screen.getByText('Skip to navigation');
     
     expect(skipToMain).toBeInTheDocument();
-    expect(skipToNav).toBeInTheDocument();
     expect(skipToMain).toHaveAttribute('href', '#main-content');
-    expect(skipToNav).toHaveAttribute('href', '#navigation');
   });
 
   test('navigation has proper ARIA labels', () => {
     render(<App />);
     
-    const navigation = screen.getByRole('navigation');
-    expect(navigation).toHaveAttribute('aria-label', 'Main navigation');
+    const navigations = screen.getAllByRole('navigation');
+    expect(navigations).toHaveLength(2);
+    
+    // Check that we have both skip navigation and main navigation
+    expect(screen.getByRole('navigation', { name: 'Skip navigation' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
   });
 
   test('sections have proper headings and labels', () => {
     render(<App />);
     
-    // Check for section headings
-    expect(screen.getByRole('heading', { name: /welcome to healthvis/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /getting started/i })).toBeInTheDocument();
+    // Check for main headings in our simplified structure
+    expect(screen.getByRole('heading', { name: 'HealthVis', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Health Data Dashboard', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Data Visualization Area', level: 3 })).toBeInTheDocument();
     
-    // Check for proper heading hierarchy (h1, then h2s)
+    // Check for proper heading hierarchy (h1, then h2s, then h3s)
     const headings = screen.getAllByRole('heading');
     expect(headings[0]).toHaveProperty('tagName', 'H1');
     expect(headings[1]).toHaveProperty('tagName', 'H2');
-    expect(headings[2]).toHaveProperty('tagName', 'H2');
+    expect(headings[2]).toHaveProperty('tagName', 'H3');
+  });
+
+  test('accessibility mode selector is present', () => {
+    render(<App />);
+    
+    // Check for mode selector fieldset
+    expect(screen.getByRole('group', { name: 'Accessibility Mode' })).toBeInTheDocument();
+    
+    // Check for mode options
+    expect(screen.getByRole('radio', { name: /visual mode/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /audio mode/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /hybrid mode/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /simplified mode/i })).toBeInTheDocument();
+  });
+
+  test('navigation buttons have minimum touch target requirements', () => {
+    render(<App />);
+    
+    const navButtons = screen.getAllByRole('menuitem');
+    
+    // Check that navigation buttons exist and have proper attributes
+    navButtons.forEach(button => {
+      expect(button).toBeInTheDocument();
+      expect(button).toHaveAttribute('type', 'button');
+      expect(button).toHaveAttribute('title'); // Should have tooltip
+      expect(button).toHaveAttribute('aria-describedby'); // Should have description
+    });
+    
+    // Verify we have the expected navigation items
+    expect(navButtons).toHaveLength(3);
   });
 
   test('should not have accessibility violations', async () => {
@@ -62,24 +94,5 @@ describe('App Component', () => {
     await new Promise(resolve => setTimeout(resolve, 200));
     const results = await axe(container);
     expect(results).toHaveNoViolations();
-  });
-
-  test('navigation links have minimum touch target size', () => {
-    render(<App />);
-    
-    const navLinks = screen.getAllByRole('link');
-    const navigationLinks = navLinks.filter(link => 
-      link.textContent === 'Dashboard' || 
-      link.textContent === 'Data Input' || 
-      link.textContent === 'Settings'
-    );
-    
-    // In test environment, we check that the CSS class is applied
-    // The actual computed styles may not be available in jsdom
-    navigationLinks.forEach(link => {
-      expect(link).toBeInTheDocument();
-      // Check that the link has proper structure for accessibility
-      expect(link.getAttribute('href')).toBeTruthy();
-    });
   });
 });
