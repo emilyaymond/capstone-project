@@ -1,6 +1,6 @@
 # HealthVis - Accessible Health Data Visualization
 
-**Capstone Project: Making Health Data Visualization Accessible to All Users**
+**Capstone Project: Making Health Data Visualization Accessible to All**
 
 HealthVis is a React-based web application designed to make health data visualization accessible to users with varying visual abilities, particularly blind and visually impaired users. The application provides multiple interaction modes including visual, audio-focused, hybrid, and simplified interfaces.
 
