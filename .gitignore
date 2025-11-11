@@ -34,9 +34,10 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 
-# IDE
+# IDE and tool-specific folders
 .vscode/
 .idea/
+.kiro/
 *.swp
 *.swo
 
