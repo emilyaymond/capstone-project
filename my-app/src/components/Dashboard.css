@@ -3,6 +3,27 @@
   color: #212529;
 }
 
+.visualization-container {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.visualization-container h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #495057;
+  font-size: 1.25rem;
+}
+
+.visualization-container p {
+  color: #6c757d;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
 .visualization-placeholder {
   border: 2px dashed #6c757d;
   border-radius: 8px;
