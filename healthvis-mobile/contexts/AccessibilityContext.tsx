@@ -10,6 +10,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AccessibilityMode, AccessibilitySettings } from '../types';
 import { useStorage } from '../hooks/useStorage';
+import { announceModeChange, announceSettingsChange, announceError } from '../lib/announcer';
 
 // ============================================================================
 // Context Value Interface
@@ -184,6 +185,9 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       // Update state
       setModeState(newMode);
 
+      // Announce mode change to screen readers
+      announceModeChange(newMode);
+
       // Persist to storage (async, non-blocking)
       saveSettingsToStorage(newMode, settings);
 
@@ -192,6 +196,7 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
     } catch (err) {
       const errorMessage = err instanceof Error ? err : new Error('Failed to set mode');
       setError(errorMessage);
+      announceError('Failed to change accessibility mode');
       console.error('Error setting accessibility mode:', errorMessage);
     }
   };
@@ -214,6 +219,14 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       // Update state
       setSettingsState(validatedSettings);
 
+      // Announce each setting change to screen readers
+      Object.entries(partialSettings).forEach(([key, value]) => {
+        if (value !== undefined) {
+          const settingName = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+          announceSettingsChange(settingName, value);
+        }
+      });
+
       // Persist to storage (async, non-blocking)
       saveSettingsToStorage(mode, validatedSettings);
 
@@ -222,6 +235,7 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
     } catch (err) {
       const errorMessage = err instanceof Error ? err : new Error('Failed to update settings');
       setError(errorMessage);
+      announceError('Failed to update settings');
       console.error('Error updating accessibility settings:', errorMessage);
     }
   };
