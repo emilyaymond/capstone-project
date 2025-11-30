@@ -4,9 +4,41 @@ import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
+import { useAudio } from '@/hooks/useAudio';
+import { useHaptics } from '@/hooks/useHaptics';
+import { useSpeech } from '@/hooks/useSpeech';
+import { VitalSign } from '@/types';
 
 export default function ModalScreen() {
   const { mode, setMode, settings, updateSettings, isLoading, error } = useAccessibility();
+  const audio = useAudio();
+  const haptics = useHaptics();
+  const speech = useSpeech();
+
+  // Mock vital signs data for testing TTS
+  const mockVitals: VitalSign[] = [
+    {
+      type: 'heart_rate',
+      value: 72,
+      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+      unit: 'bpm',
+      range: 'normal',
+    },
+    {
+      type: 'glucose',
+      value: 95,
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+      unit: 'mg/dL',
+      range: 'normal',
+    },
+    {
+      type: 'steps',
+      value: 8500,
+      timestamp: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
+      unit: 'steps',
+      range: 'normal',
+    },
+  ];
 
   if (isLoading) {
     return (
@@ -123,6 +155,136 @@ export default function ModalScreen() {
               Haptics: {settings.hapticsEnabled ? 'ON' : 'OFF'}
             </ThemedText>
           </TouchableOpacity>
+        </View>
+
+        {/* Audio Testing */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>Test Audio Feedback</ThemedText>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => audio.playClickSound()}
+            >
+              <ThemedText style={styles.buttonText}>Click</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => audio.playSuccessSound()}
+            >
+              <ThemedText style={styles.buttonText}>Success</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => audio.playErrorSound()}
+            >
+              <ThemedText style={styles.buttonText}>Error</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => audio.playFocusSound()}
+            >
+              <ThemedText style={styles.buttonText}>Focus</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => audio.playModeChangeSound(mode)}
+            >
+              <ThemedText style={styles.buttonText}>Mode Sound</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => audio.playHoverSound()}
+            >
+              <ThemedText style={styles.buttonText}>Hover</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Haptic Testing */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Test Haptic Feedback {!haptics.isSupported && '(Not Supported)'}
+          </ThemedText>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => haptics.triggerLight()}
+            >
+              <ThemedText style={styles.buttonText}>Light</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => haptics.triggerMedium()}
+            >
+              <ThemedText style={styles.buttonText}>Medium</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => haptics.triggerHeavy()}
+            >
+              <ThemedText style={styles.buttonText}>Heavy</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => haptics.triggerForDataPoint('normal')}
+            >
+              <ThemedText style={styles.buttonText}>Normal</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => haptics.triggerForDataPoint('warning')}
+            >
+              <ThemedText style={styles.buttonText}>Warning</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => haptics.triggerForDataPoint('danger')}
+            >
+              <ThemedText style={styles.buttonText}>Danger</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Text-to-Speech Testing */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Test Text-to-Speech {speech.isSpeaking && '(Speaking...)'}
+          </ThemedText>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => speech.speak('Hello! This is a test of the text to speech system.')}
+            >
+              <ThemedText style={styles.buttonText}>Speak Test</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.button, speech.isSpeaking && styles.activeButton]} 
+              onPress={() => speech.stop()}
+              disabled={!speech.isSpeaking}
+            >
+              <ThemedText style={styles.buttonText}>Stop</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => speech.speakSummary(mockVitals)}
+            >
+              <ThemedText style={styles.buttonText}>Hear Summary</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => speech.speakDetails(mockVitals[0])}
+            >
+              <ThemedText style={styles.buttonText}>Hear Details</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Link href="/" dismissTo style={styles.link}>
