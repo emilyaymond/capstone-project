@@ -9,6 +9,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AccessibilityMode, AccessibilitySettings } from '../types';
+import { useStorage } from '../hooks/useStorage';
 
 // ============================================================================
 // Context Value Interface
@@ -99,50 +100,45 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Initialize storage hook
+  const storage = useStorage();
+
   // ============================================================================
   // Load Settings on Mount
   // ============================================================================
 
   useEffect(() => {
-    loadSettings();
+    loadSettingsFromStorage();
   }, []);
 
   // ============================================================================
   // Load Settings Function
   // ============================================================================
 
-  async function loadSettings() {
+  async function loadSettingsFromStorage() {
     try {
       setIsLoading(true);
       setError(null);
 
-      // TODO: Integrate with useStorage hook when available (Task 4)
-      // For now, we'll use a placeholder that can be replaced
-      // const storage = useStorage();
-      // const savedSettings = await storage.loadSettings();
-      
-      // Placeholder: Check AsyncStorage directly
-      // This will be replaced when useStorage hook is implemented
-      const AsyncStorage = await import('@react-native-async-storage/async-storage').then(m => m.default);
-      
-      const savedMode = await AsyncStorage.getItem('accessibility_mode');
-      const savedSettingsJson = await AsyncStorage.getItem('accessibility_settings');
+      // Check if storage is available
+      if (!storage.isAvailable) {
+        console.warn('AsyncStorage is not available, using default settings');
+        setIsLoading(false);
+        return;
+      }
+
+      // Load settings using the storage hook
+      const { mode: savedMode, settings: savedSettings } = await storage.loadSettings();
 
       // Load and validate mode
       if (savedMode && isValidMode(savedMode)) {
-        setModeState(savedMode as AccessibilityMode);
+        setModeState(savedMode);
       }
 
       // Load and validate settings
-      if (savedSettingsJson) {
-        try {
-          const parsedSettings = JSON.parse(savedSettingsJson);
-          const validatedSettings = validateSettings(parsedSettings);
-          setSettingsState(validatedSettings);
-        } catch (parseError) {
-          // Invalid JSON, use defaults
-          console.warn('Failed to parse saved settings, using defaults:', parseError);
-        }
+      if (savedSettings) {
+        const validatedSettings = validateSettings(savedSettings);
+        setSettingsState(validatedSettings);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err : new Error('Failed to load settings');
@@ -158,14 +154,16 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
   // Save Settings Function
   // ============================================================================
 
-  async function saveSettings(newMode: AccessibilityMode, newSettings: AccessibilitySettings) {
+  async function saveSettingsToStorage(newMode: AccessibilityMode, newSettings: AccessibilitySettings) {
     try {
-      // TODO: Integrate with useStorage hook when available (Task 4)
-      // For now, we'll use a placeholder that can be replaced
-      const AsyncStorage = await import('@react-native-async-storage/async-storage').then(m => m.default);
-      
-      await AsyncStorage.setItem('accessibility_mode', newMode);
-      await AsyncStorage.setItem('accessibility_settings', JSON.stringify(newSettings));
+      // Check if storage is available
+      if (!storage.isAvailable) {
+        console.warn('AsyncStorage is not available, settings will not persist');
+        return;
+      }
+
+      // Save settings using the storage hook (with 100ms debounce)
+      await storage.saveSettings(newMode, newSettings);
     } catch (err) {
       console.error('Error saving accessibility settings:', err);
       // Don't throw - settings are still applied in memory
@@ -187,7 +185,7 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       setModeState(newMode);
 
       // Persist to storage (async, non-blocking)
-      saveSettings(newMode, settings);
+      saveSettingsToStorage(newMode, settings);
 
       // Clear any previous errors
       setError(null);
@@ -217,7 +215,7 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       setSettingsState(validatedSettings);
 
       // Persist to storage (async, non-blocking)
-      saveSettings(mode, validatedSettings);
+      saveSettingsToStorage(mode, validatedSettings);
 
       // Clear any previous errors
       setError(null);

@@ -10,7 +10,7 @@ import { Link } from 'expo-router';
 export default function HomeScreen() {
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerBackgroundColor={{ light: '#a4eaffff', dark: '#1D3D47' }}
       headerImage={
         <Image
           source={require('@/assets/images/partial-react-logo.png')}
@@ -18,9 +18,20 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
+        <ThemedText type="title">HealthVis Mobile</ThemedText>
         <HelloWave />
       </ThemedView>
+      
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">🧪 Test Accessibility Features</ThemedText>
+        <Link href="/modal" style={styles.testLink}>
+          <ThemedText type="link">Open Accessibility Test Screen →</ThemedText>
+        </Link>
+        <ThemedText>
+          Try changing modes, font sizes, and settings. Your preferences will be saved automatically!
+        </ThemedText>
+      </ThemedView>
+
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
@@ -87,6 +98,12 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: 8,
     marginBottom: 8,
+  },
+  testLink: {
+    padding: 15,
+    backgroundColor: '#000000ff',
+    borderRadius: 8,
+    alignItems: 'center',
   },
   reactLogo: {
     height: 178,
