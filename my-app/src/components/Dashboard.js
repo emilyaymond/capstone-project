@@ -33,7 +33,7 @@ const Dashboard = () => {
       </style>
     </head>
     <body>
-      <h2>📈 Heart Rate Viewer</h2>
+      <h2>Heart Rate Viewer</h2>
       <p>Upload a CSV with columns: <code>startDate,value</code> or <code>datetime,heart_rate</code></p>
       <input type="file" id="fileInput" accept=".csv" />
       <br><br>
