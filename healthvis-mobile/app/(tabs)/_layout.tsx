@@ -25,6 +25,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="upload"
+        options={{
+          title: 'Upload',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="arrow.up.doc.fill" color={color} />,
+          tabBarAccessibilityLabel: 'Upload data tab',
+        }}
+      />
+      <Tabs.Screen
         name="trends"
         options={{
           title: 'Trends',

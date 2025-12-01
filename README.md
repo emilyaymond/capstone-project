@@ -65,6 +65,55 @@ It correctly bundles React in production mode and optimizes the build for the be
 - **High Contrast**: Visual accessibility options
 - **Customizable Interface**: User-configurable accessibility preferences
 
+## Mobile App (Expo)
+
+The mobile version of HealthVis is built with Expo and React Native, located in the `healthvis-mobile/` directory.
+
+### Features
+- Apple Health data import (ZIP file support)
+- CSV and JSON file upload
+- Cross-platform (iOS, Android, Web)
+- Full accessibility support
+- Offline data processing
+
+### Quick Start
+
+```bash
+cd healthvis-mobile
+npm install
+npm start
+```
+
+See [QUICK_START_TESTING.md](QUICK_START_TESTING.md) for testing the Apple Health import feature.
+
+### Testing Apple Health Import
+
+We provide test data and scripts to validate the Apple Health import functionality:
+
+**Test Files:**
+- `Health-Export.zip` (35 MB) - Real Apple Health export with thousands of records
+- `Health-Export-Sample.zip` (3 KB) - Generated sample for quick testing
+
+**Testing Resources:**
+- [QUICK_START_TESTING.md](QUICK_START_TESTING.md) - 5-minute quick start guide
+- [healthvis-mobile/TESTING_APPLE_HEALTH.md](healthvis-mobile/TESTING_APPLE_HEALTH.md) - Comprehensive testing guide
+- [healthvis-mobile/APPLE_HEALTH_IMPORT.md](healthvis-mobile/APPLE_HEALTH_IMPORT.md) - Feature documentation
+- [healthvis-mobile/scripts/README.md](healthvis-mobile/scripts/README.md) - Testing scripts documentation
+
+**Quick Test:**
+```bash
+# Validate the test data
+node healthvis-mobile/scripts/validate-health-export.js
+
+# Create a small sample file
+node healthvis-mobile/scripts/create-sample-export.js
+
+# Test the parser
+node healthvis-mobile/scripts/test-parser-integration.js
+
+# Start the app and test upload
+cd healthvis-mobile && npm start
+```
 
 ## Learn More
 

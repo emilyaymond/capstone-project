@@ -54,6 +54,7 @@ export interface HealthDataContextValue {
   requestChat: (message: string, context?: any) => Promise<ChatResponse>;
   clearError: () => void;
   refreshData: () => Promise<void>;
+  setVitals: (vitals: VitalSign[]) => Promise<void>;
 }
 
 // ============================================================================
@@ -165,8 +166,9 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
 
       // Try to load from cache first for offline support
       const cachedVitals = await loadVitalsFromCache();
-      if (cachedVitals) {
+      if (cachedVitals && cachedVitals.length > 0) {
         setVitals(cachedVitals);
+        console.log(`✅ Loaded ${cachedVitals.length} vitals from cache`);
       }
 
       // Attempt to fetch fresh data from backend
@@ -179,17 +181,25 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
       
       setIsLoading(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err : new Error('Failed to fetch data');
-      setError(errorMessage);
-      setIsLoading(false);
+      // Only show error if we don't have cached data
+      const cachedVitals = await loadVitalsFromCache();
+      if (!cachedVitals || cachedVitals.length === 0) {
+        const errorMessage = err instanceof Error ? err : new Error('Failed to fetch data');
+        setError(errorMessage);
 
-      // Announce error to screen readers
-      announceError('Failed to load health data');
+        // Announce error to screen readers
+        announceError('Failed to load health data');
+        
+        // Play error sound
+        await audio.playErrorSound();
+
+        console.error('Error fetching health data:', errorMessage);
+      } else {
+        // We have cached data, so just log the error
+        console.log('Backend unavailable, using cached data');
+      }
       
-      // Play error sound
-      await audio.playErrorSound();
-
-      console.error('Error fetching health data:', errorMessage);
+      setIsLoading(false);
     }
   }, [audio]);
 
@@ -366,6 +376,24 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }, [fetchData]);
 
   // ============================================================================
+  // Set Vitals Function
+  // ============================================================================
+
+  /**
+   * Directly sets vitals data (for local processing like Apple Health)
+   * Saves to cache for offline access
+   */
+  const setVitalsData = useCallback(async (newVitals: VitalSign[]): Promise<void> => {
+    try {
+      setVitals(newVitals);
+      await saveVitalsToCache(newVitals);
+      console.log(`✅ Set ${newVitals.length} vitals in context`);
+    } catch (error) {
+      console.error('Failed to set vitals:', error);
+    }
+  }, []);
+
+  // ============================================================================
   // Helper Functions
   // ============================================================================
 
@@ -443,6 +471,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     requestChat,
     clearError,
     refreshData,
+    setVitals: setVitalsData,
   };
 
   return (
