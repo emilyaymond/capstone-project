@@ -13,11 +13,14 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, ActivityIndicator, RefreshControl } from 'react-native';
+import { ScrollView, StyleSheet, View, RefreshControl } from 'react-native';
+import { Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { VitalCard } from '@/components/VitalCard';
 import { AccessibleButton } from '@/components/AccessibleButton';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { useHealthData } from '@/contexts/HealthDataContext';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
 import { useSpeech } from '@/hooks/useSpeech';
@@ -111,15 +114,13 @@ export default function HomeScreen() {
   if (isLoading && vitals.length === 0) {
     return (
       <ThemedView style={styles.container}>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" accessibilityLabel="Loading health data" />
-          <ThemedText
-            style={[styles.loadingText, { fontSize: fontSize.body }]}
-            accessibilityLiveRegion="polite"
-          >
-            Loading health data...
-          </ThemedText>
-        </View>
+        <LoadingIndicator
+          message="Loading health data..."
+          timeout={15000}
+          onTimeout={() => {
+            announceError('Loading is taking longer than expected');
+          }}
+        />
       </ThemedView>
     );
   }
@@ -132,25 +133,11 @@ export default function HomeScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={styles.centerContent}>
-          <ThemedText
-            type="title"
-            style={[styles.errorTitle, { fontSize: fontSize.heading }]}
-            accessibilityRole="alert"
-          >
-            Unable to Load Data
-          </ThemedText>
-          <ThemedText
-            style={[styles.errorMessage, { fontSize: fontSize.body }]}
-            accessibilityLiveRegion="assertive"
-          >
-            {error.message || 'An error occurred while loading your health data.'}
-          </ThemedText>
-          <AccessibleButton
-            onPress={handleRetry}
-            label="Retry"
-            hint="Try loading health data again"
-            variant="primary"
-            style={styles.retryButton}
+          <ErrorDisplay
+            error={error}
+            errorType="network"
+            onRetry={handleRetry}
+            onDismiss={clearError}
           />
         </View>
       </ThemedView>
@@ -187,6 +174,15 @@ export default function HomeScreen() {
             >
               Pull down to refresh
             </ThemedText>
+            
+            {/* Test Modal Link */}
+            <View style={styles.emptyTestLinkContainer}>
+              <Link href="/modal" style={styles.testLink}>
+                <ThemedText type="link" style={{ fontSize: fontSize.body }}>
+                  🧪 Open Test Screen →
+                </ThemedText>
+              </Link>
+            </View>
           </View>
         </ScrollView>
       </ThemedView>
@@ -220,6 +216,15 @@ export default function HomeScreen() {
           >
             {vitals.length} vital sign{vitals.length !== 1 ? 's' : ''} tracked
           </ThemedText>
+        </View>
+        
+        {/* Test Modal Link */}
+        <View style={styles.testLinkContainer}>
+          <Link href="/modal" style={styles.testLink}>
+            <ThemedText type="link" style={{ fontSize: fontSize.body }}>
+              🧪 Open Accessibility Test Screen →
+            </ThemedText>
+          </Link>
         </View>
 
         {/* Hear Summary Button (Requirement 7.1) */}
@@ -271,18 +276,12 @@ export default function HomeScreen() {
         {/* Error Banner (if error but we have cached data) */}
         {error && vitals.length > 0 && (
           <View style={styles.errorBanner}>
-            <ThemedText
-              style={[styles.errorBannerText, { fontSize: fontSize.label }]}
-              accessibilityRole="alert"
-            >
-              ⚠️ Showing cached data. {error.message}
-            </ThemedText>
-            <AccessibleButton
-              onPress={handleRetry}
-              label="Retry"
-              hint="Try refreshing health data"
-              variant="outline"
-              style={styles.errorBannerButton}
+            <ErrorDisplay
+              error={error}
+              errorType="network"
+              onRetry={handleRetry}
+              onDismiss={clearError}
+              style={styles.errorDisplay}
             />
           </View>
         )}
@@ -332,6 +331,16 @@ const styles = StyleSheet.create({
 
   subtitle: {
     opacity: 0.7,
+  },
+
+  testLinkContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+
+  testLink: {
+    padding: 12,
   },
 
   summaryButtonContainer: {
@@ -385,24 +394,19 @@ const styles = StyleSheet.create({
   emptyHint: {
     textAlign: 'center',
     opacity: 0.6,
+    marginBottom: 24,
+  },
+
+  emptyTestLinkContainer: {
+    marginTop: 16,
   },
 
   errorBanner: {
     margin: 16,
-    padding: 16,
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(244, 67, 54, 0.3)',
   },
 
-  errorBannerText: {
-    marginBottom: 12,
-    color: '#f44336',
-  },
-
-  errorBannerButton: {
-    alignSelf: 'flex-start',
+  errorDisplay: {
+    margin: 0,
   },
 
   footer: {

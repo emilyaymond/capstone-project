@@ -3,11 +3,21 @@ import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AccessibleButton } from '@/components/AccessibleButton';
+import { ModeSelector } from '@/components/ModeSelector';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
 import { useAudio } from '@/hooks/useAudio';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSpeech } from '@/hooks/useSpeech';
 import { VitalSign } from '@/types';
+import { 
+  announce, 
+  announceSuccess, 
+  announceError, 
+  announceNavigation,
+  announceLoading,
+  announceDataUpdate 
+} from '@/lib/announcer';
 
 export default function ModalScreen() {
   const { mode, setMode, settings, updateSettings, isLoading, error } = useAccessibility();
@@ -59,37 +69,16 @@ export default function ModalScreen() {
           </View>
         )}
 
-        {/* Mode Selection */}
+        {/* Mode Selection - Using ModeSelector Component */}
         <View style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Current Mode: {mode}</ThemedText>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={[styles.button, mode === 'visual' && styles.activeButton]} 
-              onPress={() => setMode('visual')}
-            >
-              <ThemedText style={styles.buttonText}>Visual</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.button, mode === 'audio' && styles.activeButton]} 
-              onPress={() => setMode('audio')}
-            >
-              <ThemedText style={styles.buttonText}>Audio</ThemedText>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={[styles.button, mode === 'hybrid' && styles.activeButton]} 
-              onPress={() => setMode('hybrid')}
-            >
-              <ThemedText style={styles.buttonText}>Hybrid</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.button, mode === 'simplified' && styles.activeButton]} 
-              onPress={() => setMode('simplified')}
-            >
-              <ThemedText style={styles.buttonText}>Simplified</ThemedText>
-            </TouchableOpacity>
-          </View>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>Accessibility Mode</ThemedText>
+          <ThemedText style={styles.helperText}>
+            Select your preferred accessibility mode. Each mode provides different features and interface adaptations.
+          </ThemedText>
+          <ModeSelector
+            currentMode={mode}
+            onModeChange={setMode}
+          />
         </View>
 
         {/* Font Size */}
@@ -287,6 +276,107 @@ export default function ModalScreen() {
           </View>
         </View>
 
+        {/* Screen Reader Announcements Testing */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Test Screen Reader Announcements
+          </ThemedText>
+          <ThemedText style={styles.helperText}>
+            Enable VoiceOver (iOS) or TalkBack (Android) to hear these announcements
+          </ThemedText>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announce('This is a polite announcement', { priority: 'polite' })}
+            >
+              <ThemedText style={styles.buttonText}>Polite</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announce('This is an assertive announcement', { priority: 'assertive' })}
+            >
+              <ThemedText style={styles.buttonText}>Assertive</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announceSuccess('Settings saved successfully')}
+            >
+              <ThemedText style={styles.buttonText}>Success</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announceError('Failed to load data')}
+            >
+              <ThemedText style={styles.buttonText}>Error</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announceNavigation('Settings', 'Configure your accessibility preferences')}
+            >
+              <ThemedText style={styles.buttonText}>Navigation</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announceLoading('Loading health data')}
+            >
+              <ThemedText style={styles.buttonText}>Loading</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={() => announceDataUpdate('Heart rate data refreshed')}
+            >
+              <ThemedText style={styles.buttonText}>Data Update</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* AccessibleButton Testing */}
+        <View style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Test AccessibleButton Component
+          </ThemedText>
+          <ThemedText style={styles.helperText}>
+            These buttons use the new AccessibleButton component with automatic audio/haptic feedback
+          </ThemedText>
+          <View style={styles.buttonRow}>
+            <AccessibleButton
+              label="Primary Button"
+              hint="This is a primary button with audio and haptic feedback"
+              onPress={() => announceSuccess('Primary button pressed')}
+              variant="primary"
+            />
+            <AccessibleButton
+              label="Secondary"
+              hint="This is a secondary button"
+              onPress={() => announceSuccess('Secondary button pressed')}
+              variant="secondary"
+            />
+          </View>
+          <View style={styles.buttonRow}>
+            <AccessibleButton
+              label="Outline Button"
+              hint="This is an outline button"
+              onPress={() => announceSuccess('Outline button pressed')}
+              variant="outline"
+            />
+            <AccessibleButton
+              label="Disabled"
+              hint="This button is disabled"
+              onPress={() => {}}
+              disabled={true}
+            />
+          </View>
+          <ThemedText style={styles.helperText}>
+            Notice: In simplified mode, buttons are larger (56x56 minimum). Audio feedback plays in audio/hybrid modes. Haptics trigger when enabled.
+          </ThemedText>
+        </View>
+
         <Link href="/" dismissTo style={styles.link}>
           <ThemedText type="link">← Back to Home</ThemedText>
         </Link>
@@ -355,5 +445,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingVertical: 15,
     alignSelf: 'center',
+  },
+  helperText: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
 });

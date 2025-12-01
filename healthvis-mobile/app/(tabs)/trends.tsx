@@ -17,7 +17,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -26,11 +25,12 @@ import { AccessibleButton } from '@/components/AccessibleButton';
 import { TouchExploreChart } from '@/components/TouchExploreChart';
 import { SimpleLineChart } from '@/components/SimpleLineChart';
 import { SimpleBarChart } from '@/components/SimpleBarChart';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { useHealthData } from '@/contexts/HealthDataContext';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
 import { DataPoint, ChartType, VitalSignType } from '@/types';
 import { FONT_SIZES } from '@/constants/accessibility';
-import { announceNavigation } from '@/lib/announcer';
+import { announceNavigation, announceError } from '@/lib/announcer';
 
 // ============================================================================
 // Types
@@ -175,12 +175,13 @@ export default function TrendsScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <ThemedView style={styles.centerContent}>
-          <ActivityIndicator size="large" accessibilityLabel="Loading trends data" />
-          <ThemedText style={[styles.statusText, { fontSize: fontSize.body }]}>
-            Loading trends...
-          </ThemedText>
-        </ThemedView>
+        <LoadingIndicator
+          message="Loading trends..."
+          timeout={15000}
+          onTimeout={() => {
+            announceError('Loading trends is taking longer than expected');
+          }}
+        />
       </ThemedView>
     );
   }

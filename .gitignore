@@ -49,3 +49,8 @@ coverage/
 .Trashes
 ehthumbs.db
 Thumbs.db
+backend/services/__pycache__/client.cpython-313.pyc
+backend/__pycache__/config.cpython-313.pyc
+backend/__pycache__/main.cpython-313.pyc
+backend/api/__pycache__/chat.cpython-313.pyc
+backend/services/__pycache__/client.cpython-313.pyc

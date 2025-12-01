@@ -42,17 +42,24 @@ const FOCUS_DURATION = 80;
 const HOVER_DURATION = 60;
 
 // Frequency ranges in Hz
-const FREQUENCY_LOW = 200;
-const FREQUENCY_MID = 440;
-const FREQUENCY_HIGH = 800;
-const FREQUENCY_VERY_HIGH = 1000;
+const FREQUENCY_LOW = 300;   // Maps to tone-low.wav
+const FREQUENCY_MID = 500;   // Maps to tone-medium.wav
+const FREQUENCY_HIGH = 800;  // Maps to tone-high.wav
+const FREQUENCY_VERY_HIGH = 800; // Also maps to tone-high.wav
 
 // Mode-specific frequencies
 const MODE_FREQUENCIES: Record<AccessibilityMode, number> = {
-  visual: 500,
-  audio: 600,
-  hybrid: 700,
-  simplified: 400,
+  visual: 500,    // medium
+  audio: 800,     // high
+  hybrid: 500,    // medium
+  simplified: 300, // low
+};
+
+// Audio file mapping
+const TONE_FILES = {
+  low: require('../assets/audio/tone-low.wav'),
+  medium: require('../assets/audio/tone-medium.wav'),
+  high: require('../assets/audio/tone-high.wav'),
 };
 
 // ============================================================================
@@ -135,8 +142,11 @@ export function useAudio(): UseAudioReturn {
   ): Promise<void> {
     // Check if audio is enabled
     if (!settings.audioEnabled) {
+      console.log('🔇 Audio is disabled in settings');
       return;
     }
+
+    console.log(`🔊 Playing sound: ${frequency}Hz, ${duration}ms, ${type}`);
 
     try {
       // Generate audio buffer using Web Audio API approach
@@ -148,6 +158,7 @@ export function useAudio(): UseAudioReturn {
       
       // Play the sound
       await sound.playAsync();
+      console.log('✅ Sound played successfully');
       
       // Auto-cleanup after playback
       setTimeout(async () => {
@@ -160,7 +171,7 @@ export function useAudio(): UseAudioReturn {
       }, duration + 100);
       
     } catch (error) {
-      console.error('Error playing sound:', error);
+      console.error('❌ Error playing sound:', error);
     }
   }
 
@@ -169,27 +180,22 @@ export function useAudio(): UseAudioReturn {
   // ============================================================================
 
   /**
-   * Generate a tone using expo-av
-   * Note: This is a simplified implementation. In production, you might want to
-   * pre-generate audio files or use a more sophisticated synthesis approach.
+   * Generate a tone using expo-av with pre-generated audio files
+   * Maps requested frequency to the closest available tone file
    */
   async function generateTone(
     frequency: number,
     duration: number,
     type: OscillatorType
   ): Promise<Audio.Sound> {
-    // For MVP, we'll use a simple approach with pre-generated tones
-    // In a production app, you would either:
-    // 1. Pre-generate audio files for common frequencies
-    // 2. Use a native module for real-time synthesis
-    // 3. Use Web Audio API on web platform
+    // Map frequency to the closest available tone file
+    const toneFile = selectToneFile(frequency);
     
-    // Create a simple beep sound using Audio.Sound
-    // This is a placeholder - in production you'd load actual audio files
+    console.log(`🎵 Loading tone file for ${frequency}Hz (using ${toneFile})`);
+    
+    // Load the pre-generated audio file
     const { sound } = await Audio.Sound.createAsync(
-      // Using a data URI for a simple sine wave (this is a simplified approach)
-      // In production, you'd use actual audio files or a synthesis library
-      { uri: generateToneDataUri(frequency, duration, type) },
+      TONE_FILES[toneFile],
       { shouldPlay: false }
     );
     
@@ -197,20 +203,18 @@ export function useAudio(): UseAudioReturn {
   }
 
   /**
-   * Generate a data URI for a simple tone
-   * This is a simplified implementation for demonstration
+   * Select the appropriate tone file based on frequency
+   * Maps requested frequency to low (300Hz), medium (500Hz), or high (800Hz)
    */
-  function generateToneDataUri(frequency: number, duration: number, type: OscillatorType): string {
-    // For React Native, we'll use a simple approach
-    // In production, you would pre-generate these or use a native audio synthesis module
-    
-    // For now, we'll use a silent audio file and log the parameters
-    // This allows the hook to work without actual audio synthesis
-    console.log(`Generating tone: ${frequency}Hz, ${duration}ms, ${type}`);
-    
-    // Return a minimal WAV file data URI (silent)
-    // In production, replace this with actual tone generation
-    return 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+  function selectToneFile(frequency: number): 'low' | 'medium' | 'high' {
+    // Map frequency ranges to available files
+    if (frequency < 400) {
+      return 'low';    // 300 Hz
+    } else if (frequency < 650) {
+      return 'medium'; // 500 Hz
+    } else {
+      return 'high';   // 800 Hz
+    }
   }
 
   // ============================================================================

@@ -20,6 +20,7 @@ import {
   Switch,
   Platform,
 } from 'react-native';
+import { Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ModeSelector } from '@/components/ModeSelector';
@@ -414,6 +415,28 @@ export default function SettingsScreen() {
           All settings are saved automatically and will be restored when you reopen the app.
         </ThemedText>
       </ThemedView>
+
+      {/* Developer Testing Section */}
+      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+        <ThemedText
+          style={[
+            styles.sectionTitle,
+            { fontSize: fontSize.heading, color: colors.text },
+          ]}
+        >
+          Developer Tools
+        </ThemedText>
+        <Link href="/modal" style={styles.testLink}>
+          <ThemedText
+            style={[
+              styles.linkText,
+              { fontSize: fontSize.body, color: colors.primary },
+            ]}
+          >
+            🧪 Open Accessibility Test Screen →
+          </ThemedText>
+        </Link>
+      </ThemedView>
     </ScrollView>
   );
 }
@@ -490,5 +513,14 @@ const styles = StyleSheet.create({
   infoText: {
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+
+  testLink: {
+    padding: 12,
+    alignItems: 'center',
+  },
+
+  linkText: {
+    textDecorationLine: 'underline',
   },
 });

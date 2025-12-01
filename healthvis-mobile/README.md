@@ -1,50 +1,62 @@
-# Welcome to your Expo app 👋
+# HealthVis Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Accessible health data visualization app built with Expo and React Native.
 
-## Get started
+## Features
 
-1. Install dependencies
+- 🎯 **4 Accessibility Modes**: Visual, Audio, Hybrid, Simplified
+- 🔊 **Audio Feedback**: Button clicks, mode changes, data sonification
+- 📳 **Haptic Feedback**: Touch-based feedback for data exploration
+- 🗣️ **Text-to-Speech**: Spoken summaries of health data
+- 👆 **Touch-to-Explore**: Interactive charts with audio/haptic feedback
+- 📊 **Data Visualization**: Line and bar charts with accessibility features
+- ⚙️ **Customizable Settings**: Font size, contrast, audio/haptic toggles
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Quick Start
 
 ```bash
-npm run reset-project
+# Install dependencies
+npm install
+
+# Start the app
+npm start
+
+# Press 'i' for iOS simulator
+# Press 'a' for Android emulator
+# Scan QR code for physical device
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Testing
 
-## Learn more
+See `TESTING_GUIDE.md` for detailed testing instructions.
 
-To learn more about developing your project with Expo, look at the following resources:
+Quick test: Navigate to `/test-feedback` in the app to test all audio and haptic features.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project Structure
 
-## Join the community
+```
+app/              # Screens (file-based routing)
+components/       # Reusable components
+contexts/         # React contexts (Accessibility, HealthData)
+hooks/            # Custom hooks (useAudio, useHaptics, useSpeech)
+lib/              # Utilities (API client, announcer, sonification)
+types/            # TypeScript type definitions
+constants/        # App constants (theme, accessibility)
+```
 
-Join our community of developers creating universal apps.
+## Documentation
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `TESTING_GUIDE.md` - Testing audio and haptic features
+- `CODE_REVIEW.md` - Current implementation status
+- `.kiro/specs/expo-accessibility-migration/` - Full spec documentation
+
+## Tech Stack
+
+- Expo SDK 54
+- React Native 0.81
+- TypeScript
+- Expo Router (file-based routing)
+- expo-av (audio)
+- expo-haptics (haptic feedback)
+- expo-speech (text-to-speech)
+- AsyncStorage (persistence)
