@@ -473,6 +473,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingTop: 60,
   },
   centerContent: {
     flex: 1,
@@ -519,7 +520,7 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   vitalButton: {
-    flex: 1,
+    flexBasis: '48%',
     minWidth: 100,
   },
   chartTypeButton: {

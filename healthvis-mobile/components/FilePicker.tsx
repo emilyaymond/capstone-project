@@ -27,18 +27,13 @@ import { parseAppleHealthExport, getVitalsSummary } from '../lib/apple-health-pa
 // ============================================================================
 
 export interface FilePickerProps {
-  /** Callback when file is successfully uploaded */
-  onUploadSuccess?: (response: UploadDataResponse) => void;
-  /** Callback when upload fails */
-  onUploadError?: (error: Error) => void;
-  /** Callback when vitals are extracted (for Apple Health ZIP files) */
-  onVitalsExtracted?: (vitals: VitalSign[]) => Promise<void>;
-  /** Custom button label */
-  buttonLabel?: string;
-  /** Custom button hint for accessibility */
-  buttonHint?: string;
-  /** Whether to show upload results inline */
-  showResults?: boolean;
+
+  onUploadSuccess?: (response: UploadDataResponse) => void; // Callback when file is successfully uploaded
+  onUploadError?: (error: Error) => void;   // Callback when upload fails 
+  onVitalsExtracted?: (vitals: VitalSign[]) => Promise<void>; // Callback when vitals are extracted (for Apple Health ZIP files) 
+  buttonLabel?: string; // Custom button label 
+  buttonHint?: string;  // Custom button hint for accessibility 
+  showResults?: boolean;  // Whether to show upload results inline 
 }
 
 // ============================================================================
@@ -367,7 +362,7 @@ export function FilePicker({
       {/* Upload Results */}
       {showResults && uploadResult && !isUploading && !error && (
         <View style={styles.resultsContainer}>
-          <Text style={styles.resultsTitle}>Upload Successful!</Text>
+          <Text style={styles.resultsTitle}>Upload Successful</Text>
           
           <View style={styles.resultItem}>
             <Text style={styles.resultLabel}>File:</Text>

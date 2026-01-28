@@ -1,16 +1,15 @@
 /**
  * ErrorBoundary Component
- * 
+ *
  * React Error Boundary that catches JavaScript errors anywhere in the component tree,
  * logs those errors, and displays a fallback UI instead of crashing the entire app.
- * 
+ *
  * Requirements: 15.4
  */
 
-import React, { Component, ReactNode, ErrorInfo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { announceError } from '../lib/announcer';
-import { AccessibleButton } from './AccessibleButton';
+import React, { Component, ReactNode, ErrorInfo } from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { announceError } from "../lib/announcer";
 
 // ============================================================================
 // Props and State Interfaces
@@ -34,7 +33,7 @@ interface ErrorBoundaryState {
 
 /**
  * Error Boundary component that catches crashes and displays recovery UI
- * 
+ *
  * Usage:
  * ```tsx
  * <ErrorBoundary>
@@ -42,7 +41,10 @@ interface ErrorBoundaryState {
  * </ErrorBoundary>
  * ```
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -69,15 +71,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
    */
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log error details for debugging
-    console.error('[ErrorBoundary] Caught error:', error);
-    console.error('[ErrorBoundary] Error info:', errorInfo);
-    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+    console.error("[ErrorBoundary] Caught error:", error);
+    console.error("[ErrorBoundary] Error info:", errorInfo);
+    console.error("[ErrorBoundary] Component stack:", errorInfo.componentStack);
 
     // Store error info in state
     this.setState({ errorInfo });
 
     // Announce error to screen readers with assertive priority
-    announceError('Application error occurred. Please restart or contact support.');
+    announceError(
+      "Application error occurred. Please restart or contact support.",
+    );
 
     // Call custom error handler if provided
     if (this.props.onError) {
@@ -119,14 +123,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <Text style={styles.title} accessibilityRole="header">
               Something Went Wrong
             </Text>
-            
+
             <Text style={styles.message}>
-              The application encountered an unexpected error. You can try restarting the app or contact support if the problem persists.
+              The application encountered an unexpected error. You can try
+              restarting the app or contact support if the problem persists.
             </Text>
 
             {__DEV__ && (
               <View style={styles.errorDetails}>
-                <Text style={styles.errorTitle}>Error Details (Development Only):</Text>
+                <Text style={styles.errorTitle}>
+                  Error Details (Development Only):
+                </Text>
                 <Text style={styles.errorText}>{error.toString()}</Text>
                 {this.state.errorInfo && (
                   <Text style={styles.stackTrace}>
@@ -137,11 +144,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             )}
 
             <View style={styles.buttonContainer}>
-              <AccessibleButton
+              <Pressable
                 onPress={this.resetError}
-                label="Restart App"
-                hint="Attempts to restart the application and clear the error"
-              />
+                accessibilityLabel="Restart App"
+                accessibilityHint="Attempts to restart the application and clear the error"
+                style={styles.plainButton}
+              >
+                <Text style={styles.plainButtonText}>Restart App</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -160,18 +170,18 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f5f5f5",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   content: {
     maxWidth: 500,
-    width: '100%',
-    backgroundColor: '#ffffff',
+    width: "100%",
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -179,45 +189,55 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#d32f2f',
+    fontWeight: "bold",
+    color: "#d32f2f",
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   message: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
     lineHeight: 24,
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorDetails: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     borderRadius: 8,
     padding: 12,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
   },
   errorTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#666',
+    fontWeight: "bold",
+    color: "#666",
     marginBottom: 8,
   },
   errorText: {
     fontSize: 12,
-    color: '#d32f2f',
-    fontFamily: 'monospace',
+    color: "#d32f2f",
+    fontFamily: "monospace",
     marginBottom: 8,
   },
   stackTrace: {
     fontSize: 10,
-    color: '#666',
-    fontFamily: 'monospace',
+    color: "#666",
+    fontFamily: "monospace",
   },
   buttonContainer: {
-    alignItems: 'center',
+    alignItems: "center",
+  },
+  plainButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "#007aff",
+    borderRadius: 8,
+  },
+  plainButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
-

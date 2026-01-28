@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "HealthVis needs access to read your health data to show vital signs.",
+          "healthUpdatePermission": "HealthVis needs access to write health data.",
+          "healthClinicalHealthRecordsSharePermission": "Allow HealthVis to read clinical health records."
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.anonymous.healthvis",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "HealthVis reads your steps, heart rate, and glucose to show health summaries."
+      }
+    }
+  }
+}

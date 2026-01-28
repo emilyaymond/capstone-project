@@ -105,7 +105,7 @@ export default function UploadScreen() {
         </View>
 
         {/* Supported Formats Section */}
-        <View style={styles.infoSection}>
+        {/* <View style={styles.infoSection}>
           <ThemedText
             type="subtitle"
             style={[styles.sectionTitle, { fontSize: fontSize.heading }]}
@@ -115,7 +115,7 @@ export default function UploadScreen() {
 
           <View style={styles.formatItem}>
             <ThemedText style={[styles.formatTitle, { fontSize: fontSize.body }]}>
-              📊 CSV Files
+              CSV Files
             </ThemedText>
             <ThemedText style={[styles.formatDescription, { fontSize: fontSize.label }]}>
               Comma-separated values with health metrics
@@ -124,7 +124,7 @@ export default function UploadScreen() {
 
           <View style={styles.formatItem}>
             <ThemedText style={[styles.formatTitle, { fontSize: fontSize.body }]}>
-              📄 JSON Files
+              JSON Files
             </ThemedText>
             <ThemedText style={[styles.formatDescription, { fontSize: fontSize.label }]}>
               Structured health data in JSON format
@@ -133,13 +133,14 @@ export default function UploadScreen() {
 
           <View style={styles.formatItem}>
             <ThemedText style={[styles.formatTitle, { fontSize: fontSize.body }]}>
-              🍎 Apple Health Export
+              Apple Health Export
             </ThemedText>
             <ThemedText style={[styles.formatDescription, { fontSize: fontSize.label }]}>
               ZIP file exported from Apple Health app
             </ThemedText>
           </View>
-        </View>
+        </View> */}
+        
 
         {/* Apple Health Instructions */}
         <View style={styles.infoSection}>
@@ -188,7 +189,7 @@ export default function UploadScreen() {
         </View>
 
         {/* Data Types Section */}
-        <View style={styles.infoSection}>
+        {/* <View style={styles.infoSection}>
           <ThemedText
             type="subtitle"
             style={[styles.sectionTitle, { fontSize: fontSize.heading }]}
@@ -208,7 +209,7 @@ export default function UploadScreen() {
           <ThemedText style={[styles.dataTypeText, { fontSize: fontSize.body }]}>
             • Sleep (hours)
           </ThemedText>
-        </View>
+        </View> */}
       </ScrollView>
     </ThemedView>
   );
@@ -230,7 +231,7 @@ const styles = StyleSheet.create({
 
   header: {
     padding: 16,
-    paddingTop: 24,
+    paddingTop: 60,
   },
 
   title: {

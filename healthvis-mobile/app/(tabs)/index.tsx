@@ -1,6 +1,6 @@
 /**
  * Home Screen
- * 
+ *
  * Displays health data visualization with:
  * - High-level vital signs summary
  * - VitalCard components for each vital sign (heart rate, glucose, steps, sleep)
@@ -8,33 +8,72 @@
  * - Proper screen reader announcements on load
  * - Integration with HealthDataContext for data
  * - Loading and error states
- * 
+ *
  * Requirements: 7.1, 7.4, 8.5
  */
 
-import React, { useEffect, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, RefreshControl } from 'react-native';
-import { Link } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { VitalCard } from '@/components/VitalCard';
-import { AccessibleButton } from '@/components/AccessibleButton';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { useHealthData } from '@/contexts/HealthDataContext';
-import { useAccessibility } from '@/contexts/AccessibilityContext';
-import { useSpeech } from '@/hooks/useSpeech';
-import { announceNavigation, announceError, announceLoading } from '@/lib/announcer';
-import { FONT_SIZES } from '@/constants/accessibility';
+import React, { useEffect, useCallback, useState } from "react";
+import { ScrollView, StyleSheet, View, RefreshControl } from "react-native";
+import { Link } from "expo-router";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { VitalCard } from "@/components/VitalCard";
+import { AccessibleButton } from "@/components/AccessibleButton";
+import { ErrorDisplay } from "@/components/ErrorDisplay";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
+import { useHealthData } from "@/contexts/HealthDataContext";
+import { useAccessibility } from "@/contexts/AccessibilityContext";
+import { useSpeech } from "@/hooks/useSpeech";
+import {
+  announceNavigation,
+  announceError,
+  announceLoading,
+} from "@/lib/announcer";
+import { FONT_SIZES } from "@/constants/accessibility";
+import AppleHealthKit, {
+  HealthValue,
+  HealthKitPermissions,
+} from "react-native-health";
+
+// console.log(
+//   "AppleHealthKit keys:",
+//   AppleHealthKit && Object.keys(AppleHealthKit as any),
+// );
 
 export default function HomeScreen() {
   // ============================================================================
   // Hooks
   // ============================================================================
+  const permissions = {
+    permissions: {
+      read: [AppleHealthKit.Constants.Permissions.Steps],
+      write: [],
+    },
+  } as HealthKitPermissions;
 
-  const { vitals, isLoading, error, fetchData, refreshData, clearError } = useHealthData();
+  const { vitals, isLoading, error, fetchData, refreshData, clearError } =
+    useHealthData();
   const { settings } = useAccessibility();
   const { speakSummary, isSpeaking, stop } = useSpeech();
+
+  useEffect(() => {
+    AppleHealthKit.initHealthKit(permissions, (error: string) => {
+      /* Called after we receive a response from the system */
+      if (error) {
+        console.log("[ERROR] Cannot grant permissions!");
+      }
+      /* Can now read or write to HealthKit */
+      const options = {
+        startDate: new Date(2020, 1, 1).toISOString(),
+      };
+      //   AppleHealthKit.getHeartRateSamples(
+      //     options,
+      //     (callbackError: string, results: HealthValue[]) => {
+      //       /* Samples are now collected from HealthKit */
+      //     },
+      //   );
+    });
+  }, []);
 
   // ============================================================================
   // Screen Reader Announcements on Load (Requirement 8.5)
@@ -42,7 +81,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     // Announce navigation to Home screen
-    announceNavigation('Home', 'View your health data summary');
+    announceNavigation("Home", "View your health data summary");
 
     // Load data on mount
     fetchData();
@@ -55,7 +94,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (error) {
-      announceError(error.message || 'Failed to load health data');
+      announceError(error.message || "Failed to load health data");
     }
   }, [error]);
 
@@ -83,7 +122,7 @@ export default function HomeScreen() {
    * Handles pull-to-refresh
    */
   const handleRefresh = useCallback(async () => {
-    announceLoading('Refreshing health data');
+    announceLoading("Refreshing health data");
     await refreshData();
   }, [refreshData]);
 
@@ -102,10 +141,10 @@ export default function HomeScreen() {
   const fontSize = FONT_SIZES[settings.fontSize];
 
   // Group vitals by type for display
-  const heartRateVital = vitals.find(v => v.type === 'heart_rate');
-  const glucoseVital = vitals.find(v => v.type === 'glucose');
-  const stepsVital = vitals.find(v => v.type === 'steps');
-  const sleepVital = vitals.find(v => v.type === 'sleep');
+  const heartRateVital = vitals.find((v) => v.type === "heart_rate");
+  const glucoseVital = vitals.find((v) => v.type === "glucose");
+  const stepsVital = vitals.find((v) => v.type === "steps");
+  const sleepVital = vitals.find((v) => v.type === "sleep");
 
   // ============================================================================
   // Render Loading State
@@ -118,7 +157,7 @@ export default function HomeScreen() {
           message="Loading health data..."
           timeout={15000}
           onTimeout={() => {
-            announceError('Loading is taking longer than expected');
+            announceError("Loading is taking longer than expected");
           }}
         />
       </ThemedView>
@@ -145,7 +184,7 @@ export default function HomeScreen() {
   }
 
   // ============================================================================
-  // Render Empty State
+  // Render Empty State / no data uploaded
   // ============================================================================
 
   if (vitals.length === 0) {
@@ -167,19 +206,20 @@ export default function HomeScreen() {
             <ThemedText
               style={[styles.emptyMessage, { fontSize: fontSize.body }]}
             >
-              Upload health data or sync with your device to see your vital signs here.
+              Upload health data or sync with your device to see your vital
+              signs here.
             </ThemedText>
             <ThemedText
               style={[styles.emptyHint, { fontSize: fontSize.label }]}
             >
               Pull down to refresh
             </ThemedText>
-            
+
             {/* Test Modal Link */}
             <View style={styles.emptyTestLinkContainer}>
               <Link href="/modal" style={styles.testLink}>
                 <ThemedText type="link" style={{ fontSize: fontSize.body }}>
-                  🧪 Open Test Screen →
+                  Open Accessibility Test Screen →
                 </ThemedText>
               </Link>
             </View>
@@ -211,31 +251,31 @@ export default function HomeScreen() {
           >
             Health Summary
           </ThemedText>
-          <ThemedText
-            style={[styles.subtitle, { fontSize: fontSize.body }]}
-          >
-            {vitals.length} vital sign{vitals.length !== 1 ? 's' : ''} tracked
+          <ThemedText style={[styles.subtitle, { fontSize: fontSize.body }]}>
+            {vitals.length} vital sign{vitals.length !== 1 ? "s" : ""} tracked
           </ThemedText>
         </View>
-        
+
+        {/* ---------------------------------- */}
         {/* Test Modal Link */}
-        <View style={styles.testLinkContainer}>
+        {/* <View style={styles.testLinkContainer}>
           <Link href="/modal" style={styles.testLink}>
             <ThemedText type="link" style={{ fontSize: fontSize.body }}>
-              🧪 Open Accessibility Test Screen →
+              Open Accessibility Test Screen →
             </ThemedText>
           </Link>
-        </View>
+        </View> */}
+        {/* ---------------------------------- */}
 
         {/* Hear Summary Button (Requirement 7.1) */}
         <View style={styles.summaryButtonContainer}>
           <AccessibleButton
             onPress={handleHearSummary}
-            label={isSpeaking ? 'Stop Speaking' : 'Hear Summary'}
+            label={isSpeaking ? "Stop Speaking" : "Hear Summary"}
             hint={
               isSpeaking
-                ? 'Stop reading health data summary'
-                : 'Hear a spoken summary of all your vital signs'
+                ? "Stop reading health data summary"
+                : "Hear a spoken summary of all your vital signs"
             }
             variant="primary"
             style={styles.summaryButton}
@@ -245,31 +285,19 @@ export default function HomeScreen() {
         {/* Vital Signs Cards (Requirement 7.4) */}
         <View style={styles.vitalsContainer}>
           {heartRateVital && (
-            <VitalCard
-              vital={heartRateVital}
-              style={styles.vitalCard}
-            />
+            <VitalCard vital={heartRateVital} style={styles.vitalCard} />
           )}
 
           {glucoseVital && (
-            <VitalCard
-              vital={glucoseVital}
-              style={styles.vitalCard}
-            />
+            <VitalCard vital={glucoseVital} style={styles.vitalCard} />
           )}
 
           {stepsVital && (
-            <VitalCard
-              vital={stepsVital}
-              style={styles.vitalCard}
-            />
+            <VitalCard vital={stepsVital} style={styles.vitalCard} />
           )}
 
           {sleepVital && (
-            <VitalCard
-              vital={sleepVital}
-              style={styles.vitalCard}
-            />
+            <VitalCard vital={sleepVital} style={styles.vitalCard} />
           )}
         </View>
 
@@ -288,9 +316,7 @@ export default function HomeScreen() {
 
         {/* Pull to Refresh Hint */}
         <View style={styles.footer}>
-          <ThemedText
-            style={[styles.footerText, { fontSize: fontSize.label }]}
-          >
+          <ThemedText style={[styles.footerText, { fontSize: fontSize.label }]}>
             Pull down to refresh
           </ThemedText>
         </View>
@@ -315,14 +341,14 @@ const styles = StyleSheet.create({
 
   centerContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 24,
   },
 
   header: {
     padding: 16,
-    paddingTop: 24,
+    paddingTop: 60,
   },
 
   title: {
@@ -336,7 +362,7 @@ const styles = StyleSheet.create({
   testLinkContainer: {
     paddingHorizontal: 16,
     marginBottom: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   testLink: {
@@ -349,7 +375,7 @@ const styles = StyleSheet.create({
   },
 
   summaryButton: {
-    width: '100%',
+    width: "100%",
   },
 
   vitalsContainer: {
@@ -362,17 +388,17 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   errorTitle: {
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   errorMessage: {
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.8,
   },
 
@@ -382,17 +408,17 @@ const styles = StyleSheet.create({
 
   emptyTitle: {
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   emptyMessage: {
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.8,
   },
 
   emptyHint: {
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.6,
     marginBottom: 24,
   },
@@ -411,7 +437,7 @@ const styles = StyleSheet.create({
 
   footer: {
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   footerText: {

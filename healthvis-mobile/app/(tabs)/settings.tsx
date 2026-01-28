@@ -433,7 +433,7 @@ export default function SettingsScreen() {
               { fontSize: fontSize.body, color: colors.primary },
             ]}
           >
-            🧪 Open Accessibility Test Screen →
+            Open Accessibility Test Screen →
           </ThemedText>
         </Link>
       </ThemedView>
@@ -453,6 +453,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
+    paddingTop: 60,
   },
   
   header: {
