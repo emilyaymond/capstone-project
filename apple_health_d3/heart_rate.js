@@ -8,8 +8,13 @@ function movingAverageHR(data, window = 15) {
 }
 
 //------------------------------------------------------------
+<<<<<<< HEAD
 // LOAD RAW HR DATA
 d3.csv("data/HeartRate.csv").then(raw => {
+=======
+// ✅ Load data
+d3.csv("data/RestingHeartRate.csv").then(raw => {
+>>>>>>> d27e133be09373b8d5433628cb5f36eaca252381
 
   const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
 
