@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Apple Health Data Visualization</title>
+  <title>Apple Health Visualization</title>
 
   <!-- D3 -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -14,24 +14,13 @@
       margin: 40px;
       background: #fafafa;
     }
-
-    #controls {
-      margin-bottom: 20px;
-      font-size: 16px;
-    }
-
-    #weekLabel {
-      margin-left: 10px;
-      font-weight: 600;
-    }
-
     svg {
       width: 100%;
       height: 550px;
       background: white;
       border-radius: 8px;
+      margin-top: 20px;
     }
-
     .tooltip {
       position: absolute;
       padding: 8px;
@@ -45,22 +34,29 @@
   </style>
 </head>
 
-<body>
+<<body>
 
-  <h1>Apple Health: Heart Rate Over Time</h1>
+  <h1>Apple Health Visualization</h1>
 
-  <!-- WEEK SELECTOR -->
-  <div id="controls">
-    <label for="weekRange">Select Week:</label>
-    <input type="range" id="weekRange" min="0" value="0" step="1">
-    <span id="weekLabel"></span>
-  </div>
+  <label>Show:</label>
+  <select id="mode">
+    <option value="hr">Heart Rate (Daily)</option>
+    <option value="rhr">Resting Heart Rate</option>
+  </select>
 
-  <!-- D3 Chart -->
+  <!-- NEW: Month selector (for Resting HR zoomed view) -->
+  <label id="month-label">Month:</label>
+  <select id="month-select"></select>
+
+  <!-- Existing Day selector (only for hourly HR view) -->
+  <label id="day-label">Day:</label>
+  <select id="day-select"></select>
+
   <svg id="chart"></svg>
 
-  <!-- Load JS -->
-  <script src="heart_rate.js?v=3"></script>
+  <script src="heart_rate.js?v=10"></script>
+  <script src="resting.js?v=10"></script>
+  <script src="toggle.js?v=10"></script>
 
 </body>
 </html>
