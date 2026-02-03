@@ -12,7 +12,7 @@
  * Requirements: 7.1, 7.4, 8.5
  */
 
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, use } from "react";
 import { ScrollView, StyleSheet, View, RefreshControl } from "react-native";
 import { Link } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
@@ -31,49 +31,67 @@ import {
 } from "@/lib/announcer";
 import { FONT_SIZES } from "@/constants/accessibility";
 import AppleHealthKit, {
-  HealthValue,
+  HealthInputOptions,
   HealthKitPermissions,
 } from "react-native-health";
 
+const permissions: HealthKitPermissions = {
+  permissions: {
+    read: [AppleHealthKit.Constants.Permissions.StepCount],
+    write: [],
+  },
+};
 // console.log(
 //   "AppleHealthKit keys:",
 //   AppleHealthKit && Object.keys(AppleHealthKit as any),
 // );
 
 export default function HomeScreen() {
+  const [hasPermissions, setHasPermission] = useState(false);
+  const [steps, setSteps] = useState(0);
+
+  useEffect(() => {
+    AppleHealthKit.initHealthKit(permissions, (err: string) => {
+      if (err) {
+        console.log("Error initializing HealthKit: ", err);
+        return;
+      }
+
+      setHasPermission(true);
+      console.log(
+        "HealthKit initialized successfully and permissions granted.",
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hasPermissions) {
+      return;
+    }
+
+    const options: HealthInputOptions = {
+      date: new Date().toISOString(),
+      includeManuallyAdded: false,
+    };
+
+    AppleHealthKit.getStepCount(options, (err, results) => {
+      if (err) {
+        console.log("Error fetching step count: ", err);
+        return;
+      }
+
+      console.log("Step Count: ", results);
+    });
+  }, [hasPermissions]);
+
   // ============================================================================
   // Hooks
   // ============================================================================
-  const permissions = {
-    permissions: {
-      read: [AppleHealthKit.Constants.Permissions.Steps],
-      write: [],
-    },
-  } as HealthKitPermissions;
 
   const { vitals, isLoading, error, fetchData, refreshData, clearError } =
     useHealthData();
   const { settings } = useAccessibility();
   const { speakSummary, isSpeaking, stop } = useSpeech();
-
-  useEffect(() => {
-    AppleHealthKit.initHealthKit(permissions, (error: string) => {
-      /* Called after we receive a response from the system */
-      if (error) {
-        console.log("[ERROR] Cannot grant permissions!");
-      }
-      /* Can now read or write to HealthKit */
-      const options = {
-        startDate: new Date(2020, 1, 1).toISOString(),
-      };
-      //   AppleHealthKit.getHeartRateSamples(
-      //     options,
-      //     (callbackError: string, results: HealthValue[]) => {
-      //       /* Samples are now collected from HealthKit */
-      //     },
-      //   );
-    });
-  }, []);
 
   // ============================================================================
   // Screen Reader Announcements on Load (Requirement 8.5)

@@ -11,6 +11,7 @@
       ]
     ],
     "ios": {
+      "newArchEnabled": false,
       "bundleIdentifier": "com.anonymous.healthvis",
       "infoPlist": {
         "NSHealthShareUsageDescription": "HealthVis reads your steps, heart rate, and glucose to show health summaries."
