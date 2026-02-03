@@ -157,3 +157,63 @@ export const announceLoading = (message: string = 'Loading'): void => {
 export const announceDataUpdate = (message: string): void => {
   announce(`Data updated: ${message}`, { priority: 'polite' });
 };
+
+/**
+ * Announces HealthKit data fetching with polite priority
+ * Used when fetching health data from HealthKit
+ * 
+ * @param category - Optional category being fetched (e.g., 'vitals', 'activity')
+ * @param count - Optional count of metrics fetched
+ */
+export const announceHealthKitFetch = (category?: string, count?: number): void => {
+  let message = 'Fetching health data from HealthKit';
+  
+  if (category && count !== undefined) {
+    message = `Fetched ${count} ${category} metrics from HealthKit`;
+  } else if (category) {
+    message = `Fetching ${category} data from HealthKit`;
+  } else if (count !== undefined) {
+    message = `Fetched ${count} health metrics from HealthKit`;
+  }
+  
+  announce(message, { priority: 'polite' });
+};
+
+/**
+ * Announces HealthKit permission errors with assertive priority
+ * Used when HealthKit permissions are denied or unavailable
+ * 
+ * @param permissionType - The type of permission that was denied (e.g., 'heart rate', 'steps')
+ * @param isPartial - Whether some permissions were granted (partial denial)
+ */
+export const announcePermissionError = (permissionType?: string, isPartial: boolean = false): void => {
+  let message: string;
+  
+  if (permissionType) {
+    message = `HealthKit permission denied for ${permissionType}. Enable permissions in Settings to view this data.`;
+  } else if (isPartial) {
+    message = 'Some HealthKit permissions were denied. Some health data may be unavailable.';
+  } else {
+    message = 'HealthKit access denied. Enable permissions in Settings to view your health data.';
+  }
+  
+  announce(message, { priority: 'assertive' });
+};
+
+/**
+ * Announces category navigation with polite priority
+ * Used when user switches between health data categories
+ * 
+ * @param category - The category being navigated to (e.g., 'Vitals', 'Activity', 'Body')
+ * @param count - Optional count of metrics in the category
+ */
+export const announceCategoryNavigation = (category: string, count?: number): void => {
+  let message = `Viewing ${category}`;
+  
+  if (count !== undefined) {
+    const metricWord = count === 1 ? 'metric' : 'metrics';
+    message = `Viewing ${category}. ${count} ${metricWord} available.`;
+  }
+  
+  announce(message, { priority: 'polite' });
+};

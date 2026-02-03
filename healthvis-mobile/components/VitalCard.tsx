@@ -25,7 +25,8 @@ import { AccessibleButton } from './AccessibleButton';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useHaptics } from '../hooks/useHaptics';
 import { useSpeech } from '../hooks/useSpeech';
-import { VitalSign } from '../types';
+import { VitalSign, HealthMetric } from '../types';
+import { getDisplayNameForType, hasDefinedRange } from '../types/health-metric';
 import { FONT_SIZES, TOUCH_TARGET_SIZES } from '../constants/accessibility';
 
 // ============================================================================
@@ -33,8 +34,11 @@ import { FONT_SIZES, TOUCH_TARGET_SIZES } from '../constants/accessibility';
 // ============================================================================
 
 export interface VitalCardProps {
-  /** The vital sign data to display */
-  vital: VitalSign;
+  /** The vital sign data to display (legacy) */
+  vital?: VitalSign;
+  
+  /** The health metric data to display (new) */
+  metric?: HealthMetric;
   
   /** Optional custom style for the card container */
   style?: ViewStyle;
@@ -44,7 +48,7 @@ export interface VitalCardProps {
 // VitalCard Component
 // ============================================================================
 
-export function VitalCard({ vital, style }: VitalCardProps) {
+export function VitalCard({ vital, metric, style }: VitalCardProps) {
   // ============================================================================
   // State
   // ============================================================================
@@ -60,17 +64,34 @@ export function VitalCard({ vital, style }: VitalCardProps) {
   const { speakDetails, isSpeaking, stop } = useSpeech();
 
   // ============================================================================
-  // Computed Values
+  // Computed Values - Support both VitalSign and HealthMetric
   // ============================================================================
 
-  // Format vital type for display
-  const vitalName = formatVitalType(vital.type);
+  // Use metric if provided, otherwise use vital (backwards compatibility)
+  const data = metric || vital;
+  
+  // Extract common properties (with defaults to avoid null issues)
+  const value = data?.value ?? 0;
+  const unit = data?.unit ?? '';
+  const timestamp = data?.timestamp ?? new Date();
+  const range = data?.range;
+  
+  // Get display name
+  const displayName = metric 
+    ? getDisplayNameForType(metric.type)
+    : vital ? formatVitalType(vital.type) : '';
+  
+  // Get icon
+  const icon = metric ? getIconForMetricType(metric.type) : vital ? getIconForMetricType(vital.type) : '📊';
+  
+  // Check if this metric has a defined range
+  const showRange = metric ? hasDefinedRange(metric.type) : true;
   
   // Format range for display
-  const rangeText = formatRange(vital.range);
+  const rangeText = range ? formatRange(range) : 'N/A';
   
   // Format timestamp for display
-  const timeText = formatTimestamp(vital.timestamp);
+  const timeText = formatTimestamp(timestamp);
   
   // Determine font size based on settings
   const fontSize = FONT_SIZES[settings.fontSize];
@@ -86,8 +107,8 @@ export function VitalCard({ vital, style }: VitalCardProps) {
 
   // Accessibility label that updates with expanded/collapsed state
   const cardAccessibilityLabel = expanded
-    ? `${vitalName}: ${vital.value} ${vital.unit}, ${rangeText}. Expanded. Double tap to collapse.`
-    : `${vitalName}: ${vital.value} ${vital.unit}, ${rangeText}. Collapsed. Double tap to expand for details.`;
+    ? `${displayName}: ${value} ${unit}${showRange ? `, ${rangeText}` : ''}. Expanded. Double tap to collapse.`
+    : `${displayName}: ${value} ${unit}${showRange ? `, ${rangeText}` : ''}. Collapsed. Double tap to expand for details.`;
 
   const cardAccessibilityHint = expanded
     ? 'Shows detailed information. Double tap to collapse.'
@@ -103,12 +124,14 @@ export function VitalCard({ vital, style }: VitalCardProps) {
    * Requirement 7.3: Provide collapse button when expanded
    */
   const handleToggle = useCallback(() => {
-    // Trigger haptic feedback based on data range
-    triggerForDataPoint(vital.range);
+    // Trigger haptic feedback based on data range (if available)
+    if (range) {
+      triggerForDataPoint(range);
+    }
     
     // Toggle expanded state
     setExpanded(prev => !prev);
-  }, [vital.range, triggerForDataPoint]);
+  }, [range, triggerForDataPoint]);
 
   /**
    * Handles "Hear Summary" button press
@@ -118,9 +141,30 @@ export function VitalCard({ vital, style }: VitalCardProps) {
     if (isSpeaking) {
       stop();
     } else {
-      speakDetails(vital);
+      // For backwards compatibility, convert HealthMetric to VitalSign if needed
+      if (vital) {
+        speakDetails(vital);
+      } else if (metric) {
+        // Create a temporary VitalSign-like object for TTS
+        const vitalForTTS: VitalSign = {
+          type: metric.type as any, // Type conversion for compatibility
+          value: metric.value,
+          timestamp: metric.timestamp,
+          unit: metric.unit,
+          range: metric.range || 'normal',
+        };
+        speakDetails(vitalForTTS);
+      }
     }
-  }, [vital, speakDetails, isSpeaking, stop]);
+  }, [vital, metric, speakDetails, isSpeaking, stop]);
+
+  // ============================================================================
+  // Early Return - No Data
+  // ============================================================================
+  
+  if (!data) {
+    return null; // No data to display
+  }
 
   // ============================================================================
   // Render
@@ -142,16 +186,21 @@ export function VitalCard({ vital, style }: VitalCardProps) {
         accessibilityState={{ expanded }}
       >
         <View style={styles.headerContent}>
-          {/* Vital Sign Name */}
-          <ThemedText
-            style={[
-              styles.vitalName,
-              { fontSize: fontSize.heading },
-            ]}
-            type="defaultSemiBold"
-          >
-            {vitalName}
-          </ThemedText>
+          {/* Icon and Vital Sign Name */}
+          <View style={styles.nameContainer}>
+            <ThemedText style={[styles.icon, { fontSize: fontSize.heading }]}>
+              {icon}
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.vitalName,
+                { fontSize: fontSize.heading },
+              ]}
+              type="defaultSemiBold"
+            >
+              {displayName}
+            </ThemedText>
+          </View>
 
           {/* Value and Unit */}
           <View style={styles.valueContainer}>
@@ -159,11 +208,11 @@ export function VitalCard({ vital, style }: VitalCardProps) {
               style={[
                 styles.value,
                 { fontSize: fontSize.title },
-                getRangeColor(vital.range, settings.contrast),
+                range && showRange ? getRangeColor(range, settings.contrast) : {},
               ]}
               type="title"
             >
-              {vital.value}
+              {value}
             </ThemedText>
             <ThemedText
               style={[
@@ -171,20 +220,22 @@ export function VitalCard({ vital, style }: VitalCardProps) {
                 { fontSize: fontSize.body },
               ]}
             >
-              {vital.unit}
+              {unit}
             </ThemedText>
           </View>
 
-          {/* Range Status */}
-          <ThemedText
-            style={[
-              styles.range,
-              { fontSize: fontSize.body },
-              getRangeColor(vital.range, settings.contrast),
-            ]}
-          >
-            {rangeText}
-          </ThemedText>
+          {/* Range Status (only if metric has defined range) */}
+          {showRange && range && (
+            <ThemedText
+              style={[
+                styles.range,
+                { fontSize: fontSize.body },
+                getRangeColor(range, settings.contrast),
+              ]}
+            >
+              {rangeText}
+            </ThemedText>
+          )}
 
           {/* Expand/Collapse Indicator */}
           <ThemedText
@@ -263,6 +314,48 @@ function formatVitalType(type: string): string {
     sleep: 'Sleep Duration',
   };
   return typeMap[type] || type;
+}
+
+/**
+ * Gets an icon/emoji for a health metric type
+ */
+function getIconForMetricType(type: string): string {
+  const iconMap: Record<string, string> = {
+    // Vitals
+    heart_rate: '❤️',
+    blood_pressure_systolic: '🩺',
+    blood_pressure_diastolic: '🩺',
+    respiratory_rate: '🫁',
+    body_temperature: '🌡️',
+    oxygen_saturation: '🫁',
+    blood_glucose: '🩸',
+    glucose: '🩸',
+    
+    // Activity
+    steps: '👟',
+    distance: '🏃',
+    flights_climbed: '🪜',
+    active_energy: '🔥',
+    exercise_minutes: '⏱️',
+    
+    // Body
+    weight: '⚖️',
+    height: '📏',
+    bmi: '📊',
+    body_fat_percentage: '📊',
+    
+    // Nutrition
+    dietary_energy: '🍽️',
+    water: '💧',
+    protein: '🥩',
+    carbohydrates: '🍞',
+    fats: '🥑',
+    
+    // Sleep & Mindfulness
+    sleep: '😴',
+    mindfulness: '🧘',
+  };
+  return iconMap[type] || '📊';
 }
 
 /**
@@ -352,8 +445,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  vitalName: {
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
+  },
+
+  icon: {
+    lineHeight: 24,
+  },
+
+  vitalName: {
+    flex: 1,
   },
 
   valueContainer: {

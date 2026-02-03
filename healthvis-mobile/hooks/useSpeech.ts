@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import * as Speech from 'expo-speech';
 import { usePathname } from 'expo-router';
 import { VitalSign } from '../types';
+import { HealthMetric, HealthCategory, getDisplayNameForType } from '../types/health-metric';
 
 // ============================================================================
 // Types
@@ -29,6 +30,9 @@ export interface UseSpeechReturn {
   isSpeaking: boolean;
   speakSummary: (vitals: VitalSign[]) => Promise<void>;
   speakDetails: (vital: VitalSign) => Promise<void>;
+  speakHealthMetricSummary: (metrics: HealthMetric[], category?: HealthCategory) => Promise<void>;
+  speakHealthMetricDetails: (metric: HealthMetric) => Promise<void>;
+  speakCategorySummary: (category: HealthCategory, metrics: HealthMetric[]) => Promise<void>;
 }
 
 // ============================================================================
@@ -210,6 +214,194 @@ export function useSpeech(): UseSpeechReturn {
   }, [speak]);
 
   // ============================================================================
+  // Speak Health Metric Summary Function
+  // ============================================================================
+
+  /**
+   * Speaks a summary of health metrics (new unified format)
+   * Supports all health metric categories
+   * 
+   * @param metrics - Array of health metrics to summarize
+   * @param category - Optional category filter
+   */
+  const speakHealthMetricSummary = useCallback(async (
+    metrics: HealthMetric[], 
+    category?: HealthCategory
+  ): Promise<void> => {
+    try {
+      if (!metrics || metrics.length === 0) {
+        await speak('No health data available.');
+        return;
+      }
+
+      // Build summary text
+      const summaryParts: string[] = [];
+      
+      if (category) {
+        summaryParts.push(`${formatCategory(category)} summary:`);
+      } else {
+        summaryParts.push('Health data summary:');
+      }
+
+      // Group metrics by type and get the most recent value for each
+      const metricsByType = new Map<string, HealthMetric>();
+      for (const metric of metrics) {
+        const existing = metricsByType.get(metric.type);
+        if (!existing || metric.timestamp > existing.timestamp) {
+          metricsByType.set(metric.type, metric);
+        }
+      }
+
+      // Speak each metric type
+      for (const metric of metricsByType.values()) {
+        const metricName = getDisplayNameForType(metric.type);
+        const rangeDescription = metric.range ? formatRange(metric.range) : '';
+        
+        if (rangeDescription) {
+          summaryParts.push(
+            `${metricName}: ${metric.value} ${metric.unit}, ${rangeDescription}.`
+          );
+        } else {
+          summaryParts.push(
+            `${metricName}: ${metric.value} ${metric.unit}.`
+          );
+        }
+      }
+
+      const summaryText = summaryParts.join(' ');
+      await speak(summaryText);
+    } catch (error) {
+      console.error('Failed to speak health metric summary:', error);
+      await speak('Unable to read health data summary.');
+    }
+  }, [speak]);
+
+  // ============================================================================
+  // Speak Health Metric Details Function
+  // ============================================================================
+
+  /**
+   * Speaks detailed information about a single health metric
+   * 
+   * @param metric - The health metric to describe in detail
+   */
+  const speakHealthMetricDetails = useCallback(async (metric: HealthMetric): Promise<void> => {
+    try {
+      const metricName = getDisplayNameForType(metric.type);
+      const rangeDescription = metric.range ? formatRange(metric.range) : '';
+      const timestamp = formatTimestamp(metric.timestamp);
+      const categoryName = formatCategory(metric.category);
+
+      const detailParts = [
+        `${metricName} details:`,
+        `Category: ${categoryName}.`,
+        `Current value: ${metric.value} ${metric.unit}.`,
+      ];
+
+      if (rangeDescription) {
+        detailParts.push(`Status: ${rangeDescription}.`);
+      }
+
+      detailParts.push(`Recorded at: ${timestamp}.`);
+
+      // Add metadata if available
+      if (metric.metadata && Object.keys(metric.metadata).length > 0) {
+        detailParts.push('Additional information:');
+        for (const [key, value] of Object.entries(metric.metadata)) {
+          detailParts.push(`${key}: ${value}.`);
+        }
+      }
+
+      const detailText = detailParts.join(' ');
+      await speak(detailText);
+    } catch (error) {
+      console.error('Failed to speak health metric details:', error);
+      await speak('Unable to read metric details.');
+    }
+  }, [speak]);
+
+  // ============================================================================
+  // Speak Category Summary Function
+  // ============================================================================
+
+  /**
+   * Speaks a category-specific summary with contextual information
+   * 
+   * @param category - The health category
+   * @param metrics - Metrics in that category
+   */
+  const speakCategorySummary = useCallback(async (
+    category: HealthCategory,
+    metrics: HealthMetric[]
+  ): Promise<void> => {
+    try {
+      if (!metrics || metrics.length === 0) {
+        await speak(`No ${formatCategory(category).toLowerCase()} data available.`);
+        return;
+      }
+
+      const categoryName = formatCategory(category);
+      const summaryParts: string[] = [`${categoryName} summary:`];
+
+      // Add category-specific context
+      switch (category) {
+        case 'vitals':
+          summaryParts.push('Your vital signs show:');
+          break;
+        case 'activity':
+          summaryParts.push('Your activity metrics show:');
+          break;
+        case 'body':
+          summaryParts.push('Your body measurements show:');
+          break;
+        case 'nutrition':
+          summaryParts.push('Your nutrition data shows:');
+          break;
+        case 'sleep':
+          summaryParts.push('Your sleep data shows:');
+          break;
+        case 'mindfulness':
+          summaryParts.push('Your mindfulness data shows:');
+          break;
+      }
+
+      // Group by type and get most recent
+      const metricsByType = new Map<string, HealthMetric>();
+      for (const metric of metrics) {
+        const existing = metricsByType.get(metric.type);
+        if (!existing || metric.timestamp > existing.timestamp) {
+          metricsByType.set(metric.type, metric);
+        }
+      }
+
+      // Speak each metric
+      for (const metric of metricsByType.values()) {
+        const metricName = getDisplayNameForType(metric.type);
+        const rangeDescription = metric.range ? formatRange(metric.range) : '';
+        
+        if (rangeDescription) {
+          summaryParts.push(
+            `${metricName}: ${metric.value} ${metric.unit}, ${rangeDescription}.`
+          );
+        } else {
+          summaryParts.push(
+            `${metricName}: ${metric.value} ${metric.unit}.`
+          );
+        }
+      }
+
+      // Add total count
+      summaryParts.push(`Total of ${metrics.length} data points recorded.`);
+
+      const summaryText = summaryParts.join(' ');
+      await speak(summaryText);
+    } catch (error) {
+      console.error('Failed to speak category summary:', error);
+      await speak('Unable to read category summary.');
+    }
+  }, [speak]);
+
+  // ============================================================================
   // Helper Functions
   // ============================================================================
 
@@ -224,6 +416,21 @@ export function useSpeech(): UseSpeechReturn {
       sleep: 'Sleep duration',
     };
     return typeMap[type] || type;
+  }
+
+  /**
+   * Formats health category for speech
+   */
+  function formatCategory(category: HealthCategory): string {
+    const categoryMap: Record<HealthCategory, string> = {
+      vitals: 'Vitals',
+      activity: 'Activity',
+      body: 'Body Measurements',
+      nutrition: 'Nutrition',
+      sleep: 'Sleep',
+      mindfulness: 'Mindfulness',
+    };
+    return categoryMap[category];
   }
 
   /**
@@ -272,5 +479,8 @@ export function useSpeech(): UseSpeechReturn {
     isSpeaking,
     speakSummary,
     speakDetails,
+    speakHealthMetricSummary,
+    speakHealthMetricDetails,
+    speakCategorySummary,
   };
 }

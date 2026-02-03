@@ -14,18 +14,25 @@ import {
   VitalSign,
   AnalysisResponse,
   ChatResponse,
-  UploadDataResponse,
+  HealthMetric,
+  HealthMetricType,
+  HealthCategory,
+  CategorizedHealthData,
 } from '../types';
 import {
   analyzeData as apiAnalyzeData,
   chatWithAI as apiChatWithAI,
-  uploadFile as apiUploadFile,
   APIError,
 } from '../lib/api-client';
 import { useAudio } from '../hooks/useAudio';
 import { useHaptics } from '../hooks/useHaptics';
 import { useSpeech } from '../hooks/useSpeech';
-import { announceSuccess, announceError } from '../lib/announcer';
+import { announceSuccess, announceError, announceHealthKitFetch, announcePermissionError } from '../lib/announcer';
+import { 
+  healthKitService, 
+  PermissionStatus, 
+  FetchOptions 
+} from '../lib/healthkit-service';
 
 // ============================================================================
 // Storage Keys
@@ -33,6 +40,7 @@ import { announceSuccess, announceError } from '../lib/announcer';
 
 const CACHE_KEYS = {
   VITALS: 'health_data_vitals',
+  HEALTH_METRICS: 'health_data_metrics',
   LAST_ANALYSIS: 'health_data_last_analysis',
   LAST_FETCH: 'health_data_last_fetch',
 } as const;
@@ -46,15 +54,20 @@ const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
 
 export interface HealthDataContextValue {
   vitals: VitalSign[];
+  healthMetrics: CategorizedHealthData;
+  permissions: PermissionStatus | null;
+  isInitialized: boolean;
   isLoading: boolean;
   error: Error | null;
   fetchData: () => Promise<void>;
-  uploadFile: (file: File | Blob, filename: string) => Promise<UploadDataResponse>;
   requestAnalysis: (data: Record<string, any>) => Promise<AnalysisResponse>;
   requestChat: (message: string, context?: any) => Promise<ChatResponse>;
   clearError: () => void;
   refreshData: () => Promise<void>;
   setVitals: (vitals: VitalSign[]) => Promise<void>;
+  getMetricsByCategory: (category: HealthCategory) => HealthMetric[];
+  getMetricsByType: (type: HealthMetricType) => HealthMetric[];
+  getMetricsByDateRange: (startDate: Date, endDate: Date) => HealthMetric[];
 }
 
 // ============================================================================
@@ -77,6 +90,16 @@ interface HealthDataProviderProps {
 
 export function HealthDataProvider({ children }: HealthDataProviderProps) {
   const [vitals, setVitals] = useState<VitalSign[]>([]);
+  const [healthMetrics, setHealthMetrics] = useState<CategorizedHealthData>({
+    vitals: [],
+    activity: [],
+    body: [],
+    nutrition: [],
+    sleep: [],
+    mindfulness: [],
+  });
+  const [permissions, setPermissions] = useState<PermissionStatus | null>(null);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -90,7 +113,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   // ============================================================================
 
   /**
-   * Save vitals to cache
+   * Save vitals to cache (legacy format)
    */
   async function saveVitalsToCache(vitalsData: VitalSign[]): Promise<void> {
     try {
@@ -107,7 +130,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }
 
   /**
-   * Load vitals from cache
+   * Load vitals from cache (legacy format)
    */
   async function loadVitalsFromCache(): Promise<VitalSign[] | null> {
     try {
@@ -135,6 +158,107 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }
 
   /**
+   * Save health metrics to cache (new format)
+   */
+  async function saveHealthMetricsToCache(metrics: CategorizedHealthData): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        CACHE_KEYS.HEALTH_METRICS,
+        JSON.stringify({
+          data: metrics,
+          timestamp: Date.now(),
+        })
+      );
+    } catch (error) {
+      console.error('Failed to save health metrics to cache:', error);
+    }
+  }
+
+  /**
+   * Load health metrics from cache (new format)
+   */
+  async function loadHealthMetricsFromCache(): Promise<CategorizedHealthData | null> {
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
+      if (!cached) {
+        return null;
+      }
+
+      const { data, timestamp } = JSON.parse(cached);
+      
+      // Check if cache is expired
+      if (Date.now() - timestamp > CACHE_EXPIRATION_MS) {
+        return null;
+      }
+
+      // Parse dates in all metrics
+      const parsedData: CategorizedHealthData = {
+        vitals: [],
+        activity: [],
+        body: [],
+        nutrition: [],
+        sleep: [],
+        mindfulness: [],
+      };
+
+      for (const category of Object.keys(data) as Array<keyof CategorizedHealthData>) {
+        parsedData[category] = data[category].map((metric: any) => ({
+          ...metric,
+          timestamp: new Date(metric.timestamp),
+        }));
+      }
+
+      return parsedData;
+    } catch (error) {
+      console.error('Failed to load health metrics from cache:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Migrate existing VitalSign cache data to HealthMetric format
+   * This ensures backwards compatibility with existing cached data
+   * 
+   * Requirements: 9.1, 9.3, 9.4, 9.5
+   */
+  async function migrateVitalSignCache(): Promise<void> {
+    try {
+      // Check if we already have HealthMetric cache
+      const existingMetrics = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
+      if (existingMetrics) {
+        console.log('HealthMetric cache already exists, skipping migration');
+        return;
+      }
+
+      // Load old VitalSign cache
+      const cachedVitals = await loadVitalsFromCache();
+      if (!cachedVitals || cachedVitals.length === 0) {
+        console.log('No VitalSign cache to migrate');
+        return;
+      }
+
+      console.log(`Migrating ${cachedVitals.length} VitalSign records to HealthMetric format...`);
+
+      // Import migration function
+      const { migrateVitalSignsToHealthMetrics, categorizeHealthMetrics } = await import('../types/health-metric');
+
+      // Migrate VitalSigns to HealthMetrics
+      const migratedMetrics = migrateVitalSignsToHealthMetrics(cachedVitals);
+
+      // Categorize the metrics
+      const categorizedMetrics = categorizeHealthMetrics(migratedMetrics);
+
+      // Save to new cache format
+      await saveHealthMetricsToCache(categorizedMetrics);
+
+      console.log('✅ Successfully migrated VitalSign cache to HealthMetric format');
+    } catch (error) {
+      console.error('Failed to migrate VitalSign cache:', error);
+      // Don't throw - migration failure shouldn't break the app
+    }
+  }
+
+  /**
    * Save analysis response to cache
    */
   async function saveAnalysisToCache(analysis: AnalysisResponse): Promise<void> {
@@ -152,116 +276,173 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }
 
   // ============================================================================
-  // Fetch Data Function (Requirement 10.1, 10.7)
+  // Fetch Data Function (Requirement 10.1, 10.7, 4.1, 4.2, 9.2)
   // ============================================================================
 
   /**
-   * Fetches health data from backend or cache
-   * Implements offline support by loading cached data when backend is unavailable
+   * Fetches health data from HealthKit with cache-first loading for offline support
+   * Implements comprehensive data fetching across all health categories
+   * 
+   * Includes robust error handling with retry logic and fallback to cached data.
+   * 
+   * Requirements: 10.1, 10.7, 4.1, 4.2, 9.2, 6.3, 6.5
    */
   const fetchData = useCallback(async (): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Try to load from cache first for offline support
-      const cachedVitals = await loadVitalsFromCache();
-      if (cachedVitals && cachedVitals.length > 0) {
-        setVitals(cachedVitals);
-        console.log(`✅ Loaded ${cachedVitals.length} vitals from cache`);
+      // Initialize HealthKit if not already initialized
+      if (!isInitialized) {
+        console.log('Initializing HealthKit...');
+        announceHealthKitFetch(); // Announce we're fetching data
+        
+        try {
+          const permStatus = await healthKitService.initializeHealthKit();
+          setPermissions(permStatus);
+          setIsInitialized(true);
+          console.log('HealthKit initialized with permissions:', permStatus);
+          
+          // Check if any permissions were denied
+          if (!permStatus.allGranted) {
+            const deniedCategories: string[] = [];
+            if (!permStatus.categoryStatus.vitals) deniedCategories.push('vitals');
+            if (!permStatus.categoryStatus.activity) deniedCategories.push('activity');
+            if (!permStatus.categoryStatus.body) deniedCategories.push('body');
+            if (!permStatus.categoryStatus.nutrition) deniedCategories.push('nutrition');
+            if (!permStatus.categoryStatus.sleep) deniedCategories.push('sleep');
+            if (!permStatus.categoryStatus.mindfulness) deniedCategories.push('mindfulness');
+            
+            if (deniedCategories.length > 0) {
+              announcePermissionError(deniedCategories.join(', '), true);
+            }
+          }
+        } catch (initError) {
+          console.error('HealthKit initialization failed:', initError);
+          // Continue with cached data if available
+          const cachedMetrics = await loadHealthMetricsFromCache();
+          if (cachedMetrics && Object.values(cachedMetrics).some(cat => cat.length > 0)) {
+            setHealthMetrics(cachedMetrics);
+            announceSuccess('Using cached health data');
+          } else {
+            throw initError; // Re-throw if no cached data available
+          }
+          setIsLoading(false);
+          return;
+        }
       }
 
-      // Attempt to fetch fresh data from backend
-      // Note: In a real implementation, you would have a specific endpoint for fetching vitals
-      // For now, we'll simulate this or use the analysis endpoint
+      // Migrate old VitalSign cache if needed (backwards compatibility)
+      await migrateVitalSignCache();
+
+      // Load from cache first for offline support (cache-first loading)
+      const cachedMetrics = await loadHealthMetricsFromCache();
+      if (cachedMetrics) {
+        setHealthMetrics(cachedMetrics);
+        console.log('✅ Loaded health metrics from cache');
+      }
+
+      // Load data range preference (default to 30 days)
+      let daysToFetch = 30;
+      try {
+        const rangeStr = await AsyncStorage.getItem('health_data_range');
+        if (rangeStr) {
+          daysToFetch = parseInt(rangeStr, 10);
+        }
+      } catch (error) {
+        console.error('Failed to load data range preference:', error);
+      }
+
+      // Fetch fresh data from HealthKit with configured range
+      const fetchOptions: FetchOptions = {
+        startDate: new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000),
+        endDate: new Date(),
+        limit: 1000, // Reasonable limit for performance
+      };
+
+      console.log(`Fetching fresh data from HealthKit (last ${daysToFetch} days)...`);
       
-      // Since there's no specific "fetch vitals" endpoint in the current API,
-      // we'll rely on cached data or data from analysis/upload operations
-      // This is a placeholder that would be replaced with actual endpoint call
-      
+      try {
+        const freshMetrics = await healthKitService.fetchAllHealthData(fetchOptions);
+        
+        // Update state with fresh data
+        setHealthMetrics(freshMetrics);
+        
+        // Save to cache
+        await saveHealthMetricsToCache(freshMetrics);
+        
+        // Calculate total metrics fetched
+        const totalMetrics = Object.values(freshMetrics).reduce(
+          (sum, category) => sum + category.length, 
+          0
+        );
+        
+        console.log(`✅ Fetched ${totalMetrics} health metrics from HealthKit`);
+        
+        // Announce success with count
+        announceHealthKitFetch(undefined, totalMetrics);
+        
+        // Trigger haptic feedback for successful data load
+        if (totalMetrics > 0) {
+          // Check if any metrics are in danger or warning range
+          const allMetricsArray = Object.values(freshMetrics).flat();
+          const hasDanger = allMetricsArray.some(m => m.range === 'danger');
+          const hasWarning = allMetricsArray.some(m => m.range === 'warning');
+          
+          if (hasDanger) {
+            haptics.triggerHeavy();
+          } else if (hasWarning) {
+            haptics.triggerMedium();
+          } else {
+            haptics.triggerLight();
+          }
+        }
+      } catch (fetchError) {
+        console.error('Error fetching fresh data from HealthKit:', fetchError);
+        
+        // Fall back to cached data if available
+        if (cachedMetrics && Object.values(cachedMetrics).some(cat => cat.length > 0)) {
+          console.log('Using cached data due to fetch failure');
+          announceSuccess('Using cached health data');
+          // Don't set error state since we have cached data
+        } else {
+          // No cached data available, set error
+          throw fetchError;
+        }
+      }
+
       setIsLoading(false);
     } catch (err) {
-      // Only show error if we don't have cached data
-      const cachedVitals = await loadVitalsFromCache();
-      if (!cachedVitals || cachedVitals.length === 0) {
+      console.error('Error fetching health data:', err);
+      
+      // Trigger error haptic feedback
+      haptics.triggerHeavy();
+      
+      // Try to use cached data if available (last resort)
+      const cachedMetrics = await loadHealthMetricsFromCache();
+      if (!cachedMetrics || Object.values(cachedMetrics).every(cat => cat.length === 0)) {
+        // No cached data available, show error
         const errorMessage = err instanceof Error ? err : new Error('Failed to fetch data');
         setError(errorMessage);
 
-        // Announce error to screen readers
-        announceError('Failed to load health data');
+        // Announce error to screen readers with specific message
+        if (err instanceof Error && err.message.includes('permission')) {
+          announcePermissionError();
+        } else {
+          announceError('Failed to load health data from HealthKit');
+        }
         
         // Play error sound
         await audio.playErrorSound();
-
-        console.error('Error fetching health data:', errorMessage);
       } else {
-        // We have cached data, so just log the error
-        console.log('Backend unavailable, using cached data');
+        // We have cached data, just log the error
+        console.log('HealthKit unavailable, using cached data');
+        announceSuccess('Using cached health data');
       }
       
       setIsLoading(false);
     }
-  }, [audio]);
-
-  // ============================================================================
-  // Upload File Function (Requirement 10.4)
-  // ============================================================================
-
-  /**
-   * Uploads a health data file (CSV or JSON) to the backend
-   * Triggers appropriate accessibility feedback based on response
-   */
-  const uploadFile = useCallback(
-    async (file: File | Blob, filename: string): Promise<UploadDataResponse> => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Call API client to upload file
-        const response = await apiUploadFile(file, filename);
-
-        // Process the data preview to extract vitals
-        let processedVitals: VitalSign[] = [];
-        if (response.data_preview && Array.isArray(response.data_preview)) {
-          processedVitals = processDataPreviewToVitals(response.data_preview);
-          setVitals(processedVitals);
-          
-          // Cache the vitals
-          await saveVitalsToCache(processedVitals);
-        }
-
-        // Cache the analysis
-        if (response.analysis) {
-          await saveAnalysisToCache({
-            analysis: response.analysis,
-            chart_suggestions: response.chart_suggestions,
-            status: response.status,
-          });
-        }
-
-        // Trigger accessibility outputs (Requirement 10.8)
-        await triggerAccessibilityOutputs(response.analysis.analysis, processedVitals);
-
-        // Announce success
-        announceSuccess('File uploaded successfully');
-        await audio.playSuccessSound();
-
-        setIsLoading(false);
-        return response;
-      } catch (err) {
-        const errorMessage = err instanceof APIError ? err : new Error('Failed to upload file');
-        setError(errorMessage);
-        setIsLoading(false);
-
-        // Announce error
-        announceError('Failed to upload file');
-        await audio.playErrorSound();
-
-        throw errorMessage;
-      }
-    },
-    [audio]
-  );
+  }, [isInitialized, audio, haptics]);
 
   // ============================================================================
   // Request Analysis Function (Requirement 10.1, 10.2)
@@ -362,16 +543,19 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
 
   /**
    * Forces a refresh of health data, bypassing cache
+   * Requirements: 7.1, 7.4
    */
   const refreshData = useCallback(async (): Promise<void> => {
-    // Clear cache
+    // Clear both old and new cache formats
     try {
       await AsyncStorage.removeItem(CACHE_KEYS.VITALS);
+      await AsyncStorage.removeItem(CACHE_KEYS.HEALTH_METRICS);
+      console.log('✅ Cache cleared for refresh');
     } catch (error) {
       console.error('Failed to clear cache:', error);
     }
 
-    // Fetch fresh data
+    // Fetch fresh data from HealthKit
     await fetchData();
   }, [fetchData]);
 
@@ -394,35 +578,70 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }, []);
 
   // ============================================================================
-  // Helper Functions
+  // Category-Based Query Methods (Requirement 4.6)
   // ============================================================================
 
   /**
-   * Processes data preview from backend into VitalSign array
+   * Get all metrics for a specific category
+   * 
+   * @param category - The health category to query
+   * @returns Array of metrics in that category
    */
-  function processDataPreviewToVitals(dataPreview: any[]): VitalSign[] {
-    // This is a simplified implementation
-    // In production, you would parse the actual data structure from the backend
-    const processedVitals: VitalSign[] = [];
+  const getMetricsByCategory = useCallback((category: HealthCategory): HealthMetric[] => {
+    return healthMetrics[category] || [];
+  }, [healthMetrics]);
 
-    for (const item of dataPreview) {
-      // Try to extract vital sign information
-      // This depends on the actual structure of data_preview from backend
-      if (item && typeof item === 'object') {
-        // Example structure - adjust based on actual backend response
-        const vital: VitalSign = {
-          type: item.type || 'heart_rate',
-          value: item.value || 0,
-          timestamp: item.timestamp ? new Date(item.timestamp) : new Date(),
-          unit: item.unit || 'bpm',
-          range: item.range || 'normal',
-        };
-        processedVitals.push(vital);
-      }
+  /**
+   * Get all metrics of a specific type across all categories
+   * 
+   * @param type - The health metric type to query
+   * @returns Array of metrics of that type
+   */
+  const getMetricsByType = useCallback((type: HealthMetricType): HealthMetric[] => {
+    const allMetrics: HealthMetric[] = [];
+    
+    // Search through all categories
+    for (const category of Object.keys(healthMetrics) as Array<keyof CategorizedHealthData>) {
+      const categoryMetrics = healthMetrics[category].filter(metric => metric.type === type);
+      allMetrics.push(...categoryMetrics);
     }
+    
+    // Sort by timestamp (most recent first)
+    allMetrics.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    return allMetrics;
+  }, [healthMetrics]);
 
-    return processedVitals;
-  }
+  /**
+   * Get all metrics within a specific date range
+   * 
+   * @param startDate - Start of the date range (inclusive)
+   * @param endDate - End of the date range (inclusive)
+   * @returns Array of metrics within the date range
+   */
+  const getMetricsByDateRange = useCallback((startDate: Date, endDate: Date): HealthMetric[] => {
+    const allMetrics: HealthMetric[] = [];
+    
+    // Collect all metrics from all categories
+    for (const category of Object.keys(healthMetrics) as Array<keyof CategorizedHealthData>) {
+      allMetrics.push(...healthMetrics[category]);
+    }
+    
+    // Filter by date range
+    const filteredMetrics = allMetrics.filter(metric => {
+      const metricTime = metric.timestamp.getTime();
+      return metricTime >= startDate.getTime() && metricTime <= endDate.getTime();
+    });
+    
+    // Sort by timestamp (most recent first)
+    filteredMetrics.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    return filteredMetrics;
+  }, [healthMetrics]);
+
+  // ============================================================================
+  // Helper Functions
+  // ============================================================================
 
   /**
    * Triggers appropriate TTS, haptics, or sonification based on backend responses
@@ -463,15 +682,20 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
 
   const value: HealthDataContextValue = {
     vitals,
+    healthMetrics,
+    permissions,
+    isInitialized,
     isLoading,
     error,
     fetchData,
-    uploadFile,
     requestAnalysis,
     requestChat,
     clearError,
     refreshData,
     setVitals: setVitalsData,
+    getMetricsByCategory,
+    getMetricsByType,
+    getMetricsByDateRange,
   };
 
   return (

@@ -7,7 +7,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AccessibilityProvider } from '@/contexts/AccessibilityContext';
-import { HealthDataProvider } from '@/contexts/HealthDataContext';
+import { HealthDataProvider, useHealthData } from '@/contexts/HealthDataContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const unstable_settings = {
@@ -43,11 +43,13 @@ export default function RootLayout() {
  * - Stops TTS when app is backgrounded
  * - Pauses audio when app is backgrounded
  * - Saves state when app is backgrounded
+ * - Refreshes health data when app returns to foreground
  * 
- * Requirements: 16.5
+ * Requirements: 16.5, 7.2
  */
 function AppLifecycleHandler({ children }: { children: React.ReactNode }) {
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const { fetchData } = useHealthData();
 
   /**
    * Handles backgrounding logic
@@ -71,8 +73,25 @@ function AppLifecycleHandler({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
+   * Handles foregrounding logic
+   * - Refreshes health data from HealthKit
+   * 
+   * Requirement 7.2: Trigger HealthKit fetch on foreground
+   */
+  const handleForegrounding = useCallback(async () => {
+    try {
+      console.log('App foregrounded: Refreshing health data...');
+      await fetchData();
+      console.log('Health data refreshed on foreground');
+    } catch (error) {
+      console.error('Error refreshing health data on foreground:', error);
+    }
+  }, [fetchData]);
+
+  /**
    * Handles app state changes
    * When app moves to background, stops TTS and saves state
+   * When app moves to foreground, refreshes health data
    */
   const handleAppStateChange = useCallback(async (nextAppState: AppStateStatus) => {
     // Check if app is moving to background
@@ -84,9 +103,18 @@ function AppLifecycleHandler({ children }: { children: React.ReactNode }) {
       await handleBackgrounding();
     }
 
+    // Check if app is moving to foreground
+    if (
+      appState.current.match(/inactive|background/) &&
+      nextAppState === 'active'
+    ) {
+      // App is being foregrounded
+      await handleForegrounding();
+    }
+
     // Update current app state
     appState.current = nextAppState;
-  }, [handleBackgrounding]);
+  }, [handleBackgrounding, handleForegrounding]);
 
   useEffect(() => {
     // Subscribe to app state changes
