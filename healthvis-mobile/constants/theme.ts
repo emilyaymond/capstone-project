@@ -6,7 +6,7 @@
 import { Platform } from 'react-native';
 import { HIGH_CONTRAST_COLORS, NORMAL_CONTRAST_COLORS } from './accessibility';
 
-const tintColorLight = '#0a7ea4';
+const tintColorLight = '#a40a52ff';
 const tintColorDark = '#fff';
 
 export const Colors = {

@@ -8,8 +8,7 @@
  * - Proper screen reader announcements on load
  * - Integration with HealthDataContext for data
  * - Loading and error states
- *
- * Requirements: 7.1, 7.4, 8.5
+ * 
  */
 
 import React, { useEffect, useCallback, useState } from "react";
@@ -35,14 +34,14 @@ import {
   announceCategoryNavigation,
 } from "@/lib/announcer";
 import { FONT_SIZES } from "@/constants/accessibility";
+import { loadPinnedKeys, PinnedKey } from "@/lib/pins";
 
-export default function HomeScreen() {
+export default function SummaryScreen() {
   const [selectedCategory, setSelectedCategory] = useState<HealthCategory>('vitals');
   const [viewMode, setViewMode] = useState<'cards' | 'chart'>('cards');
 
-  // ============================================================================
+  
   // Hooks
-  // ============================================================================
 
   const { 
     vitals, 
@@ -64,9 +63,7 @@ export default function HomeScreen() {
     stop 
   } = useSpeech();
 
-  // ============================================================================
-  // Screen Reader Announcements on Load (Requirement 8.5)
-  // ============================================================================
+  // Screen Reader Announcements on Load 
 
   useEffect(() => {
     // Announce navigation to Home screen
@@ -77,9 +74,9 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ============================================================================
+
   // Announce Errors
-  // ============================================================================
+
 
   useEffect(() => {
     if (error) {
@@ -87,9 +84,9 @@ export default function HomeScreen() {
     }
   }, [error]);
 
-  // ============================================================================
+
   // Computed Values
-  // ============================================================================
+
 
   const fontSize = FONT_SIZES[settings.fontSize];
 
@@ -137,31 +134,70 @@ export default function HomeScreen() {
     }));
   };
 
+  // setting up pinned cats
+  const [pins, setPins] = useState<PinnedKey[]>([]);
+
+  useEffect(() => {
+    loadPinnedKeys().then(setPins);
+  }, []);
+
+  const renderPinnedCardsHere = pins.map((p, idx) => {
+    const showDivider = idx !== pins.length - 1;
+
+    switch (p) {
+      case "heart_rate_latest":
+        return (
+          <View key={p} style={[styles.pinnedRow, showDivider && styles.divider]}>
+            <ThemedText style={styles.pinnedLabel}>Heart Rate</ThemedText>
+            <ThemedText style={styles.pinnedValue}>
+              {heartRateVital?.value ?? "0"} BPM
+            </ThemedText>
+          </View>
+        );
+
+      case "steps_today":
+        return (
+          <View key={p} style={[styles.pinnedRow, showDivider && styles.divider]}>
+            <ThemedText style={styles.pinnedLabel}>Steps</ThemedText>
+            <ThemedText style={styles.pinnedValue}>
+              {stepsVital?.value ?? "0"} steps
+            </ThemedText>
+          </View>
+        );
+
+      case "sleep_score":
+        return (
+          <View key={p} style={[styles.pinnedRow, showDivider && styles.divider]}>
+            <ThemedText style={styles.pinnedLabel}>Sleep</ThemedText>
+            <ThemedText style={styles.pinnedValue}>
+              {sleepVital?.value ?? "0"} hr
+            </ThemedText>
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  });
+
+
+
+
   // Get data points for chart visualization
   const chartDataPoints = convertMetricsToDataPoints(selectedMetrics);
 
   // Determine if we should show line or bar chart based on category
   const shouldUseBarChart = selectedCategory === 'activity' || selectedCategory === 'nutrition';
 
-  // ============================================================================
-  // Announce Category Changes
-  // ============================================================================
 
+  // Announce Category Changes
   useEffect(() => {
-    // Announce when category changes
     const categoryMetrics = getMetricsByCategory(selectedCategory);
     announceCategoryNavigation(categoryNames[selectedCategory], categoryMetrics.length);
   }, [selectedCategory, getMetricsByCategory, categoryNames]);
 
-  // ============================================================================
+  
   // Event Handlers
-  // ============================================================================
-
-  /**
-   * Handles "Hear Summary" button press
-   * Requirement 7.1: High-level vital signs summary with TTS
-   * Updated to support comprehensive health data categories
-   */
   const handleHearSummary = useCallback(() => {
     if (isSpeaking) {
       stop();
@@ -196,10 +232,9 @@ export default function HomeScreen() {
     fetchData();
   }, [clearError, fetchData]);
 
-  // ============================================================================
-  // Render Loading State
-  // ============================================================================
 
+
+  // Render Loading State
   if (isLoading && !hasAnyData) {
     return (
       <ThemedView style={styles.container}>
@@ -214,10 +249,8 @@ export default function HomeScreen() {
     );
   }
 
-  // ============================================================================
-  // Render Error State
-  // ============================================================================
 
+  // Render Error State
   if (error && !hasAnyData) {
     // Check if error is permission-related
     const isPermissionError = error.message?.toLowerCase().includes('permission') || 
@@ -283,12 +316,11 @@ export default function HomeScreen() {
         </View>
       </ThemedView>
     );
+
   }
 
-  // ============================================================================
-  // Render Empty State / no data uploaded
-  // ============================================================================
 
+  // Render Empty State / no permissions
   if (!hasAnyData) {
     // Check if we have permission information
     const needsPermissions = permissions && !permissions.allGranted;
@@ -397,86 +429,51 @@ export default function HomeScreen() {
     );
   }
 
-  // ============================================================================
-  // Render Main Content (Requirement 7.1, 7.4)
-  // ============================================================================
+
+
+
+  // Render Main Content 
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.summaryBg} lightColor="#F2F2F7" darkColor="#000">
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
-        }
-        accessible={true}
-        accessibilityLabel="Health data summary"
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />}
       >
-        {/* Header Section */}
-        <View style={styles.header}>
-          <ThemedText
-            type="title"
-            style={[styles.title, { fontSize: fontSize.title }]}
-          >
-            Health Summary
-          </ThemedText>
-          <ThemedText style={[styles.subtitle, { fontSize: fontSize.body }]}>
-            {allMetrics.length} metric{allMetrics.length !== 1 ? "s" : ""} tracked
-          </ThemedText>
-        </View>
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <ThemedText style={styles.largeTitle}>Summary</ThemedText>
 
-        {/* Category Navigation Tabs */}
-        <View style={styles.categoryTabsContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryTabsContent}
-          >
-            {categories.map((category) => {
-              const isSelected = selectedCategory === category;
-              const categoryMetrics = getMetricsByCategory(category);
-              const hasData = categoryMetrics.length > 0;
-              
-              return (
-                <TouchableOpacity
-                  key={category}
-                  onPress={() => setSelectedCategory(category)}
-                  style={[
-                    styles.categoryTab,
-                    isSelected && styles.categoryTabSelected,
-                    !hasData && styles.categoryTabDisabled,
-                  ]}
-                  accessible={true}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`${categoryNames[category]} category, ${categoryMetrics.length} metrics`}
-                  disabled={!hasData}
-                >
-                  <ThemedText
-                    style={[
-                      styles.categoryTabText,
-                      { fontSize: fontSize.body },
-                      isSelected && styles.categoryTabTextSelected,
-                      !hasData && styles.categoryTabTextDisabled,
-                    ]}
-                  >
-                    {categoryNames[category]}
-                  </ThemedText>
-                  {hasData && (
-                    <ThemedText
-                      style={[
-                        styles.categoryTabCount,
-                        { fontSize: fontSize.label },
-                        isSelected && styles.categoryTabCountSelected,
-                      ]}
-                    >
-                      {categoryMetrics.length}
-                    </ThemedText>
-                  )}
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                onPress={() => {/* maybe open profile later */}}
+                accessibilityRole="button"
+                accessibilityLabel="Profile"
+              >
+                <View style={styles.avatarCircle}>
+                  <ThemedText style={styles.avatarText}>JM</ThemedText>
+                </View>
+              </TouchableOpacity>
+
+              <Link href="/summary/edit-pinned" asChild>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit pinned">
+                  <ThemedText style={styles.editLink}>Edit</ThemedText>
                 </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+              </Link>
+            </View>
+          </View>
+          <ThemedView style={styles.summaryBg} lightColor="#F2F2F7" darkColor="#000">
+            <ScrollView contentContainerStyle={styles.content}>
+              <ThemedText style={styles.sectionTitle}>Pinned</ThemedText>
+              <View style={styles.sectionCard}>
+                {renderPinnedCardsHere?.length ? renderPinnedCardsHere : (
+                  <View style={{ padding: 16 }}>
+                    <ThemedText style={{ opacity: 0.7 }}>No pinned items yet.</ThemedText>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </ThemedView>
 
         {/* View Mode Toggle */}
         {selectedMetrics.length > 0 && (
@@ -688,12 +685,15 @@ const styles = StyleSheet.create({
 
   header: {
     padding: 16,
-    paddingTop: 60,
+    paddingTop: 25,
   },
 
-  title: {
-    marginBottom: 8,
-  },
+  largeTitle: { 
+    paddingTop: 25,
+    fontSize: 34, 
+    fontWeight: "700", 
+    marginBottom: 12 
+    },
 
   subtitle: {
     opacity: 0.7,
@@ -952,4 +952,48 @@ const styles = StyleSheet.create({
   footerText: {
     opacity: 0.5,
   },
+
+  summaryBg: { 
+    flex: 1 },
+    
+  content: { 
+    padding: 16, paddingTop: 56, paddingBottom: 32 },
+
+  headerRow: { 
+    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 10 },
+
+
+  headerRight: { 
+    flexDirection: "row", alignItems: "center", gap: 12 },
+  
+    avatarCircle: { 
+    width: 34, height: 34, borderRadius: 17, backgroundColor: "#F7A7B8", alignItems: "center", justifyContent: "center" },
+  
+    avatarText: { 
+    fontWeight: "700" },
+
+  editLink: { 
+    color: "#007AFF", fontSize: 17, fontWeight: "500" },
+
+  sectionTitle: { 
+    fontSize: 22, fontWeight: "700", marginTop: 12, marginBottom: 8 },
+  
+    sectionCard: { 
+    backgroundColor: "#fff", borderRadius: 16, overflow: "hidden" },
+
+  sectionHeaderRow: { 
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  
+    seeAll: { 
+      color: "#007AFF", fontSize: 15, fontWeight: "500" },
+
+  pinnedRow: { 
+    paddingHorizontal: 16, paddingVertical: 14 },
+  pinnedLabel: { 
+    fontSize: 17, fontWeight: "600", marginBottom: 6 },
+  pinnedValue: { 
+    fontSize: 26, fontWeight: "800" },
+  divider: { 
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E5E5EA" },
+
 });

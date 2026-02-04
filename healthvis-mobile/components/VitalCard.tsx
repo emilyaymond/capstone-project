@@ -22,12 +22,15 @@ import {
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { AccessibleButton } from './AccessibleButton';
+import { IconSymbol } from './ui/icon-symbol';
 import { useAccessibility } from '../contexts/AccessibilityContext';
 import { useHaptics } from '../hooks/useHaptics';
 import { useSpeech } from '../hooks/useSpeech';
 import { VitalSign, HealthMetric } from '../types';
 import { getDisplayNameForType, hasDefinedRange } from '../types/health-metric';
 import { FONT_SIZES, TOUCH_TARGET_SIZES } from '../constants/accessibility';
+import { useColorScheme } from '../hooks/use-color-scheme';
+import { Colors } from '../constants/theme';
 
 // ============================================================================
 // Component Props Interface
@@ -62,6 +65,7 @@ export function VitalCard({ vital, metric, style }: VitalCardProps) {
   const { mode, settings } = useAccessibility();
   const { triggerForDataPoint } = useHaptics();
   const { speakDetails, isSpeaking, stop } = useSpeech();
+  const colorScheme = useColorScheme();
 
   // ============================================================================
   // Computed Values - Support both VitalSign and HealthMetric
@@ -188,9 +192,18 @@ export function VitalCard({ vital, metric, style }: VitalCardProps) {
         <View style={styles.headerContent}>
           {/* Icon and Vital Sign Name */}
           <View style={styles.nameContainer}>
-            <ThemedText style={[styles.icon, { fontSize: fontSize.heading }]}>
-              {icon}
-            </ThemedText>
+            {/* Render SF Symbol or emoji based on icon string */}
+            {icon.includes('.') ? (
+              <IconSymbol 
+                name={icon as any} 
+                size={fontSize.heading} 
+                color={Colors[colorScheme ?? 'light'].text}
+              />
+            ) : (
+              <ThemedText style={[styles.icon, { fontSize: fontSize.heading }]}>
+                {icon}
+              </ThemedText>
+            )}
             <ThemedText
               style={[
                 styles.vitalName,
@@ -322,10 +335,10 @@ function formatVitalType(type: string): string {
 function getIconForMetricType(type: string): string {
   const iconMap: Record<string, string> = {
     // Vitals
-    heart_rate: '❤️',
+    heart_rate: 'heart.fill',
     blood_pressure_systolic: '🩺',
     blood_pressure_diastolic: '🩺',
-    respiratory_rate: '🫁',
+    respiratory_rate: 'lungs.fill',
     body_temperature: '🌡️',
     oxygen_saturation: '🫁',
     blood_glucose: '🩸',

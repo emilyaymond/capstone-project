@@ -1319,11 +1319,12 @@ export const healthKitService: HealthKitService = {
         // For a range of BMI values, we would need to use a different approach
         // or calculate from weight and height
         AppleHealthKit.getLatestBmi({}, (err: string, results: any) => {
-          if (err) {
-            console.error('Error fetching BMI:', err);
-            resolve([]); // Return empty array on error
-            return;
-          }
+          //COMMENTED OUT BMI ERROR
+          // if (err) {
+          //   console.error('Error fetching BMI:', err);
+          //   resolve([]); // Return empty array on error
+          //   return;
+          // }
           
           if (!results || results.value === undefined) {
             resolve([]);
