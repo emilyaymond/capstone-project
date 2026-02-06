@@ -26,7 +26,7 @@ export default function EditPinned() {
 
   const toggle = (k: PinnedKey) => {
     setSelected((prev) =>
-      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
+      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k],
     );
   };
 
@@ -39,7 +39,9 @@ export default function EditPinned() {
     <ThemedView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText style={styles.title}>Pinned</ThemedText>
-        <ThemedText style={styles.sub}>Choose what appears in your Summary.</ThemedText>
+        <ThemedText style={styles.sub}>
+          Choose what appears in your Summary.
+        </ThemedText>
 
         <View style={styles.card}>
           {ALL.map((item, idx) => {
@@ -54,7 +56,9 @@ export default function EditPinned() {
                 accessibilityLabel={item.label}
               >
                 <ThemedText style={styles.rowLabel}>{item.label}</ThemedText>
-                <ThemedText style={[styles.badge, on ? styles.badgeOn : styles.badgeOff]}>
+                <ThemedText
+                  style={[styles.badge, on ? styles.badgeOn : styles.badgeOff]}
+                >
                   {on ? "On" : "Off"}
                 </ThemedText>
               </Pressable>
@@ -69,14 +73,28 @@ export default function EditPinned() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingTop: 56, paddingBottom: 24 },
+  content: { padding: 16, paddingTop: 32, paddingBottom: 24 },
   title: { fontSize: 34, fontWeight: "700", marginBottom: 6 },
   sub: { opacity: 0.7, marginBottom: 16 },
   card: { backgroundColor: "#fff", borderRadius: 12, overflow: "hidden" },
-  row: { height: 52, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E5E5EA" },
+  row: {
+    height: 52,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  divider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5E5EA", 
+  },
   rowLabel: { fontSize: 17, fontWeight: "500" },
-  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, overflow: "hidden" },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
   badgeOn: { backgroundColor: "#E8F5E9", color: "#1B5E20" },
   badgeOff: { backgroundColor: "#F2F2F7", color: "#6D6D72" },
 });

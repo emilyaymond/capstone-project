@@ -10,6 +10,11 @@ import { AccessibilityProvider } from '@/contexts/AccessibilityContext';
 import { HealthDataProvider, useHealthData } from '@/contexts/HealthDataContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
+console.log("Hermes enabled?", !!(global as any).HermesInternal);
+
+// Uncomment the line below to pause execution here
+debugger;
+
 export const unstable_settings = {
   anchor: '(tabs)',
 };

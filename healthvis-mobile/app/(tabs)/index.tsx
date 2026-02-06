@@ -463,7 +463,7 @@ export default function SummaryScreen() {
             </View>
           </View>
           <ThemedView style={styles.summaryBg} lightColor="#F2F2F7" darkColor="#000">
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView   contentContainerStyle={styles.content}>
               <ThemedText style={styles.sectionTitle}>Pinned</ThemedText>
               <View style={styles.sectionCard}>
                 {renderPinnedCardsHere?.length ? renderPinnedCardsHere : (
@@ -954,10 +954,11 @@ const styles = StyleSheet.create({
   },
 
   summaryBg: { 
-    flex: 1 },
+    flex: 1 
+  },
     
   content: { 
-    padding: 16, paddingTop: 56, paddingBottom: 32 },
+    padding: 16, paddingTop: 30, paddingBottom: 32 },
 
   headerRow: { 
     flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 10 },

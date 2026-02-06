@@ -1,11 +1,29 @@
 import React, { useMemo, useState } from "react";
-import { StyleSheet, View, TextInput, Pressable, ScrollView } from "react-native";
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  Pressable,
+  ScrollView,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
-type HealthCategoryKey = "activity" | "body" | "cycle" | "hearing" | "heart" | "medications" | "mindfulness" | "mobility" | "nutrition" | "respiratory" | "sleep" | "vitals";
+type HealthCategoryKey =
+  | "activity"
+  | "body"
+  | "cycle"
+  | "hearing"
+  | "heart"
+  | "medications"
+  | "mindfulness"
+  | "mobility"
+  | "nutrition"
+  | "respiratory"
+  | "sleep"
+  | "vitals";
 
 const CATEGORIES: Array<{
   key: HealthCategoryKey;
@@ -14,7 +32,11 @@ const CATEGORIES: Array<{
 }> = [
   { key: "activity", label: "Activity", icon: "flame.fill" },
   { key: "body", label: "Body Measurements", icon: "figure.arms.open" },
-  { key: "cycle", label: "Cycle Tracking", icon: "dot.circle.and.hand.point.up.left.fill" },
+  {
+    key: "cycle",
+    label: "Cycle Tracking",
+    icon: "dot.circle.and.hand.point.up.left.fill",
+  },
   { key: "hearing", label: "Hearing", icon: "ear.fill" },
   { key: "heart", label: "Heart", icon: "heart.fill" },
   { key: "medications", label: "Medications", icon: "pills.fill" },
@@ -37,14 +59,22 @@ export default function BrowseScreen() {
   }, [query]);
 
   return (
-    <ThemedView style={styles.container} lightColor="#F2F2F7" darkColor="#000000">
+    <ThemedView
+      style={styles.container}
+      lightColor="#F2F2F7"
+      darkColor="#000000"
+    >
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText style={styles.largeTitle} accessibilityRole="header">
           Browse
         </ThemedText>
 
         {/* Search bar */}
-        <View style={styles.searchWrap} accessible accessibilityLabel="Search health categories">
+        <View
+          style={styles.searchWrap}
+          accessible
+          accessibilityLabel="Search health categories"
+        >
           <IconSymbol name="magnifyingglass" size={18} color="#8E8E93" />
           <TextInput
             value={query}
@@ -75,7 +105,11 @@ export default function BrowseScreen() {
             >
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <IconSymbol name={item.icon as any} size={18} color="#FFFFFF" />
+                  <IconSymbol
+                    name={item.icon as any}
+                    size={18}
+                    color="#FFFFFF"
+                  />
                 </View>
                 <ThemedText style={styles.rowLabel}>{item.label}</ThemedText>
               </View>
@@ -91,14 +125,14 @@ export default function BrowseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, paddingTop: 56, paddingBottom: 24 },
+  content: { padding: 16, paddingTop: 32, paddingBottom: 24 },
 
-  largeTitle: { 
+  largeTitle: {
     paddingTop: 25,
-    fontSize: 34, 
-    fontWeight: "700", 
-    marginBottom: 12 
-    },
+    fontSize: 34,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
 
   searchWrap: {
     height: 40,
@@ -134,7 +168,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   rowPressed: { opacity: 0.6 },
-  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E5E5EA" },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5E5EA",
+  },
 
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconCircle: {
