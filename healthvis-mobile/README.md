@@ -23,11 +23,43 @@ npm install
 # iOS Setup (Required for HealthKit)
 cd ios && pod install && cd ..
 
-# Start the app
-npm start
+# Start the development server with Expo Dev Client
+npx expo start --dev-client
 
 # Press 'i' for iOS simulator (limited HealthKit support)
-# Run on physical iOS device for full HealthKit access
+# Or scan QR code with Expo Go on physical iOS device for full HealthKit access
+```
+
+### Running on Physical Device (Recommended for HealthKit)
+
+Since HealthKit requires a physical iOS device, use one of these methods:
+
+**Option 1: Expo Dev Client (Easiest - No Code Signing)**
+
+```bash
+npx expo start --dev-client
+# Scan QR code with camera or Expo Go app
+```
+
+**Option 2: Build with Xcode (Requires Apple Developer Account)**
+
+```bash
+# Open in Xcode
+open ios/healthvismobile.xcworkspace
+
+# In Xcode:
+# 1. Select healthvismobile target
+# 2. Go to Signing & Capabilities
+# 3. Enable "Automatically manage signing"
+# 4. Select your development team
+# 5. Build and run (Cmd+R)
+```
+
+**Option 3: Expo Build**
+
+```bash
+# Build for iOS device
+npx expo run:ios --device
 ```
 
 ## HealthKit Setup
@@ -36,13 +68,26 @@ npm start
 
 - Physical iOS device (HealthKit is not fully supported in simulator)
 - iOS 13.0 or later
-- Xcode 12.0 or later
+- For Xcode builds: Xcode 12.0 or later and Apple Developer account
+- For Expo Dev Client: No code signing required
+
+### Running Without Code Signing Issues
+
+The easiest way to run the app is using Expo Dev Client:
+
+```bash
+cd healthvis-mobile
+npx expo start --dev-client
+```
+
+This bypasses code signing requirements and works on both simulator and physical devices.
 
 ### Permissions
 
 On first launch, the app will request permissions to access the following HealthKit data:
 
 **Vitals:**
+
 - Heart Rate
 - Blood Pressure
 - Respiratory Rate
@@ -51,6 +96,7 @@ On first launch, the app will request permissions to access the following Health
 - Blood Glucose
 
 **Activity:**
+
 - Steps
 - Distance
 - Flights Climbed
@@ -58,17 +104,20 @@ On first launch, the app will request permissions to access the following Health
 - Exercise Minutes
 
 **Body Measurements:**
+
 - Weight
 - Height
 - BMI
 - Body Fat Percentage
 
 **Nutrition:**
+
 - Dietary Energy (Calories)
 - Water Intake
 - Protein, Carbohydrates, Fats
 
 **Sleep & Mindfulness:**
+
 - Sleep Analysis
 - Mindfulness Minutes
 
