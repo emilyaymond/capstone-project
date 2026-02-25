@@ -33,6 +33,8 @@ export interface SimpleLineChartProps {
   isLoading?: boolean;
   /** Accessibility label for the chart */
   accessibilityLabel?: string;
+  /** Time range for label formatting (H, D, W, M, 6M, Y) */
+  timeRange?: 'H' | 'D' | 'W' | 'M' | '6M' | 'Y';
 }
 
 // ============================================================================
@@ -42,9 +44,7 @@ export interface SimpleLineChartProps {
 const DEFAULT_WIDTH = 320;
 const DEFAULT_HEIGHT = 200;
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Gets color based on data range and accessibility mode
@@ -76,18 +76,17 @@ const getColorForRange = (
   }
 };
 
-// ============================================================================
 // SimpleLineChart Component
-// ============================================================================
 
 export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   data,
   title,
   unit,
-  width = DEFAULT_WIDTH,
-  height = DEFAULT_HEIGHT,
+  width,
+  height,
   isLoading = false,
   accessibilityLabel,
+  timeRange = 'D',
 }) => {
   const { settings, mode } = useAccessibility();
 
@@ -98,7 +97,56 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   const chartData = useMemo(() => {
     return data.map((point, idx) => {
       const d = new Date(point.timestamp);
-      const label = idx === 0 || idx === data.length - 1 ? `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}` : "";
+      let label = "";
+      
+      // Format labels based on time range
+      switch (timeRange) {
+        case 'H': // Hourly - show time for all points
+          label = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+          break;
+          
+        case 'D': // Daily - show 12am, 6am, 12pm, 6pm
+          const hour = d.getHours();
+          if (hour === 0 || hour === 6 || hour === 12 || hour === 18) {
+            label = hour === 0 ? '12am' : hour === 6 ? '6am' : hour === 12 ? '12pm' : '6pm';
+          }
+          break;
+          
+        case 'W': // Weekly - show day of week
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          // Show label if it's a new day or first/last point
+          if (idx === 0 || idx === data.length - 1 || 
+              (idx > 0 && d.getDate() !== new Date(data[idx - 1].timestamp).getDate())) {
+            label = days[d.getDay()];
+          }
+          break;
+          
+        case 'M': // Monthly - show day of month in increments of ~7
+          const dayOfMonth = d.getDate();
+          if (idx === 0 || idx === data.length - 1 || 
+              dayOfMonth % 7 === 1 || dayOfMonth === 1) {
+            label = `${dayOfMonth}`;
+          }
+          break;
+          
+        case '6M': // 6 months - show month abbreviation
+          const months6 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          // Show label if it's a new month or first/last point
+          if (idx === 0 || idx === data.length - 1 || 
+              (idx > 0 && d.getMonth() !== new Date(data[idx - 1].timestamp).getMonth())) {
+            label = months6[d.getMonth()];
+          }
+          break;
+          
+        case 'Y': // Yearly - show month abbreviation
+          const monthsY = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          // Show label if it's a new month or first/last point
+          if (idx === 0 || idx === data.length - 1 || 
+              (idx > 0 && d.getMonth() !== new Date(data[idx - 1].timestamp).getMonth())) {
+            label = monthsY[d.getMonth()];
+          }
+          break;
+      }
       
       // Get color for this specific data point based on its range
       const pointColor = getColorForRange(point.range || 'normal', settings.contrast);
@@ -111,7 +159,7 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
         dataPointRadius: mode === 'simplified' ? 6 : 4,
       };
     });
-  }, [data, settings.contrast, mode]);
+  }, [data, settings.contrast, mode, timeRange]);
 
 
   // Get primary color based on overall data state (just use normal always)
@@ -120,9 +168,7 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
     return getColorForRange('normal', settings.contrast);
   }, [data, settings.contrast]);
 
-  // ============================================================================
   // Font Size Scaling
-  // ============================================================================
 
   const fontSize = useMemo(() => {
     switch (settings.fontSize) {
@@ -146,19 +192,21 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
     }
   }, [settings.fontSize]);
 
-  // ============================================================================
+  // Use default dimensions if not provided
+  const chartWidth = width || DEFAULT_WIDTH;
+  const chartHeight = height || DEFAULT_HEIGHT;
+
   // Render Loading State
-  // ============================================================================
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { width, height: height + 60 }]}>
+      <View style={[styles.container, { width: chartWidth, height: chartHeight + 60 }]}>
         {title && (
           <Text style={[styles.title, { fontSize: titleFontSize }]}>
             {title}
           </Text>
         )}
-        <View style={[styles.loadingContainer, { height }]}>
+        <View style={[styles.loadingContainer, { height: chartHeight }]}>
           <ActivityIndicator size="large" color={primaryColor} />
           <Text style={[styles.loadingText, { fontSize }]}>
             Loading chart data...
@@ -168,14 +216,12 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
     );
   }
 
-  // ============================================================================
   // Render Empty State
-  // ============================================================================
 
   if (data.length === 0) {
     return (
       <View
-        style={[styles.container, { width, height: height + 60 }]}
+        style={[styles.container, { width: chartWidth, height: chartHeight + 60 }]}
         accessible={true}
         accessibilityLabel={accessibilityLabel || 'Empty chart'}
         accessibilityHint="No data available to display"
@@ -185,7 +231,7 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
             {title}
           </Text>
         )}
-        <View style={[styles.emptyContainer, { height }]}>
+        <View style={[styles.emptyContainer, { height: chartHeight }]}>
           <Text style={[styles.emptyText, { fontSize }]}>
             No data available
           </Text>
@@ -197,10 +243,8 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
     );
   }
 
-  // ============================================================================
   // Render Chart
-  // ============================================================================
-
+  
   const chartAccessibilityLabel = accessibilityLabel || 
     `${title || 'Line chart'} showing ${data.length} data points`;
 
@@ -209,7 +253,7 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
 
   return (
     <View
-      style={[styles.container, { width, height: height + 60 }]}
+      style={[styles.container, { width: chartWidth, height: chartHeight + 60 }]}
       accessible={true}
       accessibilityLabel={chartAccessibilityLabel}
       accessibilityRole="image"
@@ -223,17 +267,19 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
       <View style={styles.chartWrapper}>
         <LineChart
           data={chartData}
-          width={width}
-          height={height}
+          width={chartWidth}
+          height={chartHeight}  
+          spacing={Math.max(8, Math.min(24, Math.floor(width / Math.max(chartData.length, 8))))}
           color={primaryColor}
           thickness={mode === 'simplified' ? 3 : 2.5}
           curved
           hideDataPoints={false}
+          // showTextOnFocus
           hideRules={false}
           rulesColor="#E5E5E5"
           xAxisColor="#E5E5E5"
           yAxisColor="#E5E5E5"
-          yAxisTextStyle={{ fontSize: fontSize - 2, color: '#999' }}
+          yAxisTextStyle={{ fontSize: fontSize - 2, color: '#403e3eff' }}
           backgroundColor="transparent"
           isAnimated
           animationDuration={800}
@@ -241,6 +287,8 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
           startOpacity={0.3}
           endOpacity={0.05}
           areaChart
+          scrollToEnd={false}
+          disableScroll={true}
         />
       </View>
 

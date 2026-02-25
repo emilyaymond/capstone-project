@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View, Text } from "react-native";
+import React, { useMemo, useCallback, useEffect } from "react";
+import { ScrollView, StyleSheet, TouchableOpacity, View, Text, Vibration, FlatList, Dimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
@@ -14,6 +14,9 @@ import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint } from "@/types";
 import { BarChart } from 'react-native-gifted-charts';
 import { getMetricChartKind, getMetricAggregation } from "./metricConfig";
+
+import { useAccessibility } from '@/contexts/AccessibilityContext';
+import { TimeSliceRow } from '@/components/TimeSliceRow';
 
 
 // If you already created a helper file, you can import from it instead.
@@ -56,6 +59,37 @@ function useBarChart(type: string) {
   // tweak this list to match your app
   return type === "steps" || type === "calories" || type === "active_energy";
 }
+
+function formatSliceForVoiceOver(metric: HealthMetric): string {
+  const start = new Date(metric.timestamp);
+  const end = new Date(new Date(metric.timestamp).getTime() + 5 * 60 * 1000); // 5 min bucket
+  const rangeText = metric.range === 'danger' ? 'high' 
+                     : metric.range === 'warning' ? 'elevated' 
+                     : 'normal';
+  return `${start.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})} to ${end.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}, ${metric.value} beats per minute, ${rangeText} range`;
+}
+
+// 2. Map BPM to frequency (using your generate_tones.py logic)
+function mapBpmToFrequency(bpm: number): number {
+  // Heart rate 40-200 bpm → audible range 261 Hz (C4) to 1047 Hz (C6)
+  // Scale linearly: 40 bpm → 261 Hz, 200 bpm → 1047 Hz
+  return 261 + (bpm - 40) * (1047 - 261) / (200 - 40);
+}
+
+// 3. Play tone + haptic for a time slice
+function playToneForValue(value: number, range: string) {
+  const frequency = mapBpmToFrequency(value);
+  const severity = range === 'danger' ? 2 : range === 'warning' ? 1 : 0;
+  const duration = [400, 600, 800][severity];
+  
+  // TODO: hook to your generate_tones.py output
+  console.log(`Play ${frequency}Hz for ${duration}ms`); // placeholder
+  
+  // Haptic works immediately
+  const patterns = [[100], [200, 100], [400, 200, 400]];
+  Vibration.vibrate(patterns[severity]);
+}
+
 
 /**
  * Aggregates data points by time buckets to reduce chart density
@@ -108,6 +142,7 @@ function aggregateData(
 
 
 export default function MetricDetailScreen() {
+  const { settings } = useAccessibility();
   const { type } = useLocalSearchParams<{ type: string }>();
   const router = useRouter();
   const { healthMetrics } = useHealthData();
@@ -132,9 +167,12 @@ export default function MetricDetailScreen() {
 
   // filters and sorts all health data to get only the data points for the specific metric being viewed
   const allDataForType: HealthMetric[] = useMemo(() => {
-    return all
+    const filtered = all
       .filter((m) => m.type === metricType) // filters the complete health data array to keep only metrics matching the current type
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); // sorts the filtered data chronologically (oldest to newest) by converting timestamps to milliseconds and comparing them
+    
+    console.log(`[${metricType}] Total data points available:`, filtered.length);
+    return filtered;
   }, [all, metricType]);
 
   // Filter data based on selected time range
@@ -167,11 +205,14 @@ export default function MetricDetailScreen() {
 
     
     const filtered = allDataForType.filter((m) => new Date(m.timestamp).getTime() >= startDate.getTime());
+    
+    console.log(`[${metricType}] After time range filter (${timeRange}):`, filtered.length, 'points');
 
     // Aggregate data based on time range to reduce chart density
     let bucketSize: number;
     switch (timeRange) {
       case 'H': // Show every data point for last hour
+        console.log(`[${metricType}] No aggregation for hourly view`);
         return filtered;
       case 'D': // Aggregate to ~5 minute buckets (288 max points)
         bucketSize = 5 * 60 * 1000;
@@ -192,16 +233,17 @@ export default function MetricDetailScreen() {
         bucketSize = 5 * 60 * 1000;
     }
 
-    return aggregateData(filtered, bucketSize, agg);
-  }, [allDataForType, timeRange]);
+    const aggregated = aggregateData(filtered, bucketSize, agg);
+    console.log(`[${metricType}] After aggregation (bucket: ${bucketSize}ms):`, aggregated.length, 'points');
+    return aggregated;
+  }, [allDataForType, timeRange, agg]);
 
   const latest = data.length ? data[data.length - 1] : undefined;
   const { min, max } = useMemo(() => computeMinMax(data), [data]);
 
   const points = useMemo(() => toPoints(data), [data]);
   const showBar = getMetricChartKind(metricType) === "bar";
-  
-
+ 
   // Simple “highlight” text (you can replace later with smarter logic)
   const highlightText = useMemo(() => {
     if (!latest || min == null || max == null) return "No highlight available yet.";
@@ -220,6 +262,7 @@ export default function MetricDetailScreen() {
       default: return 'Today';
     }
   }, [timeRange]);
+
 
 
   return (
@@ -295,18 +338,44 @@ export default function MetricDetailScreen() {
               />
             ) : (
               <SimpleLineChart
-                data={points}
+                data={points} 
                 title=""
                 unit={latest?.unit ?? ""}
-                width={352}
+                width={Dimensions.get('window').width - 78} 
                 height={260}
                 accessibilityLabel={`${title} line chart`}
+                timeRange={timeRange}
               />
             )
           ) : (
             <ThemedText style={{ opacity: 0.6 }}>No data yet.</ThemedText>
           )}
         </View>
+
+        {/* Time Slice List - VoiceOver accessible */}
+        {data.length > 0 && (
+        <View style={styles.timeSlicesList}>
+          <ThemedText style={styles.listHeader}>Time Slices</ThemedText>
+          <ScrollView 
+            style={styles.list} 
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            accessibilityRole="list"
+            accessibilityLabel={`${data.length} time slices for ${title}`}
+          >
+            {data.slice(0, 24).map((item) => (
+              <TimeSliceRow
+                key={item.timestamp}
+                metric={item}
+                onFocus={() => playToneForValue(item.value, item.range ?? 'normal')}
+                accessibilityLabel={formatSliceForVoiceOver(item)}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+
 
         {/* Latest row */}
         <View style={styles.latestRow}>
@@ -432,6 +501,22 @@ const styles = StyleSheet.create({
   highlightCard: { backgroundColor: "white", borderRadius: 14, padding: 16, gap: 8 },
   highlightTitle: { fontWeight: "800" },
   highlightBody: { fontSize: 16, fontWeight: "600" },
+
+  timeSlicesList: { 
+  marginTop: 12, 
+  gap: 8 
+  },
+
+  listHeader: { 
+    fontSize: 16, 
+    fontWeight: '800', 
+    opacity: 0.8 
+  },
+  list: { 
+    maxHeight: 240, // scrollable but fits screen
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
 
 
 
