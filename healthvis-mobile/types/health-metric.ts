@@ -7,7 +7,7 @@
  * Requirements: 2.8, 9.3, 9.4, 10.5
  */
 
-import { VitalSign, VitalSignType, DataRange } from './index';
+import { DataRange } from './index';
 
 // ============================================================================
 // Health Metric Types
@@ -51,38 +51,21 @@ export type HealthMetricType =
   | 'sleep'
   | 'mindfulness';
 
-/**
- * Unified health metric interface that supports all health data types
- */
+
+// Unified health metric interface that supports all health data types
 export interface HealthMetric {
-  /** Unique identifier for this metric */
-  id: string;
-  
-  /** Category this metric belongs to */
-  category: HealthCategory;
-  
-  /** Specific type of metric */
-  type: HealthMetricType;
-  
-  /** Numeric value of the measurement */
-  value: number;
-  
-  /** Timestamp when the measurement was taken */
-  timestamp: Date;
-  
-  /** Unit of measurement (e.g., 'bpm', 'mg/dL', 'steps') */
-  unit: string;
-  
-  /** Optional range classification (only for metrics with defined ranges) */
-  range?: DataRange;
-  
-  /** Optional additional metadata (e.g., blood pressure has systolic/diastolic) */
-  metadata?: Record<string, any>;
+  id: string;                     // Unique identifier for this metric 
+  category: HealthCategory;       // Category this metric belongs to
+  type: HealthMetricType;         // Specific type of metric
+  value: number;                  // Numeric value of the measurement
+  timestamp: Date;                // Timestamp when the measurement was taken
+  unit: string;                   // Unit of measurement (e.g., 'bpm', 'mg/dL', 'steps')
+
+  range?: DataRange;              // Optional range classification (only for metrics with defined ranges)
+  metadata?: Record<string, any>; // Optional additional metadata (e.g., blood pressure has systolic/diastolic)
 }
 
-/**
- * Categorized health data structure for organizing metrics by category
- */
+// Categorized health data structure for organizing metrics by category
 export interface CategorizedHealthData {
   vitals: HealthMetric[];
   activity: HealthMetric[];
@@ -92,13 +75,9 @@ export interface CategorizedHealthData {
   mindfulness: HealthMetric[];
 }
 
-// ============================================================================
-// Range Classification
-// ============================================================================
 
-/**
- * Normal ranges for health metrics that have defined ranges
- */
+
+// Normal ranges for health metrics that have defined ranges (perhaps edit)
 export const NORMAL_RANGES: Partial<Record<HealthMetricType, { min: number; max: number }>> = {
   // Vitals
   heart_rate: { min: 40, max: 120 },
@@ -151,64 +130,6 @@ export function classifyRange(type: HealthMetricType, value: number): DataRange 
 // ============================================================================
 // Migration Functions
 // ============================================================================
-
-/**
- * Map old VitalSignType to new HealthCategory
- */
-const VITAL_SIGN_CATEGORY_MAP: Record<VitalSignType, HealthCategory> = {
-  heart_rate: 'vitals',
-  glucose: 'vitals',
-  steps: 'activity',
-  sleep: 'sleep',
-};
-
-/**
- * Map old VitalSignType to new HealthMetricType
- */
-const VITAL_SIGN_TYPE_MAP: Record<VitalSignType, HealthMetricType> = {
-  heart_rate: 'heart_rate',
-  glucose: 'blood_glucose',
-  steps: 'steps',
-  sleep: 'sleep',
-};
-
-/**
- * Migrate a VitalSign to the new HealthMetric format
- * 
- * This function provides backwards compatibility by converting existing VitalSign
- * data to the new unified HealthMetric structure.
- * 
- * @param vital - The VitalSign to migrate
- * @returns The equivalent HealthMetric
- * 
- * Requirements: 9.3, 9.4
- */
-export function migrateVitalSignToHealthMetric(vital: VitalSign): HealthMetric {
-  const category = VITAL_SIGN_CATEGORY_MAP[vital.type];
-  const type = VITAL_SIGN_TYPE_MAP[vital.type];
-  
-  return {
-    id: `${type}-${vital.timestamp.getTime()}`,
-    category,
-    type,
-    value: vital.value,
-    timestamp: vital.timestamp,
-    unit: vital.unit,
-    range: vital.range,
-  };
-}
-
-/**
- * Migrate an array of VitalSigns to HealthMetrics
- * 
- * @param vitals - Array of VitalSigns to migrate
- * @returns Array of equivalent HealthMetrics
- * 
- * Requirements: 9.3, 9.4
- */
-export function migrateVitalSignsToHealthMetrics(vitals: VitalSign[]): HealthMetric[] {
-  return vitals.map(migrateVitalSignToHealthMetric);
-}
 
 /**
  * Organize an array of HealthMetrics into categorized structure

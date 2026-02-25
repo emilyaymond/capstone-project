@@ -12,7 +12,7 @@ import ExploreModesCard from "@/features/trends/components/ExploreModesCard";
 import { DEFAULT_COMPARE_METRICS, TimeRangeKey } from "@/features/trends/utils/trendConfig";
 
 export default function TrendsScreen() {
-  const { vitals, healthMetrics, fetchData } = useHealthData();
+  const { healthMetrics, fetchData } = useHealthData();
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
 

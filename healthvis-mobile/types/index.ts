@@ -31,22 +31,8 @@ export interface AccessibilitySettings {
 // ============================================================================
 
 
-// Type of vital sign measurement
-export type VitalSignType = 'heart_rate' | 'glucose' | 'steps' | 'sleep';
-
-
 // Data range classification
 export type DataRange = 'normal' | 'warning' | 'danger';
-
-
-// A single vital sign measurement
-export interface VitalSign {
-  type: VitalSignType;
-  value: number;
-  timestamp: Date;
-  unit: string;
-  range: DataRange;
-}
 
 
 // A single data point in a time series

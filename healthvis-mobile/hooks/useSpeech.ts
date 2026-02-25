@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import * as Speech from 'expo-speech';
 import { usePathname } from 'expo-router';
-import { VitalSign } from '../types';
 import { HealthMetric, HealthCategory, getDisplayNameForType } from '../types/health-metric';
 
 // ============================================================================
@@ -28,8 +27,6 @@ export interface UseSpeechReturn {
   speak: (text: string, options?: SpeechOptions) => Promise<void>;
   stop: () => void;
   isSpeaking: boolean;
-  speakSummary: (vitals: VitalSign[]) => Promise<void>;
-  speakDetails: (vital: VitalSign) => Promise<void>;
   speakHealthMetricSummary: (metrics: HealthMetric[], category?: HealthCategory) => Promise<void>;
   speakHealthMetricDetails: (metric: HealthMetric) => Promise<void>;
   speakCategorySummary: (category: HealthCategory, metrics: HealthMetric[]) => Promise<void>;
@@ -147,71 +144,6 @@ export function useSpeech(): UseSpeechReturn {
       setIsSpeaking(false);
     }
   }, []);
-
-  // ============================================================================
-  // Speak Summary Function (Requirement 5.1)
-  // ============================================================================
-
-  /**
-   * Speaks a high-level summary of vital signs
-   * 
-   * @param vitals - Array of vital signs to summarize
-   */
-  const speakSummary = useCallback(async (vitals: VitalSign[]): Promise<void> => {
-    try {
-      if (!vitals || vitals.length === 0) {
-        await speak('No health data available.');
-        return;
-      }
-
-      // Build summary text
-      const summaryParts: string[] = ['Health data summary:'];
-
-      for (const vital of vitals) {
-        const vitalName = formatVitalType(vital.type);
-        const rangeDescription = formatRange(vital.range);
-        
-        summaryParts.push(
-          `${vitalName}: ${vital.value} ${vital.unit}, ${rangeDescription}.`
-        );
-      }
-
-      const summaryText = summaryParts.join(' ');
-      await speak(summaryText);
-    } catch (error) {
-      console.error('Failed to speak summary:', error);
-      await speak('Unable to read health data summary.');
-    }
-  }, [speak]);
-
-  // ============================================================================
-  // Speak Details Function (Requirement 5.2)
-  // ============================================================================
-
-  /**
-   * Speaks detailed information about a single vital sign
-   * 
-   * @param vital - The vital sign to describe in detail
-   */
-  const speakDetails = useCallback(async (vital: VitalSign): Promise<void> => {
-    try {
-      const vitalName = formatVitalType(vital.type);
-      const rangeDescription = formatRange(vital.range);
-      const timestamp = formatTimestamp(vital.timestamp);
-
-      const detailText = [
-        `${vitalName} details:`,
-        `Current value: ${vital.value} ${vital.unit}.`,
-        `Status: ${rangeDescription}.`,
-        `Recorded at: ${timestamp}.`,
-      ].join(' ');
-
-      await speak(detailText);
-    } catch (error) {
-      console.error('Failed to speak details:', error);
-      await speak('Unable to read vital sign details.');
-    }
-  }, [speak]);
 
   // ============================================================================
   // Speak Health Metric Summary Function
@@ -406,19 +338,6 @@ export function useSpeech(): UseSpeechReturn {
   // ============================================================================
 
   /**
-   * Formats vital sign type for speech
-   */
-  function formatVitalType(type: string): string {
-    const typeMap: Record<string, string> = {
-      heart_rate: 'Heart rate',
-      glucose: 'Blood glucose',
-      steps: 'Steps',
-      sleep: 'Sleep duration',
-    };
-    return typeMap[type] || type;
-  }
-
-  /**
    * Formats health category for speech
    */
   function formatCategory(category: HealthCategory): string {
@@ -477,8 +396,6 @@ export function useSpeech(): UseSpeechReturn {
     speak,
     stop,
     isSpeaking,
-    speakSummary,
-    speakDetails,
     speakHealthMetricSummary,
     speakHealthMetricDetails,
     speakCategorySummary,

@@ -38,7 +38,6 @@ export default function SummaryScreen() {
   const [selectedCategory] = useState<HealthCategory>("vitals");
 
   const {
-    vitals,
     healthMetrics,
     permissions,
     isLoading,
@@ -47,13 +46,13 @@ export default function SummaryScreen() {
     refreshData,
     clearError,
     getMetricsByCategory,
+    getMetricsByType,
   } = useHealthData();
 
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
 
   const {
-    speakSummary,
     speakHealthMetricSummary,
     speakCategorySummary,
     isSpeaking,
@@ -82,11 +81,18 @@ export default function SummaryScreen() {
     ];
   }, [healthMetrics]);
 
-  const heartRateVital = vitals.find((v) => v.type === "heart_rate");
-  const stepsVital = vitals.find((v) => v.type === "steps");
-  const sleepVital = vitals.find((v) => v.type === "sleep");
+  //todo fixed pinned bc right now it is hard coded
+  // Get latest metrics for pinned section 
+  const heartRateMetrics = getMetricsByType('heart_rate');
+  const heartRateVital = heartRateMetrics.length > 0 ? heartRateMetrics[0] : undefined;
+  
+  const stepsMetrics = getMetricsByType('steps');
+  const stepsVital = stepsMetrics.length > 0 ? stepsMetrics[0] : undefined;
+  
+  const sleepMetrics = getMetricsByType('sleep');
+  const sleepVital = sleepMetrics.length > 0 ? sleepMetrics[0] : undefined;
 
-  const hasAnyData = allMetrics.length > 0 || vitals.length > 0;
+  const hasAnyData = allMetrics.length > 0;
 
   const selectedMetrics = getMetricsByCategory(selectedCategory);
   const summaryCards = useMemo(() => {
@@ -118,8 +124,6 @@ export default function SummaryScreen() {
     }
     if (allMetrics.length > 0) {
       speakCategorySummary(selectedCategory, selectedMetrics);
-    } else if (vitals.length > 0) {
-      speakSummary(vitals);
     } else {
       speakHealthMetricSummary([]);
     }
@@ -129,9 +133,7 @@ export default function SummaryScreen() {
     allMetrics.length,
     selectedCategory,
     selectedMetrics,
-    vitals,
     speakCategorySummary,
-    speakSummary,
     speakHealthMetricSummary,
   ]);
 

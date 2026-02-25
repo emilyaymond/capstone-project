@@ -11,7 +11,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  VitalSign,
   AnalysisResponse,
   ChatResponse,
   HealthMetric,
@@ -41,7 +40,6 @@ import { getMetricAggregation, getMetricChartKind } from "@/app/metric/metricCon
 // ============================================================================
 
 const CACHE_KEYS = {
-  VITALS: 'health_data_vitals',
   HEALTH_METRICS: 'health_data_metrics',
   LAST_ANALYSIS: 'health_data_last_analysis',
   LAST_FETCH: 'health_data_last_fetch',
@@ -55,7 +53,6 @@ const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
 // ============================================================================
 
 export interface HealthDataContextValue {
-  vitals: VitalSign[];
   healthMetrics: CategorizedHealthData;
   permissions: PermissionStatus | null;
   isInitialized: boolean;
@@ -66,7 +63,6 @@ export interface HealthDataContextValue {
   requestChat: (message: string, context?: any) => Promise<ChatResponse>;
   clearError: () => void;
   refreshData: () => Promise<void>;
-  setVitals: (vitals: VitalSign[]) => Promise<void>;
   getMetricsByCategory: (category: HealthCategory) => HealthMetric[];
   getMetricsByType: (type: HealthMetricType) => HealthMetric[];
   getMetricsByDateRange: (startDate: Date, endDate: Date) => HealthMetric[];
@@ -159,7 +155,6 @@ function bucketize(
 // ============================================================================
 
 export function HealthDataProvider({ children }: HealthDataProviderProps) {
-  const [vitals, setVitals] = useState<VitalSign[]>([]);
   const [healthMetrics, setHealthMetrics] = useState<CategorizedHealthData>({
     vitals: [],
     activity: [],
@@ -182,51 +177,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   // ============================================================================
   // Cache Management Functions
   // ============================================================================
-
-  /**
-   * Save vitals to cache (legacy format)
-   */
-  async function saveVitalsToCache(vitalsData: VitalSign[]): Promise<void> {
-    try {
-      await AsyncStorage.setItem(
-        CACHE_KEYS.VITALS,
-        JSON.stringify({
-          data: vitalsData,
-          timestamp: Date.now(),
-        })
-      );
-    } catch (error) {
-      console.error('Failed to save vitals to cache:', error);
-    }
-  }
-
-  /**
-   * Load vitals from cache (legacy format)
-   */
-  async function loadVitalsFromCache(): Promise<VitalSign[] | null> {
-    try {
-      const cached = await AsyncStorage.getItem(CACHE_KEYS.VITALS);
-      if (!cached) {
-        return null;
-      }
-
-      const { data, timestamp } = JSON.parse(cached);
-      
-      // Check if cache is expired
-      if (Date.now() - timestamp > CACHE_EXPIRATION_MS) {
-        return null;
-      }
-
-      // Parse dates in vitals
-      return data.map((vital: any) => ({
-        ...vital,
-        timestamp: new Date(vital.timestamp),
-      }));
-    } catch (error) {
-      console.error('Failed to load vitals from cache:', error);
-      return null;
-    }
-  }
 
   /**
    * Save health metrics to cache (new format)
@@ -295,38 +245,16 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
    */
   async function migrateVitalSignCache(): Promise<void> {
     try {
-      // Check if we already have HealthMetric cache
-      const existingMetrics = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
-      if (existingMetrics) {
-        console.log('HealthMetric cache already exists, skipping migration');
-        return;
+      // Check if we have old VitalSign cache to clean up
+      const oldCache = await AsyncStorage.getItem('health_data_vitals');
+      if (oldCache) {
+        console.log('Removing old VitalSign cache...');
+        await AsyncStorage.removeItem('health_data_vitals');
+        console.log('✅ Old VitalSign cache removed');
       }
-
-      // Load old VitalSign cache
-      const cachedVitals = await loadVitalsFromCache();
-      if (!cachedVitals || cachedVitals.length === 0) {
-        console.log('No VitalSign cache to migrate');
-        return;
-      }
-
-      console.log(`Migrating ${cachedVitals.length} VitalSign records to HealthMetric format...`);
-
-      // Import migration function
-      const { migrateVitalSignsToHealthMetrics, categorizeHealthMetrics } = await import('../types/health-metric');
-
-      // Migrate VitalSigns to HealthMetrics
-      const migratedMetrics = migrateVitalSignsToHealthMetrics(cachedVitals);
-
-      // Categorize the metrics
-      const categorizedMetrics = categorizeHealthMetrics(migratedMetrics);
-
-      // Save to new cache format
-      await saveHealthMetricsToCache(categorizedMetrics);
-
-      console.log('Successfully migrated VitalSign cache to HealthMetric format');
     } catch (error) {
-      console.error('Failed to migrate VitalSign cache:', error);
-      // Don't throw - migration failure shouldn't break the app
+      console.error('Failed to clean up old VitalSign cache:', error);
+      // Don't throw - cleanup failure shouldn't break the app
     }
   }
 
@@ -403,9 +331,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
           return;
         }
       }
-
-      // Migrate old VitalSign cache if needed (backwards compatibility)
-      await migrateVitalSignCache();
 
       // Load from cache first for offline support (cache-first loading)
       const cachedMetrics = await loadHealthMetricsFromCache();
@@ -537,7 +462,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         await saveAnalysisToCache(response);
 
         // Trigger accessibility outputs (Requirement 10.8)
-        await triggerAccessibilityOutputs(response.analysis.analysis, vitals);
+        await triggerAccessibilityOutputs(response.analysis.analysis);
 
         // Announce success
         announceSuccess('Analysis complete');
@@ -557,7 +482,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         throw errorMessage;
       }
     },
-    [audio, vitals]
+    [audio]
   );
 
   // ============================================================================
@@ -574,8 +499,8 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         setIsLoading(true);
         setError(null);
 
-        // Prepare data context (include current vitals if available)
-        const dataContext = context || (vitals.length > 0 ? { vitals } : undefined);
+        // Prepare data context (include current health metrics if available)
+        const dataContext = context || (Object.values(healthMetrics).some(cat => cat.length > 0) ? { healthMetrics } : undefined);
 
         // Call API client for chat
         const response = await apiChatWithAI(message, dataContext);
@@ -598,7 +523,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         throw errorMessage;
       }
     },
-    [audio, vitals]
+    [audio, healthMetrics]
   );
 
   // ============================================================================
@@ -618,9 +543,8 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
    * Requirements: 7.1, 7.4
    */
   const refreshData = useCallback(async (): Promise<void> => {
-    // Clear both old and new cache formats
+    // Clear cache
     try {
-      await AsyncStorage.removeItem(CACHE_KEYS.VITALS);
       await AsyncStorage.removeItem(CACHE_KEYS.HEALTH_METRICS);
       console.log('✅ Cache cleared for refresh');
     } catch (error) {
@@ -632,22 +556,43 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }, [fetchData]);
 
   // ============================================================================
-  // Set Vitals Function
+  // Helper Functions
   // ============================================================================
 
   /**
-   * Directly sets vitals data (for local processing like Apple Health)
-   * Saves to cache for offline access
+   * Triggers appropriate TTS, haptics, or sonification based on backend responses
+   * Requirement 10.8: Backend insights trigger accessibility outputs
    */
-  const setVitalsData = useCallback(async (newVitals: VitalSign[]): Promise<void> => {
+  async function triggerAccessibilityOutputs(
+    analysisText: string
+  ): Promise<void> {
     try {
-      setVitals(newVitals);
-      await saveVitalsToCache(newVitals);
-      console.log(`✅ Set ${newVitals.length} vitals in context`);
+      // Get all metrics to check ranges
+      const allMetrics = Object.values(healthMetrics).flat();
+      
+      // Trigger haptic feedback based on data ranges
+      if (allMetrics.length > 0) {
+        // Find the most severe range in the data
+        const hasDanger = allMetrics.some(m => m.range === 'danger');
+        const hasWarning = allMetrics.some(m => m.range === 'warning');
+
+        if (hasDanger) {
+          haptics.triggerHeavy();
+        } else if (hasWarning) {
+          haptics.triggerMedium();
+        } else {
+          haptics.triggerLight();
+        }
+      }
+
+      // Optionally speak a summary of the analysis
+      // This could be triggered based on user settings or mode
+      // For now, we'll just log it
+      console.log('Analysis result:', analysisText);
     } catch (error) {
-      console.error('Failed to set vitals:', error);
+      console.error('Error triggering accessibility outputs:', error);
     }
-  }, []);
+  }
 
   // ============================================================================
   // Category-Based Query Methods (Requirement 4.6)
@@ -736,48 +681,10 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   }, [healthMetrics]);
 
   // ============================================================================
-  // Helper Functions
-  // ============================================================================
-
-  /**
-   * Triggers appropriate TTS, haptics, or sonification based on backend responses
-   * Requirement 10.8: Backend insights trigger accessibility outputs
-   */
-  async function triggerAccessibilityOutputs(
-    analysisText: string,
-    vitalsData: VitalSign[]
-  ): Promise<void> {
-    try {
-      // Trigger haptic feedback based on data ranges
-      if (vitalsData.length > 0) {
-        // Find the most severe range in the data
-        const hasDanger = vitalsData.some(v => v.range === 'danger');
-        const hasWarning = vitalsData.some(v => v.range === 'warning');
-
-        if (hasDanger) {
-          haptics.triggerHeavy();
-        } else if (hasWarning) {
-          haptics.triggerMedium();
-        } else {
-          haptics.triggerLight();
-        }
-      }
-
-      // Optionally speak a summary of the analysis
-      // This could be triggered based on user settings or mode
-      // For now, we'll just log it
-      console.log('Analysis result:', analysisText);
-    } catch (error) {
-      console.error('Error triggering accessibility outputs:', error);
-    }
-  }
-
-  // ============================================================================
   // Context Value
   // ============================================================================
 
   const value: HealthDataContextValue = {
-    vitals,
     healthMetrics,
     permissions,
     isInitialized,
@@ -788,7 +695,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     requestChat,
     clearError,
     refreshData,
-    setVitals: setVitalsData,
     getMetricsByCategory,
     getMetricsByType,
     getMetricsByDateRange,

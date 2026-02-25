@@ -9,7 +9,7 @@ import { useAccessibility } from '@/contexts/AccessibilityContext';
 import { useAudio } from '@/hooks/useAudio';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSpeech } from '@/hooks/useSpeech';
-import { VitalSign } from '@/types';
+import { HealthMetric } from '@/types';
 import { 
   announce, 
   announceSuccess, 
@@ -25,9 +25,11 @@ export default function ModalScreen() {
   const haptics = useHaptics();
   const speech = useSpeech();
 
-  // Mock vital signs data for testing TTS
-  const mockVitals: VitalSign[] = [
+  // Mock health metrics data for testing TTS
+  const mockMetrics: HealthMetric[] = [
     {
+      id: 'heart_rate-test-1',
+      category: 'vitals',
       type: 'heart_rate',
       value: 72,
       timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
@@ -35,13 +37,17 @@ export default function ModalScreen() {
       range: 'normal',
     },
     {
-      type: 'glucose',
+      id: 'blood_glucose-test-1',
+      category: 'vitals',
+      type: 'blood_glucose',
       value: 95,
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
       unit: 'mg/dL',
       range: 'normal',
     },
     {
+      id: 'steps-test-1',
+      category: 'activity',
       type: 'steps',
       value: 8500,
       timestamp: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
@@ -263,13 +269,13 @@ export default function ModalScreen() {
           <View style={styles.buttonRow}>
             <TouchableOpacity 
               style={styles.button} 
-              onPress={() => speech.speakSummary(mockVitals)}
+              onPress={() => speech.speakHealthMetricSummary(mockMetrics)}
             >
               <ThemedText style={styles.buttonText}>Hear Summary</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.button} 
-              onPress={() => speech.speakDetails(mockVitals[0])}
+              onPress={() => speech.speakHealthMetricDetails(mockMetrics[0])}
             >
               <ThemedText style={styles.buttonText}>Hear Details</ThemedText>
             </TouchableOpacity>
