@@ -1607,20 +1607,28 @@ export const healthKitService: HealthKitService = {
         }
         
         // Convert sleep samples to HealthMetric format
-        // Sleep samples have a value field representing duration in minutes
+        // Sleep samples are categorical (inBed, asleep, awake, etc.)
+        // We need to calculate duration from startDate and endDate
         const metrics = results.map(sample => {
-          // Create a HealthValue-compatible object
+          // Calculate duration in hours from startDate to endDate
+          const start = new Date(sample.startDate);
+          const end = new Date(sample.endDate);
+          const durationMs = end.getTime() - start.getTime();
+          const durationHours = durationMs / (1000 * 60 * 60); // Convert to hours
+          
+          // Create a HealthValue-compatible object with calculated duration
           const healthValue: HealthValue = {
-            value: sample.value || 0,
+            value: durationHours, // Duration in hours
             startDate: sample.startDate,
             endDate: sample.endDate,
           };
           
           // Add sleep-specific metadata if available
-          if (sample.metadata || sample.sleepStage) {
+          if (sample.metadata || sample.value || sample.sleepStage) {
             healthValue.metadata = {
               ...sample.metadata,
-              sleepStage: sample.sleepStage,
+              sleepStage: sample.value || sample.sleepStage, // Apple's categorical value
+              originalValue: sample.value, // Keep original categorical value
             };
           }
           

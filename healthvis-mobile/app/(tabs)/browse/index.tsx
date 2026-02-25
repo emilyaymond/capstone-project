@@ -125,7 +125,7 @@ export default function BrowseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, paddingTop: 32, paddingBottom: 24 },
+  content: { paddingTop: 58, padding: 16, paddingBottom: 24 },
 
   largeTitle: {
     paddingTop: 25,

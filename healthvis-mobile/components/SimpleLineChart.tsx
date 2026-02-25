@@ -1,7 +1,7 @@
 /**
  * SimpleLineChart Component
  * 
- * Visual line chart component using react-native-svg.
+ * Visual line chart component using react-native-gifted-charts.
  * Provides visual representation of time-series data with accessibility support.
  * Includes loading states and empty data handling.
  * 
@@ -10,9 +10,9 @@
 
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import Svg, { Line, Circle, Polyline, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { DataPoint } from '../types';
 import { useAccessibility } from '../contexts/AccessibilityContext';
+import { LineChart } from 'react-native-gifted-charts';
 
 // ============================================================================
 // Component Props Interface
@@ -39,59 +39,12 @@ export interface SimpleLineChartProps {
 // Constants
 // ============================================================================
 
-const DEFAULT_WIDTH = 350;
+const DEFAULT_WIDTH = 320;
 const DEFAULT_HEIGHT = 200;
-const PADDING = 40;
-const POINT_RADIUS = 4;
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Calculates min and max values from data points
- */
-const getDataRange = (data: DataPoint[]): { min: number; max: number } => {
-  if (data.length === 0) {
-    return { min: 0, max: 100 };
-  }
-
-  const values = data.map(d => d.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  
-  // Add 10% padding to the range
-  const padding = (max - min) * 0.1;
-  return {
-    min: Math.floor(min - padding),
-    max: Math.ceil(max + padding),
-  };
-};
-
-/**
- * Maps data points to SVG coordinates
- */
-const mapDataToCoordinates = (
-  data: DataPoint[],
-  width: number,
-  height: number,
-  minValue: number,
-  maxValue: number
-): { x: number; y: number; point: DataPoint }[] => {
-  if (data.length === 0) {
-    return [];
-  }
-
-  const chartWidth = width - PADDING * 2;
-  const chartHeight = height - PADDING * 2;
-  const valueRange = maxValue - minValue;
-
-  return data.map((point, index) => {
-    const x = PADDING + (index / (data.length - 1 || 1)) * chartWidth;
-    const y = PADDING + chartHeight - ((point.value - minValue) / valueRange) * chartHeight;
-    return { x, y, point };
-  });
-};
 
 /**
  * Gets color based on data range and accessibility mode
@@ -142,17 +95,18 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   // Memoized Calculations
   // ============================================================================
 
-  const { min, max } = useMemo(() => getDataRange(data), [data]);
+  const chartData = useMemo(() => {
+    return data.map((point, idx) => {
+      const d = new Date(point.timestamp);
+      const label = idx === 0 || idx === data.length - 1 ? `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}` : "";
+      return {
+        value: point.value,
+        label,
+        dataPointText: `${point.value}`,
+      };
+    });
+  }, [data]);
 
-  const coordinates = useMemo(
-    () => mapDataToCoordinates(data, width, height, min, max),
-    [data, width, height, min, max]
-  );
-
-  const polylinePoints = useMemo(
-    () => coordinates.map(c => `${c.x},${c.y}`).join(' '),
-    [coordinates]
-  );
 
   // Get primary color based on overall data state
   const primaryColor = useMemo(() => {
@@ -251,6 +205,9 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   const chartAccessibilityLabel = accessibilityLabel || 
     `${title || 'Line chart'} showing ${data.length} data points`;
 
+  const minValue = Math.min(...data.map(d => d.value));
+  const maxValue = Math.max(...data.map(d => d.value));
+
   return (
     <View
       style={[styles.container, { width, height: height + 60 }]}
@@ -264,94 +221,38 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
         </Text>
       )}
       
-      <Svg width={width} height={height}>
-        {/* Gradient for area under line (optional visual enhancement) */}
-        <Defs>
-          <LinearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={primaryColor} stopOpacity="0.3" />
-            <Stop offset="1" stopColor={primaryColor} stopOpacity="0.05" />
-          </LinearGradient>
-        </Defs>
-
-        {/* Y-axis */}
-        <Line
-          x1={PADDING}
-          y1={PADDING}
-          x2={PADDING}
-          y2={height - PADDING}
-          stroke={settings.contrast === 'high' ? '#000' : '#999'}
-          strokeWidth="2"
+      <View style={styles.chartWrapper}>
+        <LineChart
+          data={chartData}
+          width={width}
+          height={height}
+          color={primaryColor}
+          thickness={mode === 'simplified' ? 3 : 2.5}
+          curved
+          hideDataPoints={false}
+          dataPointsRadius={mode === 'simplified' ? 6 : 4}
+          dataPointsColor={primaryColor}
+          hideRules={false}
+          rulesColor="#E5E5E5"
+          xAxisColor="#E5E5E5"
+          yAxisColor="#E5E5E5"
+          yAxisTextStyle={{ fontSize: fontSize - 2, color: '#999' }}
+          backgroundColor="transparent"
+          isAnimated
+          animationDuration={800}
+          startFillColor={primaryColor}
+          startOpacity={0.3}
+          endOpacity={0.05}
+          areaChart
         />
-
-        {/* X-axis */}
-        <Line
-          x1={PADDING}
-          y1={height - PADDING}
-          x2={width - PADDING}
-          y2={height - PADDING}
-          stroke={settings.contrast === 'high' ? '#000' : '#999'}
-          strokeWidth="2"
-        />
-
-        {/* Y-axis labels */}
-        <SvgText
-          x={PADDING - 10}
-          y={PADDING}
-          fontSize={fontSize - 2}
-          fill={settings.contrast === 'high' ? '#000' : '#666'}
-          textAnchor="end"
-          alignmentBaseline="middle"
-        >
-          {max}{unit ? ` ${unit}` : ''}
-        </SvgText>
-        <SvgText
-          x={PADDING - 10}
-          y={height - PADDING}
-          fontSize={fontSize - 2}
-          fill={settings.contrast === 'high' ? '#000' : '#666'}
-          textAnchor="end"
-          alignmentBaseline="middle"
-        >
-          {min}{unit ? ` ${unit}` : ''}
-        </SvgText>
-
-        {/* Line connecting data points */}
-        {coordinates.length > 1 && (
-          <Polyline
-            points={polylinePoints}
-            fill="none"
-            stroke={primaryColor}
-            strokeWidth={mode === 'simplified' ? 3 : 2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )}
-
-        {/* Data points */}
-        {coordinates.map((coord, index) => {
-          const pointColor = getColorForRange(coord.point.range, settings.contrast);
-          const pointRadius = mode === 'simplified' ? POINT_RADIUS + 2 : POINT_RADIUS;
-          
-          return (
-            <Circle
-              key={index}
-              cx={coord.x}
-              cy={coord.y}
-              r={pointRadius}
-              fill={pointColor}
-              stroke={settings.contrast === 'high' ? '#000' : '#fff'}
-              strokeWidth={mode === 'simplified' ? 2 : 1}
-            />
-          );
-        })}
-      </Svg>
+      </View>
 
       {/* Data summary */}
       <View style={styles.summary}>
         <Text style={[styles.summaryText, { fontSize: fontSize - 2 }]}>
           {data.length} data point{data.length !== 1 ? 's' : ''}
           {' • '}
-          Range: {min} - {max}{unit ? ` ${unit}` : ''}
+          Range: {minValue} - {maxValue}{unit ? ` ${unit}` : ''}
         </Text>
       </View>
     </View>
@@ -372,6 +273,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#000',
     textAlign: 'center',
+  },
+  chartWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingContainer: {
     justifyContent: 'center',

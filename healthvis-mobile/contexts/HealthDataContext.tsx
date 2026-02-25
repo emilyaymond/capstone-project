@@ -33,6 +33,8 @@ import {
   PermissionStatus, 
   FetchOptions 
 } from '../lib/healthkit-service';
+import { getMetricAggregation, getMetricChartKind } from "@/app/metric/metricConfig";
+
 
 // ============================================================================
 // Storage Keys
@@ -68,6 +70,11 @@ export interface HealthDataContextValue {
   getMetricsByCategory: (category: HealthCategory) => HealthMetric[];
   getMetricsByType: (type: HealthMetricType) => HealthMetric[];
   getMetricsByDateRange: (startDate: Date, endDate: Date) => HealthMetric[];
+  getMetricSeries: (type: HealthMetricType, range: "day" | "week" | "month") => {
+    points: HealthMetric[];
+    chart: "line" | "bar";
+    aggregation: "avg" | "sum" | "latest";
+  };
 }
 
 // ============================================================================
@@ -84,6 +91,69 @@ interface HealthDataProviderProps {
   children: ReactNode;
 }
 
+
+type TimeRangeKey = "day" | "week" | "month";
+
+function getRangeCutoff(range: TimeRangeKey) {
+  const now = new Date();
+  const cutoff = new Date(now);
+  if (range === "day") cutoff.setDate(now.getDate() - 1);
+  if (range === "week") cutoff.setDate(now.getDate() - 7);
+  if (range === "month") cutoff.setMonth(now.getMonth() - 1);
+  return cutoff;
+}
+
+function getBucketSizeMs(range: TimeRangeKey) {
+  if (range === "day") return 60 * 60 * 1000; // hourly
+  return 24 * 60 * 60 * 1000; // daily for week/month
+}
+
+function aggregateBucket(metrics: HealthMetric[], aggregation: "avg" | "sum" | "latest") {
+  const values = metrics.map(m => Number(m.value)).filter(Number.isFinite);
+  if (!values.length) return 0;
+
+  if (aggregation === "sum") return values.reduce((a, b) => a + b, 0);
+  if (aggregation === "latest") return Number(metrics[metrics.length - 1]?.value ?? 0);
+  return values.reduce((a, b) => a + b, 0) / values.length; // avg
+}
+
+function bucketize(
+  data: HealthMetric[],
+  bucketSize: number,
+  aggregation: "avg" | "sum" | "latest"
+): HealthMetric[] {
+  const buckets = new Map<number, HealthMetric[]>();
+
+  for (const m of data) {
+    const t = m.timestamp instanceof Date ? m.timestamp.getTime() : new Date(m.timestamp as any).getTime();
+    const key = Math.floor(t / bucketSize) * bucketSize;
+    const arr = buckets.get(key) ?? [];
+    arr.push(m);
+    buckets.set(key, arr);
+  }
+
+  const out: HealthMetric[] = [];
+  for (const [key, arr] of buckets.entries()) {
+    // keep deterministic ordering within bucket
+    arr.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    const value = aggregateBucket(arr, aggregation);
+    const range =
+      arr.some(x => x.range === "danger") ? "danger" :
+      arr.some(x => x.range === "warning") ? "warning" : "normal";
+
+    out.push({
+      ...arr[0],
+      value: Math.round(value),
+      timestamp: new Date(key),
+      range,
+    });
+  }
+
+  out.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  return out;
+}
+
 // ============================================================================
 // Provider Component
 // ============================================================================
@@ -98,6 +168,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     sleep: [],
     mindfulness: [],
   });
+
   const [permissions, setPermissions] = useState<PermissionStatus | null>(null);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -215,6 +286,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     }
   }
 
+
   /**
    * Migrate existing VitalSign cache data to HealthMetric format
    * This ensures backwards compatibility with existing cached data
@@ -251,7 +323,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
       // Save to new cache format
       await saveHealthMetricsToCache(categorizedMetrics);
 
-      console.log('✅ Successfully migrated VitalSign cache to HealthMetric format');
+      console.log('Successfully migrated VitalSign cache to HealthMetric format');
     } catch (error) {
       console.error('Failed to migrate VitalSign cache:', error);
       // Don't throw - migration failure shouldn't break the app
@@ -591,6 +663,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     return healthMetrics[category] || [];
   }, [healthMetrics]);
 
+  
   /**
    * Get all metrics of a specific type across all categories
    * 
@@ -611,6 +684,29 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     
     return allMetrics;
   }, [healthMetrics]);
+
+  const getMetricSeries = useCallback(
+  (type: HealthMetricType, range: "day" | "week" | "month") => {
+    const chart = getMetricChartKind(type);
+    const aggregation = getMetricAggregation(type);
+
+    const cutoff = getRangeCutoff(range);
+    const bucketSize = getBucketSizeMs(range);
+
+    // Use your existing query method instead of a nonexistent `healthData`
+    const allOfType = getMetricsByType(type);
+
+    // getMetricsByType sorts newest-first; bucketize expects oldest-first
+    const filtered = allOfType
+      .filter(m => m.timestamp >= cutoff)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    const points = bucketize(filtered, bucketSize, aggregation);
+
+    return { points, chart, aggregation };
+  },
+  [getMetricsByType]
+);
 
   /**
    * Get all metrics within a specific date range
@@ -696,6 +792,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     getMetricsByCategory,
     getMetricsByType,
     getMetricsByDateRange,
+    getMetricSeries,
   };
 
   return (
