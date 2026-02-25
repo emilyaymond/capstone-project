@@ -101,7 +101,7 @@ export interface CategorizedHealthData {
  */
 export const NORMAL_RANGES: Partial<Record<HealthMetricType, { min: number; max: number }>> = {
   // Vitals
-  heart_rate: { min: 60, max: 100 },
+  heart_rate: { min: 40, max: 120 },
   blood_pressure_systolic: { min: 90, max: 120 },
   blood_pressure_diastolic: { min: 60, max: 80 },
   respiratory_rate: { min: 12, max: 20 },

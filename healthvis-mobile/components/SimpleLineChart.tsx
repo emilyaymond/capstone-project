@@ -67,11 +67,11 @@ const getColorForRange = (
     // Normal contrast colors
     switch (range) {
       case 'normal':
-        return '#007AFF'; // Blue
+        return '#ff0d00ff'; 
       case 'warning':
-        return '#FF9500'; // Orange
+        return '#b70b0bff'; 
       case 'danger':
-        return '#FF3B30'; // Red
+        return '#8B0000'; 
     }
   }
 };
@@ -99,25 +99,24 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
     return data.map((point, idx) => {
       const d = new Date(point.timestamp);
       const label = idx === 0 || idx === data.length - 1 ? `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}` : "";
+      
+      // Get color for this specific data point based on its range
+      const pointColor = getColorForRange(point.range || 'normal', settings.contrast);
+      
       return {
         value: point.value,
         label,
         dataPointText: `${point.value}`,
+        dataPointColor: pointColor,  // Individual point color
+        dataPointRadius: mode === 'simplified' ? 6 : 4,
       };
     });
-  }, [data]);
+  }, [data, settings.contrast, mode]);
 
 
-  // Get primary color based on overall data state
+  // Get primary color based on overall data state (just use normal always)
   const primaryColor = useMemo(() => {
     if (data.length === 0) return getColorForRange('normal', settings.contrast);
-    
-    // Use the most severe range in the dataset
-    const hasDanger = data.some(d => d.range === 'danger');
-    const hasWarning = data.some(d => d.range === 'warning');
-    
-    if (hasDanger) return getColorForRange('danger', settings.contrast);
-    if (hasWarning) return getColorForRange('warning', settings.contrast);
     return getColorForRange('normal', settings.contrast);
   }, [data, settings.contrast]);
 
@@ -230,8 +229,6 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
           thickness={mode === 'simplified' ? 3 : 2.5}
           curved
           hideDataPoints={false}
-          dataPointsRadius={mode === 'simplified' ? 6 : 4}
-          dataPointsColor={primaryColor}
           hideRules={false}
           rulesColor="#E5E5E5"
           xAxisColor="#E5E5E5"

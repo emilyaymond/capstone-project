@@ -10,7 +10,7 @@ import { useHealthData } from "@/contexts/HealthDataContext";
 import { SimpleLineChart } from "@/components/SimpleLineChart";
 import { SimpleBarChart } from "@/components/SimpleBarChart";
 
-import { HealthMetric } from "@/types/health-metric";
+import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint } from "@/types";
 import { BarChart } from 'react-native-gifted-charts';
 import { getMetricChartKind, getMetricAggregation } from "./metricConfig";
@@ -36,6 +36,8 @@ function formatTime(ts: string) {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+// converts HealthMetric array to DataPoint array for chart rendering
+// extracts only the essential fields (value, timestamp, range) needed for visualization, stripping away metadata like id, category, type, and unit.
 function toPoints(metrics: HealthMetric[]): DataPoint[] {
   return metrics.map((m) => ({
     value: Number(m.value),
@@ -112,9 +114,9 @@ export default function MetricDetailScreen() {
 
   const [timeRange, setTimeRange] = React.useState<'H' | 'D' | 'W' | 'M' | '6M' | 'Y'>('D');
 
-  const metricType = String(type ?? "");
+  const metricType = String(type ?? "") as HealthMetricType;
   const title = prettyName(metricType);
-  
+  const agg = getMetricAggregation(metricType); //looks up how that metric should be combined inside each time bucket, and passes that choice into your aggregateData helper
 
   // Flatten all categories into one array (same as SummaryScreen did)
   const all: HealthMetric[] = useMemo(() => {
@@ -128,11 +130,11 @@ export default function MetricDetailScreen() {
     ];
   }, [healthMetrics]);
 
-  // Filter for this metric type and sort ascending for chart
+  // filters and sorts all health data to get only the data points for the specific metric being viewed
   const allDataForType: HealthMetric[] = useMemo(() => {
     return all
-      .filter((m) => m.type === metricType)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      .filter((m) => m.type === metricType) // filters the complete health data array to keep only metrics matching the current type
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); // sorts the filtered data chronologically (oldest to newest) by converting timestamps to milliseconds and comparing them
   }, [all, metricType]);
 
   // Filter data based on selected time range
@@ -163,6 +165,7 @@ export default function MetricDetailScreen() {
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     }
 
+    
     const filtered = allDataForType.filter((m) => new Date(m.timestamp).getTime() >= startDate.getTime());
 
     // Aggregate data based on time range to reduce chart density
@@ -197,7 +200,7 @@ export default function MetricDetailScreen() {
 
   const points = useMemo(() => toPoints(data), [data]);
   const showBar = getMetricChartKind(metricType) === "bar";
-  const agg = getMetricAggregation(metricType);
+  
 
   // Simple “highlight” text (you can replace later with smarter logic)
   const highlightText = useMemo(() => {
@@ -218,18 +221,6 @@ export default function MetricDetailScreen() {
     }
   }, [timeRange]);
 
-  const data1 = [
-    { value: 2500, frontColor: '#006DFF', gradientColor: '#009FFF', spacing: 6, label: 'Jan' },
-    { value: 2400, frontColor: '#3BE9DE', gradientColor: '#93FCF8' },
-    { value: 3500, frontColor: '#006DFF', gradientColor: '#009FFF', spacing: 6, label: 'Feb' },
-    { value: 3000, frontColor: '#3BE9DE', gradientColor: '#93FCF8' },
-    { value: 4500, frontColor: '#006DFF', gradientColor: '#009FFF', spacing: 6, label: 'Mar' },
-    { value: 4000, frontColor: '#3BE9DE', gradientColor: '#93FCF8' },
-    { value: 5200, frontColor: '#006DFF', gradientColor: '#009FFF', spacing: 6, label: 'Apr' },
-    { value: 4900, frontColor: '#3BE9DE', gradientColor: '#93FCF8' },
-    { value: 3000, frontColor: '#006DFF', gradientColor: '#009FFF', spacing: 6, label: 'May' },
-    { value: 2800, frontColor: '#3BE9DE', gradientColor: '#93FCF8' },
-  ];
 
   return (
     <ThemedView style={styles.bg} lightColor="#F2F2F7" darkColor="#000">
@@ -307,7 +298,7 @@ export default function MetricDetailScreen() {
                 data={points}
                 title=""
                 unit={latest?.unit ?? ""}
-                width={360}
+                width={352}
                 height={260}
                 accessibilityLabel={`${title} line chart`}
               />
@@ -412,7 +403,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 14,
     padding: 16,
-    alignItems: "center",
+    alignItems: "flex-start",
     marginTop: 4,
   },
 
