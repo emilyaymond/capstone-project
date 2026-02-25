@@ -1,122 +1,205 @@
-# HealthVis - Accessible Health Data Visualization
+# HealthVis Mobile
 
-**Capstone Project: Making Health Data Visualization Accessible to All**
-
-HealthVis is a React-based web application designed to make health data visualization accessible to users with varying visual abilities, particularly blind and visually impaired users. The application provides multiple interaction modes including visual, audio-focused, hybrid, and simplified interfaces.
+Accessible health data visualization app built with Expo and React Native. Integrates directly with Apple HealthKit to provide comprehensive health and fitness data visualization.
 
 ## Features
 
-- **Multi-Modal Interface**: Visual, audio, hybrid, and simplified interaction modes
-- **Comprehensive Accessibility**: Screen reader support, keyboard navigation, and ARIA compliance
-- **Data Sonification**: Audio representation of health data trends
-- **Progressive Disclosure**: Information presented in digestible layers
-- **Persistent Preferences**: User accessibility settings saved across sessions
+- 🏥 **Direct HealthKit Integration**: Access comprehensive health data including vitals, activity, body measurements, nutrition, sleep, and mindfulness
+- 🎯 **4 Accessibility Modes**: Visual, Audio, Hybrid, Simplified
+- 🔊 **Audio Feedback**: Button clicks, mode changes, data sonification
+- 📳 **Haptic Feedback**: Touch-based feedback for data exploration
+- 🗣️ **Text-to-Speech**: Spoken summaries of health data
+- 👆 **Touch-to-Explore**: Interactive charts with audio/haptic feedback
+- 📊 **Data Visualization**: Line and bar charts with accessibility features
+- ⚙️ **Customizable Settings**: Font size, contrast, audio/haptic toggles
+- 💾 **Offline Support**: Cached data for offline viewing
 
-## Getting Started
+## Quick Start
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+```bash
+# Install dependencies
+npm install
+
+# iOS Setup (Required for HealthKit)
+cd ios && pod install && cd ..
+
+# Start the development server with Expo Dev Client
+npx expo start --dev-client
+
+# Press 'i' for iOS simulator (limited HealthKit support)
+# Or scan QR code with Expo Go on physical iOS device for full HealthKit access
+```
+
+### Running on Physical Device (Recommended for HealthKit)
+
+Since HealthKit requires a physical iOS device, use one of these methods:
+
+**Option 1: Expo Dev Client (Easiest - No Code Signing)**
+
+```bash
+npx expo start --dev-client
+# Scan QR code with camera or Expo Go app
+```
+
+**Option 2: Build with Xcode (Requires Apple Developer Account)**
+
+```bash
+# Open in Xcode
+open ios/healthvismobile.xcworkspace
+
+# In Xcode:
+# 1. Select healthvismobile target
+# 2. Go to Signing & Capabilities
+# 3. Enable "Automatically manage signing"
+# 4. Select your development team
+# 5. Build and run (Cmd+R)
+```
+
+**Option 3: Expo Build**
+
+```bash
+# Build for iOS device
+npx expo run:ios --device
+```
+
+## HealthKit Setup
 
 ### Prerequisites
 
-- Node.js (version 14 or higher)
-- npm or yarn
+- Physical iOS device (HealthKit is not fully supported in simulator)
+- iOS 13.0 or later
+- For Xcode builds: Xcode 12.0 or later and Apple Developer account
+- For Expo Dev Client: No code signing required
 
-### Installation
+### Running Without Code Signing Issues
 
-```bash
-npm install
-```
-
-### Available Scripts
-
-In the project directory, you can run:
-
-#### `npm start`
-
-Runs the app in development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-#### `npm test`
-
-Launches the test runner in interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-#### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-## Project Structure
-
-- `src/components/` - React components including accessibility-focused chart components
-- `src/contexts/` - React contexts for accessibility and application state
-- `src/hooks/` - Custom hooks for keyboard navigation and accessibility features  
-- `src/services/` - Services for audio feedback, data processing, and mock data
-- `src/styles/` - CSS modules and styling
-
-## Accessibility Features
-
-- **Screen Reader Support**: Full ARIA labeling and live regions
-- **Keyboard Navigation**: Complete keyboard-only navigation support
-- **Audio Feedback**: Data sonification and voice descriptions
-- **High Contrast**: Visual accessibility options
-- **Customizable Interface**: User-configurable accessibility preferences
-
-## Mobile App (Expo)
-
-The mobile version of HealthVis is built with Expo and React Native, located in the `healthvis-mobile/` directory.
-
-### Features
-- Apple Health data import (ZIP file support)
-- CSV and JSON file upload
-- Cross-platform (iOS, Android, Web)
-- Full accessibility support
-- Offline data processing
-
-### Quick Start
+The easiest way to run the app is using Expo Dev Client:
 
 ```bash
 cd healthvis-mobile
-npm install
-npm start
+npx expo start --dev-client
 ```
 
-See [QUICK_START_TESTING.md](QUICK_START_TESTING.md) for testing the Apple Health import feature.
+This bypasses code signing requirements and works on both simulator and physical devices.
 
-### Testing Apple Health Import
+### Permissions
 
-We provide test data and scripts to validate the Apple Health import functionality:
+On first launch, the app will request permissions to access the following HealthKit data:
 
-**Test Files:**
-- `Health-Export.zip` (35 MB) - Real Apple Health export with thousands of records
-- `Health-Export-Sample.zip` (3 KB) - Generated sample for quick testing
+**Vitals:**
 
-**Testing Resources:**
-- [QUICK_START_TESTING.md](QUICK_START_TESTING.md) - 5-minute quick start guide
-- [healthvis-mobile/TESTING_APPLE_HEALTH.md](healthvis-mobile/TESTING_APPLE_HEALTH.md) - Comprehensive testing guide
-- [healthvis-mobile/APPLE_HEALTH_IMPORT.md](healthvis-mobile/APPLE_HEALTH_IMPORT.md) - Feature documentation
-- [healthvis-mobile/scripts/README.md](healthvis-mobile/scripts/README.md) - Testing scripts documentation
+- Heart Rate
+- Blood Pressure
+- Respiratory Rate
+- Body Temperature
+- Oxygen Saturation
+- Blood Glucose
 
-**Quick Test:**
+**Activity:**
+
+- Steps
+- Distance
+- Flights Climbed
+- Active Energy
+- Exercise Minutes
+
+**Body Measurements:**
+
+- Weight
+- Height
+- BMI
+- Body Fat Percentage
+
+**Nutrition:**
+
+- Dietary Energy (Calories)
+- Water Intake
+- Protein, Carbohydrates, Fats
+
+**Sleep & Mindfulness:**
+
+- Sleep Analysis
+- Mindfulness Minutes
+
+### Enabling Permissions
+
+If you deny permissions initially, you can enable them later:
+
+1. Open iOS Settings
+2. Navigate to Privacy & Security → Health
+3. Select HealthVis
+4. Enable the data types you want to share
+
+## Testing
+
+### Unit & Integration Tests
+
 ```bash
-# Validate the test data
-node healthvis-mobile/scripts/validate-health-export.js
+# Run all tests
+npm test
 
-# Create a small sample file
-node healthvis-mobile/scripts/create-sample-export.js
+# Run tests in watch mode
+npm test -- --watch
 
-# Test the parser
-node healthvis-mobile/scripts/test-parser-integration.js
-
-# Start the app and test upload
-cd healthvis-mobile && npm start
+# Run specific test file
+npm test -- healthkit-service.test.ts
 ```
 
-## Learn More
+### Integration Testing
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+For comprehensive integration testing on physical devices:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- **Detailed Guide**: See `INTEGRATION_TESTING_GUIDE.md` for complete test procedures
+- **Quick Checklist**: See `INTEGRATION_TEST_CHECKLIST.md` for quick reference
+- **Feature Testing**: Navigate to `/test-feedback` in the app to test audio and haptic features
+
+## Project Structure
+
+```
+app/              # Screens (file-based routing)
+components/       # Reusable components
+contexts/         # React contexts (Accessibility, HealthData)
+hooks/            # Custom hooks (useAudio, useHaptics, useSpeech)
+lib/              # Utilities (API client, announcer, sonification)
+types/            # TypeScript type definitions
+constants/        # App constants (theme, accessibility)
+```
+
+## Documentation
+
+- `INTEGRATION_TESTING_GUIDE.md` - Comprehensive integration testing procedures for physical devices
+- `INTEGRATION_TEST_CHECKLIST.md` - Quick reference checklist for integration testing
+- `TESTING_GUIDE.md` - Testing audio and haptic features
+- `CODE_REVIEW.md` - Current implementation status
+- `.kiro/specs/apple-healthkit-migration/` - Apple HealthKit migration spec
+- `.kiro/specs/expo-accessibility-migration/` - Accessibility features spec
+
+## Tech Stack
+
+- Expo SDK 54
+- React Native 0.81
+- TypeScript
+- Expo Router (file-based routing)
+- react-native-health (HealthKit integration)
+- expo-av (audio)
+- expo-haptics (haptic feedback)
+- expo-speech (text-to-speech)
+- AsyncStorage (persistence)
+
+## Health Data Categories
+
+The app organizes health data into six main categories:
+
+1. **Vitals**: Heart rate, blood pressure, respiratory rate, body temperature, oxygen saturation, blood glucose
+2. **Activity**: Steps, distance, flights climbed, active energy, exercise minutes
+3. **Body**: Weight, height, BMI, body fat percentage
+4. **Nutrition**: Dietary energy, water, protein, carbohydrates, fats
+5. **Sleep**: Sleep analysis with sleep stages
+6. **Mindfulness**: Mindfulness session minutes
+
+## Data Synchronization
+
+- **Automatic Sync**: Data refreshes when app comes to foreground
+- **Manual Sync**: Pull-to-refresh on home screen
+- **Offline Access**: Cached data available when offline
+- **Time Range**: Configurable in settings (7/30/90 days)
