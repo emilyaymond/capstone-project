@@ -2,8 +2,8 @@
 import React, { useMemo } from "react";
 import { View, StyleSheet, Text, ActivityIndicator } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { DataPoint } from "../types";
-import { useAccessibility } from "../contexts/AccessibilityContext";
+import { DataPoint } from "../../types";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 export interface SimpleBarChartProps {
   data: DataPoint[];

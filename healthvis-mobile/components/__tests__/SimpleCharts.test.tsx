@@ -11,8 +11,8 @@
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
-import { SimpleLineChart } from '../SimpleLineChart';
-import { SimpleBarChart } from '../SimpleBarChart';
+import { SimpleLineChart } from '../charts/lineChart';
+import { SimpleBarChart } from '../charts/barChart';
 import { DataPoint } from '../../types';
 import { AccessibilityProvider } from '../../contexts/AccessibilityContext';
 

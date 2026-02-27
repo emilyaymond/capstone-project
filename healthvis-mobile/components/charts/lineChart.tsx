@@ -10,8 +10,8 @@
 
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import { DataPoint } from '../types';
-import { useAccessibility } from '../contexts/AccessibilityContext';
+import { DataPoint } from '../../types';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 import { LineChart } from 'react-native-gifted-charts';
 
 // ============================================================================
@@ -90,10 +90,13 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
 }) => {
   const { settings, mode } = useAccessibility();
 
-  // ============================================================================
   // Memoized Calculations
-  // ============================================================================
 
+
+  /*
+  * Todo I have to change the daily tab to only show 24 hours of data 
+  * (past 24, so if it is 11pm now it would show from 11pm yesterday) and then label the 12-6
+  */
   const chartData = useMemo(() => {
     return data.map((point, idx) => {
       const d = new Date(point.timestamp);
@@ -105,11 +108,15 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
           label = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
           break;
           
-        case 'D': // Daily - show 12am, 6am, 12pm, 6pm
+        case 'D': // Day - show 12am, 6am, 12pm, 6pm
+
           const hour = d.getHours();
           if (hour === 0 || hour === 6 || hour === 12 || hour === 18) {
-            label = hour === 0 ? '12am' : hour === 6 ? '6am' : hour === 12 ? '12pm' : '6pm';
+            if(d.getMinutes() === 0)
+              label = hour === 0 ? '12am' : hour === 6 ? '6am' : hour === 12 ? '12pm' : '6pm';
           }
+          else
+            label = `${hour}`;
           break;
           
         case 'W': // Weekly - show day of week
@@ -151,6 +158,10 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
       // Get color for this specific data point based on its range
       const pointColor = getColorForRange(point.range || 'normal', settings.contrast);
       
+      // delete
+      if(label)
+        console.log(point.timestamp, "🦺 value:", point.value, "label", label, "dataPointText:", point.value, "dataPointColor:", pointColor);
+
       return {
         value: point.value,
         label,
@@ -269,13 +280,13 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
           data={chartData}
           width={chartWidth}
           height={chartHeight}  
-          spacing={Math.max(8, Math.min(24, Math.floor(width / Math.max(chartData.length, 8))))}
+          spacing={Math.max(8, Math.min(24, Math.floor(chartWidth/ Math.max(chartData.length, 8))))}
           color={primaryColor}
           thickness={mode === 'simplified' ? 3 : 2.5}
           curved
-          hideDataPoints={false}
+          hideDataPoints
           // showTextOnFocus
-          hideRules={false}
+          hideRules
           rulesColor="#E5E5E5"
           xAxisColor="#E5E5E5"
           yAxisColor="#E5E5E5"

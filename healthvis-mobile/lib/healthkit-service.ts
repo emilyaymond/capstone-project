@@ -320,8 +320,9 @@ export function convertHealthKitSample(
   const category = METRIC_TYPE_TO_CATEGORY[type];
   const unit = getUnitForType(type);
   
-  // Extract value from sample
-  const value = typeof sample.value === 'number' ? sample.value : parseFloat(String(sample.value));
+  // Extract value from sample and round to integer
+  const rawValue = typeof sample.value === 'number' ? sample.value : parseFloat(String(sample.value));
+  const value = Math.round(rawValue);
   
   // Parse timestamp
   const timestamp = new Date(sample.startDate);

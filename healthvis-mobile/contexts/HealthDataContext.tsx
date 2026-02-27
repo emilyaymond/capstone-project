@@ -104,13 +104,13 @@ function getBucketSizeMs(range: TimeRangeKey) {
   return 24 * 60 * 60 * 1000; // daily for week/month
 }
 
-function aggregateBucket(metrics: HealthMetric[], aggregation: "avg" | "sum" | "latest") {
+function aggregateBucket(metrics: HealthMetric[], aggregation: "avg" | "sum" | "latest"): number {
   const values = metrics.map(m => Number(m.value)).filter(Number.isFinite);
   if (!values.length) return 0;
 
-  if (aggregation === "sum") return values.reduce((a, b) => a + b, 0);
-  if (aggregation === "latest") return Number(metrics[metrics.length - 1]?.value ?? 0);
-  return values.reduce((a, b) => a + b, 0) / values.length; // avg
+  if (aggregation === "sum") return Math.round(values.reduce((a, b) => a + b, 0));
+  if (aggregation === "latest") return Math.round(Number(metrics[metrics.length - 1]?.value ?? 0));
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length); // avg
 }
 
 function bucketize(

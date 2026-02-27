@@ -6,9 +6,9 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useHealthData } from "@/contexts/HealthDataContext";
 
-// Use your existing chart component(s)
-import { SimpleLineChart } from "@/components/SimpleLineChart";
-import { SimpleBarChart } from "@/components/SimpleBarChart";
+import { SimpleLineChart } from "@/components/charts/lineChart";
+import { SimpleBarChart } from "@/components/charts/barChart";
+import { ScatterPlot } from "@/components/charts/scatter";
 
 import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint } from "@/types";
@@ -35,8 +35,9 @@ function prettyName(type: string) {
 }
 
 function formatTime(ts: string) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const d = (new Date(ts)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  // console.log("💜time is ", d)
+  return d;
 }
 
 // converts HealthMetric array to DataPoint array for chart rendering
@@ -51,12 +52,16 @@ function toPoints(metrics: HealthMetric[]): DataPoint[] {
 
 function computeMinMax(metrics: HealthMetric[]) {
   const vals = metrics.map((m) => Number(m.value)).filter((v) => Number.isFinite(v));
-  if (!vals.length) return { min: undefined, max: undefined };
+  console.log("💜in compute min max", vals)
+
+  if (!vals.length) 
+    return { min: undefined, max: undefined };
+
   return { min: Math.min(...vals), max: Math.max(...vals) };
 }
 
 function useBarChart(type: string) {
-  // tweak this list to match your app
+  // TODO tweak this list to match your app
   return type === "steps" || type === "calories" || type === "active_energy";
 }
 
@@ -108,20 +113,35 @@ function aggregateData(
   const buckets = new Map<number, HealthMetric[]>();
 
   data.forEach((metric) => {
-    const t = new Date(metric.timestamp).getTime();
-    const key = Math.floor(t / bucketSize) * bucketSize;
-    if (!buckets.has(key)) buckets.set(key, []);
+    const t = new Date(metric.timestamp).getTime(); // t is ms since Jan 1, 1970 00:00:00 UTC isnt that crazyyy
+    const key = Math.floor(t / bucketSize) * bucketSize; 
+    const logTime = formatTime(metric.timestamp);
+    console.log(" 👗 heart rate is ", metric.value, " at ", logTime);
+
+    if (!buckets.has(key)) 
+      buckets.set(key, []);
+
     buckets.get(key)!.push(metric);
   });
 
   const aggregated: HealthMetric[] = [];
   buckets.forEach((metrics, key) => {
     const values = metrics.map((m) => Number(m.value)).filter(Number.isFinite);
-
     let value: number;
-    if (aggregation === "sum") value = values.reduce((a, b) => a + b, 0);
-    else if (aggregation === "latest") value = Number(metrics[metrics.length - 1]?.value ?? 0);
-    else value = values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1);
+    
+    if (aggregation === "sum") {
+      value = Math.round(values.reduce((a, b) => a + b, 0));
+      console.log("🧑Value: ", value)
+    }
+    
+    else if (aggregation === "latest") {
+      value = Math.round(Number(metrics[metrics.length - 1]?.value ?? 0));
+      console.log("🧑‍🎤Value: ", value)
+    }
+    else {
+      value = Math.round(values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1));
+      // console.log("👚Value: ", value)
+    }
 
     const mostSevereRange =
       metrics.some((m) => m.range === "danger") ? "danger" :
@@ -184,8 +204,8 @@ export default function MetricDetailScreen() {
       case 'H': // Last hour
         startDate = new Date(now.getTime() - 60 * 60 * 1000);
         break;
-      case 'D': // Last day (24 hours)
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      case 'D': // From 12AM today
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
         break;
       case 'W': // Last week
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -203,7 +223,7 @@ export default function MetricDetailScreen() {
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     }
 
-    
+    // takes allfordatatype and only gets time range requested
     const filtered = allDataForType.filter((m) => new Date(m.timestamp).getTime() >= startDate.getTime());
     
     console.log(`[${metricType}] After time range filter (${timeRange}):`, filtered.length, 'points');
@@ -232,18 +252,19 @@ export default function MetricDetailScreen() {
       default:
         bucketSize = 5 * 60 * 1000;
     }
-
+    
     const aggregated = aggregateData(filtered, bucketSize, agg);
     console.log(`[${metricType}] After aggregation (bucket: ${bucketSize}ms):`, aggregated.length, 'points');
+
     return aggregated;
   }, [allDataForType, timeRange, agg]);
 
-  const latest = data.length ? data[data.length - 1] : undefined;
+  const latest = data.length ? data[data.length - 1] : undefined; // last point in array
   const { min, max } = useMemo(() => computeMinMax(data), [data]);
 
   const points = useMemo(() => toPoints(data), [data]);
-  const showBar = getMetricChartKind(metricType) === "bar";
- 
+  const chartKind = getMetricChartKind(metricType);
+
   // Simple “highlight” text (you can replace later with smarter logic)
   const highlightText = useMemo(() => {
     if (!latest || min == null || max == null) return "No highlight available yet.";
@@ -280,11 +301,10 @@ export default function MetricDetailScreen() {
             style={styles.circleButton}
             activeOpacity={0.7}
           >
-            <ThemedText style={styles.circleButtonText}>‹</ThemedText>
+          
+          <ThemedText style={styles.circleButtonText}>‹</ThemedText>
           </TouchableOpacity>
-
           <ThemedText style={styles.screenTitle}>{title}</ThemedText>
-
           <View style={styles.circleButton} />
         </View>
 
@@ -327,7 +347,16 @@ export default function MetricDetailScreen() {
         {/* Chart */}
         <View style={styles.chartCard}>
           {points.length ? (
-            showBar ? (
+            chartKind === 'scatter' ? (
+              <ScatterPlot
+                data={points}
+                title=""
+                unit={latest?.unit ?? ""}
+                width={Dimensions.get('window').width - 35}
+                height={260}
+                accessibilityLabel={`${title} scatter plot`}
+              />
+            ) : chartKind === 'bar' ? (
               <SimpleBarChart
                 data={points}
                 title=""
@@ -470,10 +499,8 @@ const styles = StyleSheet.create({
 
   chartCard: {
     backgroundColor: "white",
-    borderRadius: 14,
-    padding: 16,
-    alignItems: "flex-start",
-    marginTop: 4,
+    borderRadius: 10,
+    alignItems: "center",
   },
 
   latestRow: {
@@ -483,6 +510,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  
   latestLeft: { opacity: 0.7, fontWeight: "600" },
   latestRight: { fontWeight: "900" },
 
@@ -517,7 +545,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(0,0,0,0.02)',
   },
-
-
 
 });

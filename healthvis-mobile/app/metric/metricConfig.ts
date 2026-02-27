@@ -3,7 +3,7 @@ import { HealthMetricType } from '@/types/health-metric';
 // features/metrics/metricConfig.ts
 export type MetricAggregation = "avg" | "sum" | "latest";
 
-export type MetricChartKind = "line" | "bar";
+export type MetricChartKind = "scatter" | "line" | "bar";
 
 // metricConfig.ts
  // adjust path to where HealthMetricType is exported
@@ -13,7 +13,7 @@ export const METRIC_CONFIG: Record<
   { chart: MetricChartKind; aggregation: MetricAggregation }
 > = {
   // Vitals (average over buckets)
-  heart_rate: { chart: "line", aggregation: "avg" },
+  heart_rate: { chart: "scatter", aggregation: "avg" },
   respiratory_rate: { chart: "line", aggregation: "avg" },
   body_temperature: { chart: "line", aggregation: "avg" },
   oxygen_saturation: { chart: "line", aggregation: "avg" },
@@ -48,7 +48,7 @@ export const METRIC_CONFIG: Record<
 
 
 export function getMetricChartKind(type: HealthMetricType): MetricChartKind {
-  return METRIC_CONFIG[type]?.chart ?? "line";
+  return METRIC_CONFIG[type]?.chart ?? "scatter";
 }
 
 export function getMetricAggregation(type: HealthMetricType): MetricAggregation {
