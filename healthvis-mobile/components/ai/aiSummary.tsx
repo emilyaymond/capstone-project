@@ -11,8 +11,7 @@ import { ThemedText } from "@/components/themed-text";
 import { HealthMetric } from "@/types/health-metric";
 
 // TODO: Move to environment variable
-const OPENAI_API_KEY =
-  "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";
+const OPENAI_API_KEY = "hidden";
 
 interface AISummaryProps {
   data: HealthMetric[];
