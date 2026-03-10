@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect } from "react";
+import React, { useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -6,7 +6,6 @@ import {
   View,
   Text,
   Vibration,
-  FlatList,
   Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -21,15 +20,12 @@ import { ScatterPlot } from "@/components/charts/scatter";
 
 import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint } from "@/types";
-import { BarChart } from "react-native-gifted-charts";
 import { getMetricChartKind, getMetricAggregation } from "./metricConfig";
 
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { TimeSliceRow } from "@/components/TimeSliceRow";
 import { AISummary } from "@/components/ai/aiSummary";
 
-// If you already created a helper file, you can import from it instead.
-// Example: import { prettyMetricName, shouldUseBarChartForType } from "@/features/summary/utils/metricsSummary";
 function prettyName(type: string) {
   switch (type) {
     case "heart_rate":
@@ -43,21 +39,18 @@ function prettyName(type: string) {
   }
 }
 
-function formatTime(ts: string) {
-  const d = new Date(ts).toLocaleTimeString([], {
+function formatTime(ts: string | Date) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
-  // console.log("💜time is ", d)
-  return d;
 }
 
-// converts HealthMetric array to DataPoint array for chart rendering
-// extracts only the essential fields (value, timestamp, range) needed for visualization, stripping away metadata like id, category, type, and unit.
 function toPoints(metrics: HealthMetric[]): DataPoint[] {
   return metrics.map((m) => ({
     value: Number(m.value),
-    timestamp: m.timestamp,
+    timestamp: new Date(m.timestamp),
     range: m.range ?? "normal",
   }));
 }
@@ -66,21 +59,15 @@ function computeMinMax(metrics: HealthMetric[]) {
   const vals = metrics
     .map((m) => Number(m.value))
     .filter((v) => Number.isFinite(v));
-  console.log("💜in compute min max", vals);
 
   if (!vals.length) return { min: undefined, max: undefined };
 
   return { min: Math.min(...vals), max: Math.max(...vals) };
 }
 
-function useBarChart(type: string) {
-  // TODO tweak this list to match your app
-  return type === "steps" || type === "calories" || type === "active_energy";
-}
-
 function formatSliceForVoiceOver(metric: HealthMetric): string {
   const start = new Date(metric.timestamp);
-  const end = new Date(new Date(metric.timestamp).getTime() + 5 * 60 * 1000); // 5 min bucket
+  const end = new Date(new Date(metric.timestamp).getTime() + 5 * 60 * 1000);
   const rangeText =
     metric.range === "danger"
       ? "high"
@@ -90,33 +77,20 @@ function formatSliceForVoiceOver(metric: HealthMetric): string {
   return `${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${metric.value} beats per minute, ${rangeText} range`;
 }
 
-// 2. Map BPM to frequency (using your generate_tones.py logic)
 function mapBpmToFrequency(bpm: number): number {
-  // Heart rate 40-200 bpm → audible range 261 Hz (C4) to 1047 Hz (C6)
-  // Scale linearly: 40 bpm → 261 Hz, 200 bpm → 1047 Hz
   return 261 + ((bpm - 40) * (1047 - 261)) / (200 - 40);
 }
 
-// 3. Play tone + haptic for a time slice
 function playToneForValue(value: number, range: string) {
   const frequency = mapBpmToFrequency(value);
   const severity = range === "danger" ? 2 : range === "warning" ? 1 : 0;
   const duration = [400, 600, 800][severity];
 
-  // TODO: hook to your generate_tones.py output
-  console.log(`Play ${frequency}Hz for ${duration}ms`); // placeholder
+  console.log(`Play ${frequency}Hz for ${duration}ms`);
 
-  // Haptic works immediately
   const patterns = [[100], [200, 100], [400, 200, 400]];
   Vibration.vibrate(patterns[severity]);
 }
-
-/**
- * Aggregates data points by time buckets to reduce chart density
- * @param data - Array of health metrics
- * @param bucketSize - Size of time bucket in milliseconds
- * @returns Aggregated array with averaged values per bucket
- */
 
 function aggregateData(
   data: HealthMetric[],
@@ -128,11 +102,8 @@ function aggregateData(
   const buckets = new Map<number, HealthMetric[]>();
 
   data.forEach((metric) => {
-    const t = new Date(metric.timestamp).getTime(); // t is ms since Jan 1, 1970 00:00:00 UTC isnt that crazyyy
+    const t = new Date(metric.timestamp).getTime();
     const key = Math.floor(t / bucketSize) * bucketSize;
-    const logTime = formatTime(t);
-    //delete
-    // console.log(" 👗 heart rate is ", metric.value, " at ", logTime);
 
     if (!buckets.has(key)) buckets.set(key, []);
 
@@ -146,15 +117,12 @@ function aggregateData(
 
     if (aggregation === "sum") {
       value = Math.round(values.reduce((a, b) => a + b, 0));
-      console.log("🧑Value: ", value);
     } else if (aggregation === "latest") {
       value = Math.round(Number(metrics[metrics.length - 1]?.value ?? 0));
-      console.log("🧑‍🎤Value: ", value);
     } else {
       value = Math.round(
         values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1),
       );
-      // console.log("👚Value: ", value)
     }
 
     const mostSevereRange = metrics.some((m) => m.range === "danger")
@@ -177,7 +145,6 @@ function aggregateData(
 }
 
 export default function MetricDetailScreen() {
-  const { settings } = useAccessibility();
   const { type } = useLocalSearchParams<{ type: string }>();
   const router = useRouter();
   const { healthMetrics, refreshData } = useHealthData();
@@ -186,19 +153,11 @@ export default function MetricDetailScreen() {
     "H" | "D" | "W" | "M" | "6M" | "Y"
   >("D");
 
-  // Refresh data when switching to weekly view to ensure we have data from 6 days ago
   React.useEffect(() => {
     if (timeRange === "W") {
-      console.log(
-        "📅 Switching to weekly view - checking if refresh needed...",
-      );
-      // Only refresh if we don't have data old enough
       const now = new Date();
       const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
 
-      console.log(`📅 Six days ago would be: ${sixDaysAgo.toLocaleString()}`);
-
-      // Check if earliest data is newer than 6 days ago
       const allMetrics = [
         ...healthMetrics.vitals,
         ...healthMetrics.activity,
@@ -214,21 +173,10 @@ export default function MetricDetailScreen() {
         );
         const earliestDate = new Date(earliestTimestamp);
 
-        console.log(
-          `📅 Earliest data in cache: ${earliestDate.toLocaleString()}`,
-        );
-        console.log(
-          `📅 Is earliest (${earliestDate.getTime()}) > sixDaysAgo (${sixDaysAgo.getTime()})? ${earliestDate > sixDaysAgo}`,
-        );
-
         if (earliestDate > sixDaysAgo) {
-          console.log("⚠️ Data too recent, refreshing to get older data...");
           refreshData();
-        } else {
-          console.log("✅ Cache has data old enough for weekly view");
         }
       } else {
-        console.log("⚠️ No data in cache, triggering refresh...");
         refreshData();
       }
     }
@@ -236,9 +184,8 @@ export default function MetricDetailScreen() {
 
   const metricType = String(type ?? "") as HealthMetricType;
   const title = prettyName(metricType);
-  const agg = getMetricAggregation(metricType); //looks up how that metric should be combined inside each time bucket, and passes that choice into your aggregateData helper
+  const agg = getMetricAggregation(metricType);
 
-  // Flatten all categories into one array (same as SummaryScreen did)
   const all: HealthMetric[] = useMemo(() => {
     return [
       ...healthMetrics.vitals,
@@ -250,44 +197,26 @@ export default function MetricDetailScreen() {
     ];
   }, [healthMetrics]);
 
-  // filters and sorts all health data to get only the data points for the specific metric being viewed
   const allDataForType: HealthMetric[] = useMemo(() => {
     const filtered = all
-      .filter((m) => m.type === metricType) // filters the complete health data array to keep only metrics matching the current type
+      .filter((m) => m.type === metricType)
       .sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      ); // sorts the filtered data chronologically (oldest to newest) by converting timestamps to milliseconds and comparing them
-
-    // delete////
-    console.log(
-      `[${metricType}] Total data points available:`,
-      filtered.length,
-    );
-
-    if (filtered.length > 0) {
-      console.log(
-        `[${metricType}] Earliest ${metricType} data: ${new Date(filtered[0].timestamp).toLocaleString()}`,
       );
-      console.log(
-        `[${metricType}] Latest ${metricType} data: ${new Date(filtered[filtered.length - 1].timestamp).toLocaleString()}`,
-      );
-    }
-    // delete////
 
     return filtered;
   }, [all, metricType]);
 
-  // Filter data based on selected time range
   const data: HealthMetric[] = useMemo(() => {
     const now = new Date();
     let startDate: Date;
 
     switch (timeRange) {
-      case "H": // Last hour
+      case "H":
         startDate = new Date(now.getTime() - 60 * 60 * 1000);
         break;
-      case "D": // From 12AM today
+      case "D":
         startDate = new Date(
           now.getFullYear(),
           now.getMonth(),
@@ -298,108 +227,69 @@ export default function MetricDetailScreen() {
           0,
         );
         break;
-      case "W": // Last week
+      case "W":
         startDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-        console.log(`📅 Weekly startDate: ${startDate.toLocaleString()}`);
-        console.log(`📅 Now: ${now.toLocaleString()}`);
         break;
-      case "M": // Last month
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      case "M":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
         break;
-      case "6M": // Last 6 months
+      case "6M":
         startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
         break;
-      case "Y": // Last year
+      case "Y":
         startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
         break;
       default:
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     }
 
-    // Log the earliest data available before filtering
-    if (allDataForType.length > 0) {
-      console.log(
-        `📊 Earliest available data: ${new Date(allDataForType[0].timestamp).toLocaleString()}`,
-      );
-      console.log(
-        `📊 Latest available data: ${new Date(allDataForType[allDataForType.length - 1].timestamp).toLocaleString()}`,
-      );
-    }
-
-    // takes allfordatatype and only gets time range requested
     const filtered = allDataForType.filter(
       (m) => new Date(m.timestamp).getTime() >= startDate.getTime(),
     );
-    console.log(
-      `[${metricType}] After time range filter (${timeRange}):`,
-      filtered.length,
-      "points",
-    );
 
-    if (filtered.length > 0) {
-      console.log(
-        `📅 Earliest data point: ${new Date(filtered[0].timestamp).toLocaleString()}`,
-      );
-      console.log(
-        `📅 Latest data point: ${new Date(filtered[filtered.length - 1].timestamp).toLocaleString()}`,
-      );
-    }
-
-    // Aggregate data based on time range to reduce chart density
     let bucketSize: number;
     switch (timeRange) {
-      case "H": // Show every data point for last hour
-        console.log(`[${metricType}] No aggregation for hourly view`);
+      case "H":
         return filtered;
-      case "D": // Aggregate to ~5 minute buckets (288 max points)
+      case "D":
         bucketSize = 5 * 60 * 1000;
         break;
-      case "W": // Aggregate to ~30 minute buckets (336 max points)
+      case "W":
         bucketSize = 30 * 60 * 1000;
         break;
-      case "M": // Aggregate to ~2 hour buckets (360 max points)
+      case "M":
         bucketSize = 2 * 60 * 60 * 1000;
         break;
-      case "6M": // Aggregate to ~12 hour buckets (360 max points)
+      case "6M":
         bucketSize = 12 * 60 * 60 * 1000;
         break;
-      case "Y": // Aggregate to ~1 day buckets (365 max points)
+      case "Y":
         bucketSize = 24 * 60 * 60 * 1000;
         break;
       default:
         bucketSize = 5 * 60 * 1000;
     }
 
-    const aggregated = aggregateData(filtered, bucketSize, agg);
-    console.log(
-      `[${metricType}] After aggregation (bucket: ${bucketSize}ms):`,
-      aggregated.length,
-      "points",
-    );
-
-    return aggregated;
+    return aggregateData(filtered, bucketSize, agg);
   }, [allDataForType, timeRange, agg]);
 
-  const latest = data.length ? data[data.length - 1] : undefined; // last point in array
+  const latest = data.length ? data[data.length - 1] : undefined;
   const { min, max } = useMemo(() => computeMinMax(data), [data]);
 
   const points = useMemo(() => toPoints(data), [data]);
   const chartKind = getMetricChartKind(metricType);
 
-  // Calculate key stats for highlights
   const keyStats = useMemo(() => {
     if (data.length === 0 || min == null || max == null) return null;
 
     const values = data.map((d) => Number(d.value)).filter(Number.isFinite);
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
 
-    // Calculate variability
     const variance =
       values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) /
       values.length;
     const stdDev = Math.sqrt(variance);
 
-    // Count outliers and elevated readings
     const outliers = values.filter((v) => Math.abs(v - avg) > 2 * stdDev);
     const dangerCount = data.filter((d) => d.range === "danger").length;
     const warningCount = data.filter((d) => d.range === "warning").length;
@@ -415,14 +305,6 @@ export default function MetricDetailScreen() {
       unit: latest?.unit ?? "",
     };
   }, [data, min, max, latest]);
-
-  // Simple “highlight” text (you can replace later with smarter logic)
-  const highlightText = useMemo(() => {
-    if (!latest || min == null || max == null)
-      return "No highlight available yet.";
-    const unit = latest.unit ?? "";
-    return `Your ${title.toLowerCase()} ranged from ${Math.round(min)} to ${Math.round(max)} ${unit} ${timeRange === "H" ? "in the last hour" : timeRange === "D" ? "today" : timeRange === "W" ? "this week" : timeRange === "M" ? "this month" : timeRange === "6M" ? "in the last 6 months" : "this year"}.`;
-  }, [latest, min, max, title, timeRange]);
 
   const rangeSubtitle = useMemo(() => {
     switch (timeRange) {
@@ -446,13 +328,9 @@ export default function MetricDetailScreen() {
   return (
     <ThemedView style={styles.bg} lightColor="#F2F2F7" darkColor="#000">
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Header row (back + title + plus button placeholder) */}
         <View style={styles.topRow}>
           <TouchableOpacity
-            onPress={() => {
-              console.log("Back button pressed");
-              router.back();
-            }}
+            onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Back"
             style={styles.circleButton}
@@ -464,7 +342,6 @@ export default function MetricDetailScreen() {
           <View style={styles.circleButton} />
         </View>
 
-        {/* Time Range Selector */}
         <View style={styles.timeRangeContainer}>
           {(["H", "D", "W", "M", "6M", "Y"] as const).map((range) => (
             <TouchableOpacity
@@ -490,7 +367,6 @@ export default function MetricDetailScreen() {
           ))}
         </View>
 
-        {/* Range block */}
         <View style={styles.rangeBlock}>
           <ThemedText style={styles.rangeLabel}>RANGE</ThemedText>
           <ThemedText style={styles.rangeValue}>
@@ -502,7 +378,6 @@ export default function MetricDetailScreen() {
           <ThemedText style={styles.rangeSub}>{rangeSubtitle}</ThemedText>
         </View>
 
-        {/* Chart */}
         <View style={styles.chartCard}>
           {points.length ? (
             chartKind === "scatter" ? (
@@ -540,7 +415,6 @@ export default function MetricDetailScreen() {
           )}
         </View>
 
-        {/* Latest row */}
         <View style={styles.latestRow}>
           <ThemedText style={styles.latestLeft}>
             Latest: {latest ? formatTime(latest.timestamp) : "—"}
@@ -550,11 +424,10 @@ export default function MetricDetailScreen() {
           </ThemedText>
         </View>
 
-        {/* CTA to “Show More Data” */}
         <TouchableOpacity
           onPress={() =>
             router.push({
-              pathname: "/metric/[type]/more",
+              pathname: "/metric/[type]",
               params: { type: metricType },
             })
           }
@@ -567,12 +440,10 @@ export default function MetricDetailScreen() {
           </ThemedText>
         </TouchableOpacity>
 
-        {/* Highlights */}
         <View style={styles.highlightsHeader}>
           <ThemedText style={styles.highlightsTitle}>Highlights</ThemedText>
         </View>
 
-        {/* Key Stats Card */}
         {keyStats && (
           <View style={styles.highlightCard}>
             <ThemedText style={styles.highlightTitle}>
@@ -616,7 +487,6 @@ export default function MetricDetailScreen() {
           </View>
         )}
 
-        {/* AI Summary Card */}
         {data.length > 0 && (
           <View style={styles.highlightCard}>
             <ThemedText style={styles.highlightTitle}>
@@ -632,7 +502,6 @@ export default function MetricDetailScreen() {
           </View>
         )}
 
-        {/* Time Slice List - VoiceOver accessible */}
         {data.length > 0 && (
           <View style={styles.timeSlicesList}>
             <ThemedText style={styles.listHeader}>Time Slices</ThemedText>
@@ -645,7 +514,7 @@ export default function MetricDetailScreen() {
             >
               {data.slice(0, 24).map((item) => (
                 <TimeSliceRow
-                  key={item.timestamp}
+                  key={item.timestamp.toString()}
                   metric={item}
                   onFocus={() =>
                     playToneForValue(item.value, item.range ?? "normal")
@@ -744,7 +613,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   highlightsTitle: { fontSize: 22, fontWeight: "900" },
-  showAll: { color: "#007AFF", fontWeight: "700" },
 
   highlightCard: {
     backgroundColor: "white",
@@ -753,14 +621,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   highlightTitle: { fontWeight: 800 },
-  highlightBody: { fontSize: 16, fontWeight: "600" },
-
-  aiCard: {
-    backgroundColor: "white",
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
-  },
 
   timeSlicesList: {
     marginTop: 12,
@@ -773,7 +633,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   list: {
-    maxHeight: 240, // scrollable but fits screen
+    maxHeight: 240,
     borderRadius: 12,
     backgroundColor: "rgba(0,0,0,0.02)",
   },

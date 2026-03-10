@@ -402,7 +402,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
       const fetchOptions: FetchOptions = {
         startDate: new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000),
         endDate: new Date(),
-        limit: 1000, // Reasonable limit for performance
+        limit: 30000, // Increased limit to fetch more historical data
       };
 
       console.log(

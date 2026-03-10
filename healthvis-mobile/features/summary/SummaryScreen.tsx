@@ -12,7 +12,7 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { AccessibleButton } from "@/components/AccessibleButton";
 import { ErrorDisplay } from "@/components/ErrorDisplay";
-
+import { LinearGradient } from "expo-linear-gradient";
 import { useHealthData } from "@/contexts/HealthDataContext";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { useSpeech } from "@/hooks/useSpeech";
@@ -52,12 +52,8 @@ export default function SummaryScreen() {
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
 
-  const {
-    speakHealthMetricSummary,
-    speakCategorySummary,
-    isSpeaking,
-    stop,
-  } = useSpeech();
+  const { speakHealthMetricSummary, speakCategorySummary, isSpeaking, stop } =
+    useSpeech();
 
   const { pins } = usePinnedKeys();
 
@@ -82,14 +78,15 @@ export default function SummaryScreen() {
   }, [healthMetrics]);
 
   //todo fixed pinned bc right now it is hard coded
-  // Get latest metrics for pinned section 
-  const heartRateMetrics = getMetricsByType('heart_rate');
-  const heartRateVital = heartRateMetrics.length > 0 ? heartRateMetrics[0] : undefined;
-  
-  const stepsMetrics = getMetricsByType('steps');
+  // Get latest metrics for pinned section
+  const heartRateMetrics = getMetricsByType("heart_rate");
+  const heartRateVital =
+    heartRateMetrics.length > 0 ? heartRateMetrics[0] : undefined;
+
+  const stepsMetrics = getMetricsByType("steps");
   const stepsVital = stepsMetrics.length > 0 ? stepsMetrics[0] : undefined;
-  
-  const sleepMetrics = getMetricsByType('sleep');
+
+  const sleepMetrics = getMetricsByType("sleep");
   const sleepVital = sleepMetrics.length > 0 ? sleepMetrics[0] : undefined;
 
   const hasAnyData = allMetrics.length > 0;
@@ -137,136 +134,161 @@ export default function SummaryScreen() {
     speakHealthMetricSummary,
   ]);
 
-    // handleRefresh (pull-to-refresh):
-    const handleRefresh = useCallback(async () => {
+  // handleRefresh (pull-to-refresh):
+  const handleRefresh = useCallback(async () => {
     announceLoading("Refreshing health data");
     clearError();
     await refreshData();
-    }, [refreshData, clearError]);
+  }, [refreshData, clearError]);
 
-    // handleRetry (error recovery):
-    const handleRetry = useCallback(async () => {
+  // handleRetry (error recovery):
+  const handleRetry = useCallback(async () => {
     announceLoading("Retrying");
     clearError();
     await fetchData();
-    }, [clearError, fetchData]);
+  }, [clearError, fetchData]);
 
   return (
-    <ThemedView style={styles.summaryBg} lightColor="#F2F2F7" darkColor="#000">
-      <SummaryStateGate
-        isLoading={isLoading}
-        error={error}
-        hasAnyData={hasAnyData}
-        permissions={permissions}
-        fontSize={fontSize}
-        onRetry={handleRetry}
-        onRefresh={handleRefresh}
+    <LinearGradient
+      colors={["#C2D9FF", "#FFDDFC", "#E8F1F9", "#f4f4f4ff"]}
+      style={styles.summaryBg}
+      start={{ x: 0.3, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+    >
+      <ThemedView
+        style={[styles.summaryBg, { backgroundColor: "transparent" }]}
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
-          }
+        <SummaryStateGate
+          isLoading={isLoading}
+          error={error}
+          hasAnyData={hasAnyData}
+          permissions={permissions}
+          fontSize={fontSize}
+          onRetry={handleRetry}
+          onRefresh={handleRefresh}
         >
-          <SummaryHeader initials="JM" /> 
-
-          <PinnedSection
-            pins={pins}
-            heartRateVital={heartRateVital}
-            stepsVital={stepsVital}
-            sleepVital={sleepVital}
-          />
-
-          {/* Hear Summary */}
-          <View style={styles.summaryButtonContainer}>
-            <AccessibleButton
-              onPress={handleHearSummary}
-              label={isSpeaking ? "Stop Speaking" : "Hear Summary"}
-              hint={
-                isSpeaking
-                  ? "Stop reading health data summary"
-                  : "Hear a spoken summary of your health data"
-              }
-              variant="primary"
-              style={styles.summaryButton}
-            />
-          </View>
-
-          {/* Cards */}
-          <View style={styles.vitalsContainer}>
-            {summaryCards.length > 0 ? (
-              summaryCards.map((metric) => (
-                <MetricSummaryCard
-                  key={metric.type}
-                  metric={metric}
-                  title={metric.type.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyCategory}>
-                <ThemedText style={[styles.emptyCategoryText, { fontSize: fontSize.body }]}>
-                  No {categoryNames[selectedCategory].toLowerCase()} data available
-                </ThemedText>
-              </View>
-            )}
-          </View>
-
-          {/* Error banner if cached data exists */}
-          {error && hasAnyData && (
-            <View style={styles.errorBanner}>
-              <ErrorDisplay
-                error={error}
-                errorType="network"
-                onRetry={handleRetry}
-                onDismiss={clearError}
+          <ScrollView
+            contentContainerStyle={styles.content}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={handleRefresh}
               />
+            }
+          >
+            <SummaryHeader initials="JM" />
 
-              {permissions && !permissions.allGranted && (
-                <View style={styles.permissionWarning}>
+            <PinnedSection
+              pins={pins}
+              heartRateVital={heartRateVital}
+              stepsVital={stepsVital}
+              sleepVital={sleepVital}
+            />
+
+            {/* Hear Summary */}
+            <View style={styles.summaryButtonContainer}>
+              <AccessibleButton
+                onPress={handleHearSummary}
+                label={isSpeaking ? "Stop Speaking" : "Hear Summary"}
+                hint={
+                  isSpeaking
+                    ? "Stop reading health data summary"
+                    : "Hear a spoken summary of your health data"
+                }
+                variant="primary"
+                style={styles.summaryButton}
+              />
+            </View>
+
+            {/* Cards */}
+            <View style={styles.vitalsContainer}>
+              {summaryCards.length > 0 ? (
+                summaryCards.map((metric) => (
+                  <MetricSummaryCard
+                    key={metric.type}
+                    metric={metric}
+                    title={metric.type
+                      .replaceAll("_", " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyCategory}>
                   <ThemedText
                     style={[
-                      styles.permissionWarningText,
-                      { fontSize: fontSize.label },
+                      styles.emptyCategoryText,
+                      { fontSize: fontSize.body },
                     ]}
                   >
-                    Some health categories are unavailable.
+                    No {categoryNames[selectedCategory].toLowerCase()} data
+                    available
                   </ThemedText>
-
-                  <TouchableOpacity
-                    onPress={() => Linking.openSettings()}
-                    style={styles.settingsLink}
-                    accessibilityRole="link"
-                    accessibilityLabel="Open iOS Settings to grant permissions"
-                  >
-                    <ThemedText
-                      style={[
-                        styles.settingsLinkText,
-                        { fontSize: fontSize.label },
-                      ]}
-                    >
-                      Open Settings →
-                    </ThemedText>
-                  </TouchableOpacity>
                 </View>
               )}
             </View>
-          )}
 
-          <View style={styles.footer}>
-            <ThemedText
-              style={[styles.footerText, { fontSize: fontSize.label }]}
-            >
-              Pull down to refresh
-            </ThemedText>
-          </View>
-        </ScrollView>
-      </SummaryStateGate>
-    </ThemedView>
+            {/* Error banner if cached data exists */}
+            {error && hasAnyData && (
+              <View style={styles.errorBanner}>
+                <ErrorDisplay
+                  error={error}
+                  errorType="network"
+                  onRetry={handleRetry}
+                  onDismiss={clearError}
+                />
+
+                {permissions && !permissions.allGranted && (
+                  <View style={styles.permissionWarning}>
+                    <ThemedText
+                      style={[
+                        styles.permissionWarningText,
+                        { fontSize: fontSize.label },
+                      ]}
+                    >
+                      Some health categories are unavailable.
+                    </ThemedText>
+
+                    <TouchableOpacity
+                      onPress={() => Linking.openSettings()}
+                      style={styles.settingsLink}
+                      accessibilityRole="link"
+                      accessibilityLabel="Open iOS Settings to grant permissions"
+                    >
+                      <ThemedText
+                        style={[
+                          styles.settingsLinkText,
+                          { fontSize: fontSize.label },
+                        ]}
+                      >
+                        Open Settings →
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={styles.footer}>
+              <ThemedText
+                style={[styles.footerText, { fontSize: fontSize.label }]}
+              >
+                Pull down to refresh
+              </ThemedText>
+            </View>
+          </ScrollView>
+        </SummaryStateGate>
+      </ThemedView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  summaryBg: { flex: 1 },
+  summaryBg: {
+    flex: 1,
+  },
+  background: {
+    flex: 1,
+  },
 
   content: {
     paddingBottom: 24,

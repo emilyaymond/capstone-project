@@ -11,17 +11,13 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
+import { LinearGradient } from "expo-linear-gradient";
+
 type HealthCategoryKey =
   | "activity"
   | "body"
-  | "cycle"
-  | "hearing"
-  | "heart"
-  | "medications"
   | "mindfulness"
-  | "mobility"
   | "nutrition"
-  | "respiratory"
   | "sleep"
   | "vitals";
 
@@ -32,18 +28,8 @@ const CATEGORIES: Array<{
 }> = [
   { key: "activity", label: "Activity", icon: "flame.fill" },
   { key: "body", label: "Body Measurements", icon: "figure.arms.open" },
-  {
-    key: "cycle",
-    label: "Cycle Tracking",
-    icon: "dot.circle.and.hand.point.up.left.fill",
-  },
-  { key: "hearing", label: "Hearing", icon: "ear.fill" },
-  { key: "heart", label: "Heart", icon: "heart.fill" },
-  { key: "medications", label: "Medications", icon: "pills.fill" },
   { key: "mindfulness", label: "Mental Wellbeing", icon: "brain.head.profile" },
-  { key: "mobility", label: "Mobility", icon: "figure.walk" },
   { key: "nutrition", label: "Nutrition", icon: "fork.knife" },
-  { key: "respiratory", label: "Respiratory", icon: "lungs.fill" },
   { key: "sleep", label: "Sleep", icon: "bed.double.fill" },
   { key: "vitals", label: "Vitals", icon: "waveform.path.ecg" },
 ];
@@ -59,67 +45,74 @@ export default function BrowseScreen() {
   }, [query]);
 
   return (
-    <ThemedView
+    <LinearGradient
+      colors={["#C2D9FF", "#FFDDFC", "#E8F1F9", "#f4f4f4ff"]}
       style={styles.container}
-      lightColor="#F2F2F7"
-      darkColor="#000000"
+      start={{ x: 0.3, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <ThemedText style={styles.largeTitle} accessibilityRole="header">
-          Browse
-        </ThemedText>
+      <ThemedView
+        style={[styles.container, { backgroundColor: "transparent" }]}
+      >
+        <ScrollView contentContainerStyle={styles.content}>
+          <ThemedText style={styles.largeTitle} accessibilityRole="header">
+            Browse
+          </ThemedText>
 
-        {/* Search bar */}
-        <View
-          style={styles.searchWrap}
-          accessible
-          accessibilityLabel="Search health categories"
-        >
-          <IconSymbol name="magnifyingglass" size={18} color="#8E8E93" />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search"
-            placeholderTextColor="#8E8E93"
-            style={styles.searchInput}
-            accessibilityLabel="Search"
-            accessibilityHint="Type to filter health categories"
-          />
-        </View>
+          {/* Search bar */}
+          <View
+            style={styles.searchWrap}
+            accessible
+            accessibilityLabel="Search health categories"
+          >
+            <IconSymbol name="magnifyingglass" size={18} color="#8E8E93" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search"
+              placeholderTextColor="#8E8E93"
+              style={styles.searchInput}
+              accessibilityLabel="Search"
+              accessibilityHint="Type to filter health categories"
+            />
+          </View>
 
-        <ThemedText style={styles.sectionHeader}>Health Categories</ThemedText>
+          <ThemedText style={styles.sectionHeader}>
+            Health Categories
+          </ThemedText>
 
-        <View style={styles.listCard}>
-          {filtered.map((item, idx) => (
-            <Pressable
-              key={item.key}
-              onPress={() => router.push(`/browse/${item.key}`)}
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-                idx !== filtered.length - 1 && styles.rowDivider,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.label}`}
-              accessibilityHint="Opens category details"
-            >
-              <View style={styles.rowLeft}>
-                <View style={styles.iconCircle}>
-                  <IconSymbol
-                    name={item.icon as any}
-                    size={18}
-                    color="#FFFFFF"
-                  />
+          <View style={styles.listCard}>
+            {filtered.map((item, idx) => (
+              <Pressable
+                key={item.key}
+                onPress={() => router.push(`/browse/${item.key}`)}
+                style={({ pressed }) => [
+                  styles.row,
+                  pressed && styles.rowPressed,
+                  idx !== filtered.length - 1 && styles.rowDivider,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.label}`}
+                accessibilityHint="Opens category details"
+              >
+                <View style={styles.rowLeft}>
+                  <View style={styles.iconCircle}>
+                    <IconSymbol
+                      name={item.icon as any}
+                      size={18}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                  <ThemedText style={styles.rowLabel}>{item.label}</ThemedText>
                 </View>
-                <ThemedText style={styles.rowLabel}>{item.label}</ThemedText>
-              </View>
 
-              <IconSymbol name="chevron.right" size={20} color="#C7C7CC" />
-            </Pressable>
-          ))}
-        </View>
-      </ScrollView>
-    </ThemedView>
+                <IconSymbol name="chevron.right" size={20} color="#C7C7CC" />
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </ThemedView>
+    </LinearGradient>
   );
 }
 

@@ -9,17 +9,11 @@ import { getDisplayNameForType } from "@/types/health-metric";
 
 const CATEGORY_LABELS: Record<string, string> = {
   activity: "Activity",
-  heart: "Heart",
-  sleep: "Sleep",
-  nutrition: "Nutrition",
-  vitals: "Vitals",
   body: "Body Measurements",
   mindfulness: "Mental Wellbeing",
-  respiratory: "Respiratory",
-  mobility: "Mobility",
-  hearing: "Hearing",
-  medications: "Medications",
-  cycle: "Cycle Tracking",
+  nutrition: "Nutrition",
+  sleep: "Sleep",
+  vitals: "Vitals",
 };
 
 export default function CategoryScreen() {
@@ -35,16 +29,16 @@ export default function CategoryScreen() {
     switch (category) {
       case "activity":
         return "activity";
-      case "heart":
-        return "vitals"; // or "vitals" if heart rate is stored there
-      case "sleep":
-        return "sleep";
-      case "nutrition":
-        return "nutrition";
       case "body":
         return "body";
       case "mindfulness":
         return "mindfulness";
+      case "nutrition":
+        return "nutrition";
+      case "sleep":
+        return "sleep";
+      case "vitals":
+        return "vitals";
       default:
         return "vitals";
     }
@@ -53,7 +47,11 @@ export default function CategoryScreen() {
   const metrics = getMetricsByCategory(internalCategory as any);
 
   return (
-    <ThemedView style={styles.container} lightColor="#F2F2F7" darkColor="#000000">
+    <ThemedView
+      style={styles.container}
+      lightColor="#F2F2F7"
+      darkColor="#000000"
+    >
       <ScrollView contentContainerStyle={styles.content}>
         {/* Apple-ish back button */}
         <Pressable
@@ -76,7 +74,9 @@ export default function CategoryScreen() {
         <View style={styles.listCard}>
           {metrics.length === 0 ? (
             <View style={styles.emptyRow}>
-              <ThemedText style={styles.emptyText}>No data available</ThemedText>
+              <ThemedText style={styles.emptyText}>
+                No data available
+              </ThemedText>
             </View>
           ) : (
             metrics.map((m, idx) => {
@@ -84,12 +84,17 @@ export default function CategoryScreen() {
               return (
                 <View
                   key={m.id}
-                  style={[styles.metricRow, idx !== metrics.length - 1 && styles.rowDivider]}
+                  style={[
+                    styles.metricRow,
+                    idx !== metrics.length - 1 && styles.rowDivider,
+                  ]}
                   accessible
                   accessibilityLabel={`${displayName}. ${m.value} ${m.unit ?? ""}.`}
                 >
                   <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.metricTitle}>{displayName}</ThemedText>
+                    <ThemedText style={styles.metricTitle}>
+                      {displayName}
+                    </ThemedText>
                     <ThemedText style={styles.metricValue}>
                       {m.value} {m.unit ?? ""}
                     </ThemedText>
@@ -109,10 +114,20 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingTop: 40, paddingBottom: 24 },
 
-  backRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
   backText: { color: "#007AFF", fontSize: 17, fontWeight: "500" },
 
-  largeTitle: { paddingTop: 25, fontSize: 34, fontWeight: "700", marginBottom: 16 },
+  largeTitle: {
+    paddingTop: 25,
+    fontSize: 34,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
 
   sectionHeader: {
     fontSize: 13,
@@ -122,7 +137,11 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  listCard: { borderRadius: 12, overflow: "hidden", backgroundColor: "#FFFFFF" },
+  listCard: {
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+  },
   metricRow: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -130,7 +149,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E5E5EA" },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5E5EA",
+  },
 
   metricTitle: { fontSize: 17, fontWeight: "600", marginBottom: 4 },
   metricValue: { fontSize: 22, fontWeight: "700" },
