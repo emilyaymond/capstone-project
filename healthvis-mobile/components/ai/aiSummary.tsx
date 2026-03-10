@@ -10,7 +10,7 @@ import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { HealthMetric } from "@/types/health-metric";
 
-// TODO: Move to environment variable
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
 interface AISummaryProps {
   data: HealthMetric[];
@@ -79,6 +79,14 @@ export function AISummary({
     setError("");
 
     try {
+      if (!OPENAI_API_KEY) {
+        setError(
+          "OpenAI API key not configured. Please add EXPO_PUBLIC_OPENAI_API_KEY to your .env file.",
+        );
+        setLoading(false);
+        return;
+      }
+
       const stats = calculateStats();
 
       if (!stats) {
