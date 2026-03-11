@@ -1,6 +1,6 @@
 /**
  * Settings Screen
- * 
+ *
  * Provides user interface for customizing accessibility settings and HealthKit integration:
  * - HealthKit permission status and management
  * - Last sync time and manual sync
@@ -10,11 +10,9 @@
  * - Toggle switches for audio feedback and haptics
  * - Immediate setting changes via AccessibilityContext
  * - Screen reader announcements for all changes
- * 
- * Requirements: 5.1, 13.1, 13.2, 13.3, 13.4, 13.5
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   ScrollView,
@@ -23,21 +21,25 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
-} from 'react-native';
-import { Link } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { ModeSelector } from '@/components/ModeSelector';
-import { AccessibleButton } from '@/components/AccessibleButton';
-import { useAccessibility } from '@/contexts/AccessibilityContext';
-import { useHealthData } from '@/contexts/HealthDataContext';
+} from "react-native";
+import { Link } from "expo-router";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { ModeSelector } from "@/components/ModeSelector";
+import { AccessibleButton } from "@/components/AccessibleButton";
+import { useAccessibility } from "@/contexts/AccessibilityContext";
+import { useHealthData } from "@/contexts/HealthDataContext";
 import {
   FONT_SIZES,
   HIGH_CONTRAST_COLORS,
   NORMAL_CONTRAST_COLORS,
-} from '@/constants/accessibility';
-import { announceSettingsChange, announceSuccess, announceError } from '@/lib/announcer';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+} from "@/constants/accessibility";
+import {
+  announceSettingsChange,
+  announceSuccess,
+  announceError,
+} from "@/lib/announcer";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ============================================================================
 // Helper Components
@@ -53,7 +55,12 @@ interface PermissionItemProps {
   colors: any;
 }
 
-function PermissionItem({ label, granted, fontSize, colors }: PermissionItemProps) {
+function PermissionItem({
+  label,
+  granted,
+  fontSize,
+  colors,
+}: PermissionItemProps) {
   return (
     <View style={styles.permissionItem}>
       <ThemedText
@@ -64,17 +71,19 @@ function PermissionItem({ label, granted, fontSize, colors }: PermissionItemProp
       >
         {label}
       </ThemedText>
-      <View style={[
-        styles.permissionBadge,
-        { backgroundColor: granted ? '#4CAF50' : '#FF5252' }
-      ]}>
+      <View
+        style={[
+          styles.permissionBadge,
+          { backgroundColor: granted ? "#4CAF50" : "#FF5252" },
+        ]}
+      >
         <ThemedText
           style={[
             styles.permissionStatus,
-            { fontSize: fontSize.label, color: '#FFFFFF' },
+            { fontSize: fontSize.label, color: "#FFFFFF" },
           ]}
         >
-          {granted ? 'Granted' : 'Denied'}
+          {granted ? "Granted" : "Denied"}
         </ThemedText>
       </View>
     </View>
@@ -91,13 +100,8 @@ export default function SettingsScreen() {
   // ============================================================================
 
   const { mode, setMode, settings, updateSettings } = useAccessibility();
-  const { 
-    permissions, 
-    isInitialized, 
-    isLoading, 
-    fetchData, 
-    refreshData 
-  } = useHealthData();
+  const { permissions, isInitialized, isLoading, fetchData, refreshData } =
+    useHealthData();
 
   // ============================================================================
   // Local State
@@ -118,23 +122,23 @@ export default function SettingsScreen() {
 
   async function loadLastSyncTime() {
     try {
-      const timestamp = await AsyncStorage.getItem('health_data_last_fetch');
+      const timestamp = await AsyncStorage.getItem("health_data_last_fetch");
       if (timestamp) {
         setLastSyncTime(new Date(parseInt(timestamp, 10)));
       }
     } catch (error) {
-      console.error('Failed to load last sync time:', error);
+      console.error("Failed to load last sync time:", error);
     }
   }
 
   async function loadDataRange() {
     try {
-      const range = await AsyncStorage.getItem('health_data_range');
+      const range = await AsyncStorage.getItem("health_data_range");
       if (range) {
         setDataRange(parseInt(range, 10) as 7 | 30 | 90);
       }
     } catch (error) {
-      console.error('Failed to load data range:', error);
+      console.error("Failed to load data range:", error);
     }
   }
 
@@ -149,18 +153,21 @@ export default function SettingsScreen() {
   const handleManualSync = async () => {
     try {
       setIsSyncing(true);
-      announceSuccess('Syncing health data...');
-      
+      announceSuccess("Syncing health data...");
+
       await refreshData();
-      
+
       const now = new Date();
       setLastSyncTime(now);
-      await AsyncStorage.setItem('health_data_last_fetch', now.getTime().toString());
-      
-      announceSuccess('Health data synced successfully');
+      await AsyncStorage.setItem(
+        "health_data_last_fetch",
+        now.getTime().toString(),
+      );
+
+      announceSuccess("Health data synced successfully");
     } catch (error) {
-      console.error('Manual sync failed:', error);
-      announceError('Failed to sync health data');
+      console.error("Manual sync failed:", error);
+      announceError("Failed to sync health data");
     } finally {
       setIsSyncing(false);
     }
@@ -172,7 +179,7 @@ export default function SettingsScreen() {
    */
   const handleOpenSettings = () => {
     Linking.openSettings();
-    announceSuccess('Opening iOS Settings');
+    announceSuccess("Opening iOS Settings");
   };
 
   /**
@@ -182,21 +189,24 @@ export default function SettingsScreen() {
   const handleDataRangeChange = async (range: 7 | 30 | 90) => {
     try {
       setDataRange(range);
-      await AsyncStorage.setItem('health_data_range', range.toString());
-      announceSettingsChange('data range', `${range} days`);
-      
+      await AsyncStorage.setItem("health_data_range", range.toString());
+      announceSettingsChange("data range", `${range} days`);
+
       // Trigger a refresh with the new range
       setIsSyncing(true);
       await refreshData();
-      
+
       const now = new Date();
       setLastSyncTime(now);
-      await AsyncStorage.setItem('health_data_last_fetch', now.getTime().toString());
-      
+      await AsyncStorage.setItem(
+        "health_data_last_fetch",
+        now.getTime().toString(),
+      );
+
       announceSuccess(`Data range updated to ${range} days`);
     } catch (error) {
-      console.error('Failed to update data range:', error);
-      announceError('Failed to update data range');
+      console.error("Failed to update data range:", error);
+      announceError("Failed to update data range");
     } finally {
       setIsSyncing(false);
     }
@@ -207,9 +217,10 @@ export default function SettingsScreen() {
   // ============================================================================
 
   const fontSize = FONT_SIZES[settings.fontSize];
-  const colors = settings.contrast === 'high' 
-    ? HIGH_CONTRAST_COLORS 
-    : NORMAL_CONTRAST_COLORS;
+  const colors =
+    settings.contrast === "high"
+      ? HIGH_CONTRAST_COLORS
+      : NORMAL_CONTRAST_COLORS;
 
   // ============================================================================
   // Font Size Handlers
@@ -220,9 +231,9 @@ export default function SettingsScreen() {
    * Requirement 13.2: Apply font size changes immediately to all text
    * Requirement 13.5: Announce setting changes to screen readers
    */
-  const handleFontSizeChange = (size: 'small' | 'medium' | 'large') => {
+  const handleFontSizeChange = (size: "small" | "medium" | "large") => {
     updateSettings({ fontSize: size });
-    announceSettingsChange('font size', size);
+    announceSettingsChange("font size", size);
   };
 
   // ============================================================================
@@ -234,9 +245,9 @@ export default function SettingsScreen() {
    * Requirement 13.3: Update colors to meet WCAG AAA contrast ratios
    * Requirement 13.5: Announce setting changes to screen readers
    */
-  const handleContrastChange = (contrast: 'normal' | 'high') => {
+  const handleContrastChange = (contrast: "normal" | "high") => {
     updateSettings({ contrast });
-    announceSettingsChange('contrast', contrast);
+    announceSettingsChange("contrast", contrast);
   };
 
   // ============================================================================
@@ -250,7 +261,7 @@ export default function SettingsScreen() {
    */
   const handleAudioToggle = (enabled: boolean) => {
     updateSettings({ audioEnabled: enabled });
-    announceSettingsChange('audio feedback', enabled);
+    announceSettingsChange("audio feedback", enabled);
   };
 
   // ============================================================================
@@ -263,7 +274,7 @@ export default function SettingsScreen() {
    */
   const handleHapticsToggle = (enabled: boolean) => {
     updateSettings({ hapticsEnabled: enabled });
-    announceSettingsChange('haptic feedback', enabled);
+    announceSettingsChange("haptic feedback", enabled);
   };
 
   // ============================================================================
@@ -278,7 +289,9 @@ export default function SettingsScreen() {
       accessibilityLabel="Settings screen"
     >
       {/* Header */}
-      <ThemedView style={[styles.header, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.header, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.title,
@@ -298,7 +311,9 @@ export default function SettingsScreen() {
       </ThemedView>
 
       {/* HealthKit Section - Requirement 5.1 */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.sectionTitle,
@@ -355,7 +370,8 @@ export default function SettingsScreen() {
                   styles.buttonText,
                   {
                     fontSize: fontSize.body,
-                    color: colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff',
+                    color:
+                      colors === HIGH_CONTRAST_COLORS ? "#000000" : "#ffffff",
                     marginLeft: 8,
                   },
                 ]}
@@ -369,7 +385,8 @@ export default function SettingsScreen() {
                 styles.buttonText,
                 {
                   fontSize: fontSize.body,
-                  color: colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff',
+                  color:
+                    colors === HIGH_CONTRAST_COLORS ? "#000000" : "#ffffff",
                 },
               ]}
             >
@@ -383,7 +400,12 @@ export default function SettingsScreen() {
           <ThemedText
             style={[
               styles.dataRangeTitle,
-              { fontSize: fontSize.body, color: colors.text, marginTop: 16, marginBottom: 12 },
+              {
+                fontSize: fontSize.body,
+                color: colors.text,
+                marginTop: 16,
+                marginBottom: 12,
+              },
             ]}
           >
             Data Time Range
@@ -391,18 +413,22 @@ export default function SettingsScreen() {
           <ThemedText
             style={[
               styles.dataRangeDescription,
-              { fontSize: fontSize.label, color: colors.textSecondary, marginBottom: 12 },
+              {
+                fontSize: fontSize.label,
+                color: colors.textSecondary,
+                marginBottom: 12,
+              },
             ]}
           >
             Select how far back to fetch health data
           </ThemedText>
-          
+
           <View style={styles.buttonGroup}>
             <AccessibleButton
               onPress={() => handleDataRangeChange(7)}
               label="7 days"
               hint="Fetch health data from the last 7 days"
-              variant={dataRange === 7 ? 'primary' : 'outline'}
+              variant={dataRange === 7 ? "primary" : "outline"}
               style={styles.groupButton}
               disabled={isSyncing || isLoading}
             >
@@ -411,9 +437,12 @@ export default function SettingsScreen() {
                   styles.buttonText,
                   {
                     fontSize: fontSize.body,
-                    color: dataRange === 7
-                      ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                      : colors.text,
+                    color:
+                      dataRange === 7
+                        ? colors === HIGH_CONTRAST_COLORS
+                          ? "#000000"
+                          : "#ffffff"
+                        : colors.text,
                   },
                 ]}
               >
@@ -425,7 +454,7 @@ export default function SettingsScreen() {
               onPress={() => handleDataRangeChange(30)}
               label="30 days"
               hint="Fetch health data from the last 30 days"
-              variant={dataRange === 30 ? 'primary' : 'outline'}
+              variant={dataRange === 30 ? "primary" : "outline"}
               style={styles.groupButton}
               disabled={isSyncing || isLoading}
             >
@@ -434,9 +463,12 @@ export default function SettingsScreen() {
                   styles.buttonText,
                   {
                     fontSize: fontSize.body,
-                    color: dataRange === 30
-                      ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                      : colors.text,
+                    color:
+                      dataRange === 30
+                        ? colors === HIGH_CONTRAST_COLORS
+                          ? "#000000"
+                          : "#ffffff"
+                        : colors.text,
                   },
                 ]}
               >
@@ -448,7 +480,7 @@ export default function SettingsScreen() {
               onPress={() => handleDataRangeChange(90)}
               label="90 days"
               hint="Fetch health data from the last 90 days"
-              variant={dataRange === 90 ? 'primary' : 'outline'}
+              variant={dataRange === 90 ? "primary" : "outline"}
               style={styles.groupButton}
               disabled={isSyncing || isLoading}
             >
@@ -457,9 +489,12 @@ export default function SettingsScreen() {
                   styles.buttonText,
                   {
                     fontSize: fontSize.body,
-                    color: dataRange === 90
-                      ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                      : colors.text,
+                    color:
+                      dataRange === 90
+                        ? colors === HIGH_CONTRAST_COLORS
+                          ? "#000000"
+                          : "#ffffff"
+                        : colors.text,
                   },
                 ]}
               >
@@ -475,7 +510,12 @@ export default function SettingsScreen() {
             <ThemedText
               style={[
                 styles.permissionsTitle,
-                { fontSize: fontSize.body, color: colors.text, marginTop: 16, marginBottom: 12 },
+                {
+                  fontSize: fontSize.body,
+                  color: colors.text,
+                  marginTop: 16,
+                  marginBottom: 12,
+                },
               ]}
             >
               Permission Status
@@ -711,7 +751,9 @@ export default function SettingsScreen() {
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
       {/* Accessibility Mode Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.sectionTitle,
@@ -728,7 +770,7 @@ export default function SettingsScreen() {
         >
           Choose how you want to interact with the app
         </ThemedText>
-        
+
         {/* Mode Selector Component - Requirement 13.1 */}
         <ModeSelector
           currentMode={mode}
@@ -738,7 +780,9 @@ export default function SettingsScreen() {
       </ThemedView>
 
       {/* Font Size Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.sectionTitle,
@@ -755,14 +799,14 @@ export default function SettingsScreen() {
         >
           Adjust text size for better readability
         </ThemedText>
-        
+
         {/* Font Size Buttons - Requirement 13.2 */}
         <View style={styles.buttonGroup}>
           <AccessibleButton
-            onPress={() => handleFontSizeChange('small')}
+            onPress={() => handleFontSizeChange("small")}
             label="Small font size"
             hint="Set font size to small"
-            variant={settings.fontSize === 'small' ? 'primary' : 'outline'}
+            variant={settings.fontSize === "small" ? "primary" : "outline"}
             style={styles.groupButton}
           >
             <ThemedText
@@ -770,9 +814,12 @@ export default function SettingsScreen() {
                 styles.buttonText,
                 {
                   fontSize: fontSize.body,
-                  color: settings.fontSize === 'small'
-                    ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                    : colors.text,
+                  color:
+                    settings.fontSize === "small"
+                      ? colors === HIGH_CONTRAST_COLORS
+                        ? "#000000"
+                        : "#ffffff"
+                      : colors.text,
                 },
               ]}
             >
@@ -781,10 +828,10 @@ export default function SettingsScreen() {
           </AccessibleButton>
 
           <AccessibleButton
-            onPress={() => handleFontSizeChange('medium')}
+            onPress={() => handleFontSizeChange("medium")}
             label="Medium font size"
             hint="Set font size to medium"
-            variant={settings.fontSize === 'medium' ? 'primary' : 'outline'}
+            variant={settings.fontSize === "medium" ? "primary" : "outline"}
             style={styles.groupButton}
           >
             <ThemedText
@@ -792,9 +839,12 @@ export default function SettingsScreen() {
                 styles.buttonText,
                 {
                   fontSize: fontSize.body,
-                  color: settings.fontSize === 'medium'
-                    ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                    : colors.text,
+                  color:
+                    settings.fontSize === "medium"
+                      ? colors === HIGH_CONTRAST_COLORS
+                        ? "#000000"
+                        : "#ffffff"
+                      : colors.text,
                 },
               ]}
             >
@@ -803,10 +853,10 @@ export default function SettingsScreen() {
           </AccessibleButton>
 
           <AccessibleButton
-            onPress={() => handleFontSizeChange('large')}
+            onPress={() => handleFontSizeChange("large")}
             label="Large font size"
             hint="Set font size to large"
-            variant={settings.fontSize === 'large' ? 'primary' : 'outline'}
+            variant={settings.fontSize === "large" ? "primary" : "outline"}
             style={styles.groupButton}
           >
             <ThemedText
@@ -814,9 +864,12 @@ export default function SettingsScreen() {
                 styles.buttonText,
                 {
                   fontSize: fontSize.body,
-                  color: settings.fontSize === 'large'
-                    ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                    : colors.text,
+                  color:
+                    settings.fontSize === "large"
+                      ? colors === HIGH_CONTRAST_COLORS
+                        ? "#000000"
+                        : "#ffffff"
+                      : colors.text,
                 },
               ]}
             >
@@ -827,7 +880,9 @@ export default function SettingsScreen() {
       </ThemedView>
 
       {/* Contrast Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.sectionTitle,
@@ -844,14 +899,14 @@ export default function SettingsScreen() {
         >
           High contrast mode meets WCAG AAA standards
         </ThemedText>
-        
+
         {/* Contrast Buttons - Requirement 13.3 */}
         <View style={styles.buttonGroup}>
           <AccessibleButton
-            onPress={() => handleContrastChange('normal')}
+            onPress={() => handleContrastChange("normal")}
             label="Normal contrast"
             hint="Use normal contrast colors"
-            variant={settings.contrast === 'normal' ? 'primary' : 'outline'}
+            variant={settings.contrast === "normal" ? "primary" : "outline"}
             style={styles.groupButton}
           >
             <ThemedText
@@ -859,9 +914,12 @@ export default function SettingsScreen() {
                 styles.buttonText,
                 {
                   fontSize: fontSize.body,
-                  color: settings.contrast === 'normal'
-                    ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                    : colors.text,
+                  color:
+                    settings.contrast === "normal"
+                      ? colors === HIGH_CONTRAST_COLORS
+                        ? "#000000"
+                        : "#ffffff"
+                      : colors.text,
                 },
               ]}
             >
@@ -870,10 +928,10 @@ export default function SettingsScreen() {
           </AccessibleButton>
 
           <AccessibleButton
-            onPress={() => handleContrastChange('high')}
+            onPress={() => handleContrastChange("high")}
             label="High contrast"
             hint="Use high contrast colors for better visibility"
-            variant={settings.contrast === 'high' ? 'primary' : 'outline'}
+            variant={settings.contrast === "high" ? "primary" : "outline"}
             style={styles.groupButton}
           >
             <ThemedText
@@ -881,9 +939,12 @@ export default function SettingsScreen() {
                 styles.buttonText,
                 {
                   fontSize: fontSize.body,
-                  color: settings.contrast === 'high'
-                    ? (colors === HIGH_CONTRAST_COLORS ? '#000000' : '#ffffff')
-                    : colors.text,
+                  color:
+                    settings.contrast === "high"
+                      ? colors === HIGH_CONTRAST_COLORS
+                        ? "#000000"
+                        : "#ffffff"
+                      : colors.text,
                 },
               ]}
             >
@@ -894,7 +955,9 @@ export default function SettingsScreen() {
       </ThemedView>
 
       {/* Audio Feedback Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <View style={styles.toggleRow}>
           <View style={styles.toggleTextContainer}>
             <ThemedText
@@ -914,28 +977,30 @@ export default function SettingsScreen() {
               Play sounds for button clicks and interactions
             </ThemedText>
           </View>
-          
+
           {/* Audio Toggle - Requirement 13.4 */}
           <Switch
             value={settings.audioEnabled}
             onValueChange={handleAudioToggle}
             accessible={true}
             accessibilityLabel="Audio feedback toggle"
-            accessibilityHint={`Audio feedback is currently ${settings.audioEnabled ? 'enabled' : 'disabled'}. Toggle to ${settings.audioEnabled ? 'disable' : 'enable'}.`}
+            accessibilityHint={`Audio feedback is currently ${settings.audioEnabled ? "enabled" : "disabled"}. Toggle to ${settings.audioEnabled ? "disable" : "enable"}.`}
             accessibilityRole="switch"
             accessibilityState={{ checked: settings.audioEnabled }}
             trackColor={{
               false: colors.border,
               true: colors.primary,
             }}
-            thumbColor={Platform.OS === 'ios' ? undefined : '#ffffff'}
+            thumbColor={Platform.OS === "ios" ? undefined : "#ffffff"}
             ios_backgroundColor={colors.border}
           />
         </View>
       </ThemedView>
 
       {/* Haptics Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <View style={styles.toggleRow}>
           <View style={styles.toggleTextContainer}>
             <ThemedText
@@ -955,40 +1020,45 @@ export default function SettingsScreen() {
               Feel vibrations for interactions and data states
             </ThemedText>
           </View>
-          
+
           {/* Haptics Toggle */}
           <Switch
             value={settings.hapticsEnabled}
             onValueChange={handleHapticsToggle}
             accessible={true}
             accessibilityLabel="Haptic feedback toggle"
-            accessibilityHint={`Haptic feedback is currently ${settings.hapticsEnabled ? 'enabled' : 'disabled'}. Toggle to ${settings.hapticsEnabled ? 'disable' : 'enable'}.`}
+            accessibilityHint={`Haptic feedback is currently ${settings.hapticsEnabled ? "enabled" : "disabled"}. Toggle to ${settings.hapticsEnabled ? "disable" : "enable"}.`}
             accessibilityRole="switch"
             accessibilityState={{ checked: settings.hapticsEnabled }}
             trackColor={{
               false: colors.border,
               true: colors.primary,
             }}
-            thumbColor={Platform.OS === 'ios' ? undefined : '#ffffff'}
+            thumbColor={Platform.OS === "ios" ? undefined : "#ffffff"}
             ios_backgroundColor={colors.border}
           />
         </View>
       </ThemedView>
 
       {/* Info Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.infoText,
             { fontSize: fontSize.label, color: colors.textSecondary },
           ]}
         >
-          All settings are saved automatically and will be restored when you reopen the app.
+          All settings are saved automatically and will be restored when you
+          reopen the app.
         </ThemedText>
       </ThemedView>
 
       {/* Developer Testing Section */}
-      <ThemedView style={[styles.section, { backgroundColor: colors.background }]}>
+      <ThemedView
+        style={[styles.section, { backgroundColor: colors.background }]}
+      >
         <ThemedText
           style={[
             styles.sectionTitle,
@@ -1020,35 +1090,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  
+
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
     paddingTop: 60,
   },
-  
+
   header: {
     marginBottom: 24,
   },
-  
+
   title: {
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 8,
   },
-  
+
   subtitle: {
     lineHeight: 22,
   },
-  
+
   section: {
     marginBottom: 32,
   },
-  
+
   sectionTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
-  
+
   sectionDescription: {
     lineHeight: 20,
     marginBottom: 16,
@@ -1056,14 +1126,14 @@ const styles = StyleSheet.create({
 
   // HealthKit Settings Styles
   syncInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
     gap: 8,
   },
 
   syncLabel: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   syncValue: {
@@ -1075,9 +1145,9 @@ const styles = StyleSheet.create({
   },
 
   syncingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   settingsButton: {
@@ -1089,7 +1159,7 @@ const styles = StyleSheet.create({
   },
 
   dataRangeTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   dataRangeDescription: {
@@ -1101,7 +1171,7 @@ const styles = StyleSheet.create({
   },
 
   permissionsTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   categoryContainer: {
@@ -1110,7 +1180,7 @@ const styles = StyleSheet.create({
   },
 
   categoryTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
 
@@ -1119,9 +1189,9 @@ const styles = StyleSheet.create({
   },
 
   permissionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 6,
     paddingHorizontal: 8,
   },
@@ -1137,7 +1207,7 @@ const styles = StyleSheet.create({
   },
 
   permissionStatus: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 11,
   },
 
@@ -1145,46 +1215,46 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: 24,
   },
-  
+
   modeSelector: {
     marginTop: 8,
   },
-  
+
   buttonGroup: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
-  
+
   groupButton: {
     flex: 1,
   },
-  
+
   buttonText: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
-  
+
   toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 16,
   },
-  
+
   toggleTextContainer: {
     flex: 1,
   },
-  
+
   infoText: {
     lineHeight: 20,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
 
   testLink: {
     padding: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   linkText: {
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
 });

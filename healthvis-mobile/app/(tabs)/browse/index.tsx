@@ -16,8 +16,14 @@ import { LinearGradient } from "expo-linear-gradient";
 type HealthCategoryKey =
   | "activity"
   | "body"
+  | "cycle"
+  | "hearing"
+  | "heart"
+  | "medications"
   | "mindfulness"
+  | "mobility"
   | "nutrition"
+  | "respiratory"
   | "sleep"
   | "vitals";
 
@@ -28,8 +34,18 @@ const CATEGORIES: Array<{
 }> = [
   { key: "activity", label: "Activity", icon: "flame.fill" },
   { key: "body", label: "Body Measurements", icon: "figure.arms.open" },
+  {
+    key: "cycle",
+    label: "Cycle Tracking",
+    icon: "dot.circle.and.hand.point.up.left.fill",
+  },
+  { key: "hearing", label: "Hearing", icon: "ear.fill" },
+  { key: "heart", label: "Heart", icon: "heart.fill" },
+  { key: "medications", label: "Medications", icon: "pills.fill" },
   { key: "mindfulness", label: "Mental Wellbeing", icon: "brain.head.profile" },
+  { key: "mobility", label: "Mobility", icon: "figure.walk" },
   { key: "nutrition", label: "Nutrition", icon: "fork.knife" },
+  { key: "respiratory", label: "Respiratory", icon: "lungs.fill" },
   { key: "sleep", label: "Sleep", icon: "bed.double.fill" },
   { key: "vitals", label: "Vitals", icon: "waveform.path.ecg" },
 ];

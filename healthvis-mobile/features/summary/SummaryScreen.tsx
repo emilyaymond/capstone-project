@@ -35,7 +35,7 @@ import { latestByType } from "@/features/summary/utils/metricsSummary";
 import { MetricSummaryCard } from "@/features/summary/components/MetricSummaryCard";
 
 export default function SummaryScreen() {
-  const [selectedCategory] = useState<HealthCategory>("vitals");
+  const [selectedCategory] = useState<HealthCategory>("sleep");
 
   const {
     healthMetrics,
