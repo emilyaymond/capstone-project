@@ -46,6 +46,8 @@ import {
 import {
   getMetricAggregation,
   getMetricChartKind,
+  MetricChartKind,
+  MetricAggregation,
 } from "@/app/metric/metricConfig";
 
 // ============================================================================
@@ -84,8 +86,8 @@ export interface HealthDataContextValue {
     range: "day" | "week" | "month",
   ) => {
     points: HealthMetric[];
-    chart: "line" | "bar";
-    aggregation: "avg" | "sum" | "latest";
+    chart: MetricChartKind;
+    aggregation: MetricAggregation;
   };
 }
 
@@ -658,9 +660,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     }
   }
 
-  // ============================================================================
-  // Category-Based Query Methods (Requirement 4.6)
-  // ============================================================================
+  // Category-Based Query Methods
 
   /**
    * Get all metrics for a specific category

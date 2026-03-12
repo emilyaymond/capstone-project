@@ -17,6 +17,7 @@ import { useHealthData } from "@/contexts/HealthDataContext";
 import { SimpleLineChart } from "@/components/charts/lineChart";
 import { SimpleBarChart } from "@/components/charts/barChart";
 import { ScatterPlot } from "@/components/charts/scatter";
+import { SleepChart } from "@/components/charts/sleepChart";
 
 import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint } from "@/types";
@@ -25,6 +26,8 @@ import { getMetricChartKind, getMetricAggregation } from "./metricConfig";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { TimeSliceRow } from "@/components/TimeSliceRow";
 import { AISummary } from "@/components/ai/aiSummary";
+import { SleepStageBreakdown } from "@/components/SleepStageBreakdown";
+import { aggregateSleepByStage, formatSleepDuration } from "@/lib/sleep-utils";
 
 function prettyName(type: string) {
   switch (type) {
@@ -67,6 +70,13 @@ function computeMinMax(metrics: HealthMetric[]) {
 
 function formatSliceForVoiceOver(metric: HealthMetric): string {
   const start = new Date(metric.timestamp);
+
+  if (metric.type === "sleep") {
+    const duration = formatSleepDuration(Number(metric.value));
+    const stage = metric.metadata?.sleepStage || "Sleep";
+    return `${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${stage}, ${duration}`;
+  }
+
   const end = new Date(new Date(metric.timestamp).getTime() + 5 * 60 * 1000);
   const rangeText =
     metric.range === "danger"
@@ -74,7 +84,7 @@ function formatSliceForVoiceOver(metric: HealthMetric): string {
       : metric.range === "warning"
         ? "elevated"
         : "normal";
-  return `${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${metric.value} beats per minute, ${rangeText} range`;
+  return `${start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${metric.value} ${metric.unit || "beats per minute"}, ${rangeText} range`;
 }
 
 function mapBpmToFrequency(bpm: number): number {
@@ -134,7 +144,7 @@ function aggregateData(
     aggregated.push({
       ...metrics[0],
       value: Math.round(value),
-      timestamp: new Date(key).toISOString(),
+      timestamp: new Date(key),
       range: mostSevereRange,
     });
   });
@@ -276,6 +286,15 @@ export default function MetricDetailScreen() {
   const latest = data.length ? data[data.length - 1] : undefined;
   const { min, max } = useMemo(() => computeMinMax(data), [data]);
 
+  // Special handling for sleep metrics
+  const isSleepMetric = metricType === "sleep";
+  const sleepBreakdown = useMemo(() => {
+    if (isSleepMetric && data.length > 0) {
+      return aggregateSleepByStage(data);
+    }
+    return null;
+  }, [isSleepMetric, data]);
+
   const points = useMemo(() => toPoints(data), [data]);
   const chartKind = getMetricChartKind(metricType);
 
@@ -327,212 +346,278 @@ export default function MetricDetailScreen() {
 
   return (
     <ThemedView style={styles.bg} lightColor="#F2F2F7" darkColor="#000">
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.topRow}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            style={styles.circleButton}
-            activeOpacity={0.7}
-          >
-            <ThemedText style={styles.circleButtonText}>‹</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.screenTitle}>{title}</ThemedText>
-          <View style={styles.circleButton} />
-        </View>
-
-        <View style={styles.timeRangeContainer}>
-          {(["H", "D", "W", "M", "6M", "Y"] as const).map((range) => (
+      {isSleepMetric ? (
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.topRow}>
             <TouchableOpacity
-              key={range}
-              onPress={() => setTimeRange(range)}
-              style={[
-                styles.timeRangeButton,
-                timeRange === range && styles.timeRangeButtonActive,
-              ]}
+              onPress={() => router.back()}
               accessibilityRole="button"
-              accessibilityLabel={`Show ${range === "H" ? "hourly" : range === "D" ? "daily" : range === "W" ? "weekly" : range === "M" ? "monthly" : range === "6M" ? "6 month" : "yearly"} data`}
-              accessibilityState={{ selected: timeRange === range }}
+              accessibilityLabel="Back"
+              style={styles.circleButton}
+              activeOpacity={0.7}
             >
-              <ThemedText
-                style={[
-                  styles.timeRangeText,
-                  timeRange === range && styles.timeRangeTextActive,
-                ]}
-              >
-                {range}
-              </ThemedText>
+              <ThemedText style={styles.circleButtonText}>‹</ThemedText>
             </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.rangeBlock}>
-          <ThemedText style={styles.rangeLabel}>RANGE</ThemedText>
-          <ThemedText style={styles.rangeValue}>
-            {min != null && max != null
-              ? `${Math.round(min)}–${Math.round(max)}`
-              : "—"}
-            {latest?.unit ? ` ${latest.unit}` : ""}
-          </ThemedText>
-          <ThemedText style={styles.rangeSub}>{rangeSubtitle}</ThemedText>
-        </View>
-
-        <View style={styles.chartCard}>
-          {points.length ? (
-            chartKind === "scatter" ? (
-              <ScatterPlot
-                data={points}
-                title=""
-                unit={latest?.unit ?? ""}
-                width={Dimensions.get("window").width - 35}
-                height={260}
-                accessibilityLabel={`${title} scatter plot`}
-                timeRange={timeRange}
-              />
-            ) : chartKind === "bar" ? (
-              <SimpleBarChart
-                data={points}
-                title=""
-                unit={latest?.unit ?? ""}
-                width={360}
-                height={260}
-                accessibilityLabel={`${title} bar chart`}
-              />
-            ) : (
-              <SimpleLineChart
-                data={points}
-                title=""
-                unit={latest?.unit ?? ""}
-                width={Dimensions.get("window").width - 78}
-                height={260}
-                accessibilityLabel={`${title} line chart`}
-                timeRange={timeRange}
-              />
-            )
-          ) : (
-            <ThemedText style={{ opacity: 0.6 }}>No data yet.</ThemedText>
-          )}
-        </View>
-
-        <View style={styles.latestRow}>
-          <ThemedText style={styles.latestLeft}>
-            Latest: {latest ? formatTime(latest.timestamp) : "—"}
-          </ThemedText>
-          <ThemedText style={styles.latestRight}>
-            {latest ? `${latest.value} ${latest.unit ?? ""}` : "—"}
-          </ThemedText>
-        </View>
-
-        <TouchableOpacity
-          onPress={() =>
-            router.push({
-              pathname: "/metric/[type]",
-              params: { type: metricType },
-            })
-          }
-          accessibilityRole="button"
-          accessibilityLabel={`Show more ${title} data`}
-          style={styles.moreButton}
-        >
-          <ThemedText style={styles.moreText}>
-            Show More {title} Data
-          </ThemedText>
-        </TouchableOpacity>
-
-        <View style={styles.highlightsHeader}>
-          <ThemedText style={styles.highlightsTitle}>Highlights</ThemedText>
-        </View>
-
-        {keyStats && (
-          <View style={styles.highlightCard}>
-            <ThemedText style={styles.highlightTitle}>
-              {title} Stats ({rangeSubtitle})
-            </ThemedText>
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <ThemedText style={styles.statLabel}>Average</ThemedText>
-                <ThemedText style={styles.statValue}>
-                  {keyStats.avg} {keyStats.unit}
-                </ThemedText>
-              </View>
-              {keyStats.outlierCount > 0 && (
-                <View style={styles.statItem}>
-                  <ThemedText style={styles.statLabel}>Outliers</ThemedText>
-                  <ThemedText style={styles.statValue}>
-                    {keyStats.outlierCount} spike
-                    {keyStats.outlierCount > 1 ? "s" : ""}
-                  </ThemedText>
-                </View>
-              )}
-              {keyStats.dangerCount > 0 && (
-                <View style={styles.statItem}>
-                  <ThemedText style={styles.statLabel}>
-                    High Readings
-                  </ThemedText>
-                  <ThemedText style={[styles.statValue, styles.dangerText]}>
-                    {keyStats.dangerCount}
-                  </ThemedText>
-                </View>
-              )}
-              {keyStats.warningCount > 0 && (
-                <View style={styles.statItem}>
-                  <ThemedText style={styles.statLabel}>Elevated</ThemedText>
-                  <ThemedText style={[styles.statValue, styles.warningText]}>
-                    {keyStats.warningCount}
-                  </ThemedText>
-                </View>
-              )}
-            </View>
+            <ThemedText style={styles.screenTitle}>{title}</ThemedText>
+            <View style={styles.circleButton} />
           </View>
-        )}
-
-        {data.length > 0 && (
-          <View style={styles.highlightCard}>
-            <ThemedText style={styles.highlightTitle}>
-              AI Health Summary
+          <View style={styles.rangeBlock}>
+            <ThemedText style={styles.rangeLabel}>
+              {timeRange === "D" ? "TIME ASLEEP" : "AVERAGE TIME ASLEEP"}
             </ThemedText>
-            <AISummary
-              data={data}
-              metricName={title}
-              timeRange={timeRange}
-              min={min}
-              max={max}
-            />
+            <ThemedText style={styles.rangeValue}>
+              {isSleepMetric && sleepBreakdown
+                ? formatSleepDuration(sleepBreakdown.totalSleep)
+                : min != null && max != null
+                  ? `${Math.round(min)}–${Math.round(max)}`
+                  : "—"}
+              {!isSleepMetric && latest?.unit ? ` ${latest.unit}` : ""}
+            </ThemedText>
+            <ThemedText style={styles.rangeSub}>{rangeSubtitle}</ThemedText>
           </View>
-        )}
-
-        {data.length > 0 && (
-          <View style={styles.timeSlicesList}>
-            <ThemedText style={styles.listHeader}>Time Slices</ThemedText>
-            <ScrollView
-              style={styles.list}
-              nestedScrollEnabled
-              showsVerticalScrollIndicator={false}
-              accessibilityRole="list"
-              accessibilityLabel={`${data.length} time slices for ${title}`}
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              style={styles.circleButton}
+              activeOpacity={0.7}
             >
-              {data.slice(0, 24).map((item) => (
-                <TimeSliceRow
-                  key={item.timestamp.toString()}
-                  metric={item}
-                  onFocus={() =>
-                    playToneForValue(item.value, item.range ?? "normal")
-                  }
-                  accessibilityLabel={formatSliceForVoiceOver(item)}
-                />
-              ))}
-            </ScrollView>
+              <ThemedText style={styles.circleButtonText}>‹</ThemedText>
+            </TouchableOpacity>
+            <ThemedText style={styles.screenTitle}>{title}</ThemedText>
+            <View style={styles.circleButton} />
           </View>
-        )}
-      </ScrollView>
+
+          <View style={styles.timeRangeContainer}>
+            {(["H", "D", "W", "M", "6M", "Y"] as const).map((range) => (
+              <TouchableOpacity
+                key={range}
+                onPress={() => setTimeRange(range)}
+                style={[
+                  styles.timeRangeButton,
+                  timeRange === range && styles.timeRangeButtonActive,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${range === "H" ? "hourly" : range === "D" ? "daily" : range === "W" ? "weekly" : range === "M" ? "monthly" : range === "6M" ? "6 month" : "yearly"} data`}
+                accessibilityState={{ selected: timeRange === range }}
+              >
+                <ThemedText
+                  style={[
+                    styles.timeRangeText,
+                    timeRange === range && styles.timeRangeTextActive,
+                  ]}
+                >
+                  {range}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.rangeBlock}>
+            <ThemedText style={styles.rangeLabel}>
+              {isSleepMetric
+                ? timeRange === "D"
+                  ? "TIME ASLEEP"
+                  : "AVERAGE TIME ASLEEP"
+                : "RANGE"}
+            </ThemedText>
+            <ThemedText style={styles.rangeValue}>
+              {isSleepMetric && sleepBreakdown
+                ? formatSleepDuration(sleepBreakdown.totalSleep)
+                : min != null && max != null
+                  ? `${Math.round(min)}–${Math.round(max)}`
+                  : "—"}
+              {!isSleepMetric && latest?.unit ? ` ${latest.unit}` : ""}
+            </ThemedText>
+            <ThemedText style={styles.rangeSub}>{rangeSubtitle}</ThemedText>
+          </View>
+
+          <View style={styles.chartCard}>
+            {points.length ? (
+              isSleepMetric ? (
+                <SleepChart
+                  data={data}
+                  width={Dimensions.get("window").width - 35}
+                  height={260}
+                  timeRange={timeRange}
+                  accessibilityLabel={`${title} sleep stages chart`}
+                />
+              ) : chartKind === "scatter" ? (
+                <ScatterPlot
+                  data={points}
+                  title=""
+                  unit={latest?.unit ?? ""}
+                  width={Dimensions.get("window").width - 35}
+                  height={260}
+                  accessibilityLabel={`${title} scatter plot`}
+                  timeRange={timeRange}
+                />
+              ) : chartKind === "bar" ? (
+                <SimpleBarChart
+                  data={points}
+                  title=""
+                  unit={latest?.unit ?? ""}
+                  width={360}
+                  height={260}
+                  accessibilityLabel={`${title} bar chart`}
+                />
+              ) : (
+                <SimpleLineChart
+                  data={points}
+                  title=""
+                  unit={latest?.unit ?? ""}
+                  width={Dimensions.get("window").width - 78}
+                  height={260}
+                  accessibilityLabel={`${title} line chart`}
+                  timeRange={timeRange}
+                />
+              )
+            ) : (
+              <ThemedText style={{ opacity: 0.6 }}>No data yet.</ThemedText>
+            )}
+          </View>
+
+          <View style={styles.latestRow}>
+            <ThemedText style={styles.latestLeft}>
+              Latest: {latest ? formatTime(latest.timestamp) : "—"}
+            </ThemedText>
+            <ThemedText style={styles.latestRight}>
+              {latest
+                ? isSleepMetric
+                  ? `${formatSleepDuration(Number(latest.value))} ${latest.metadata?.sleepStage || ""}`
+                  : `${latest.value} ${latest.unit ?? ""}`
+                : "—"}
+            </ThemedText>
+          </View>
+
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: "/metric/[type]",
+                params: { type: metricType },
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel={`Show more ${title} data`}
+            style={styles.moreButton}
+          >
+            <ThemedText style={styles.moreText}>
+              Show More {title} Data
+            </ThemedText>
+          </TouchableOpacity>
+
+          <View style={styles.highlightsHeader}>
+            <ThemedText style={styles.highlightsTitle}>Highlights</ThemedText>
+          </View>
+
+          {isSleepMetric && data.length > 0 && (
+            <View style={styles.highlightCard}>
+              <ThemedText style={styles.highlightTitle}>
+                Sleep Analysis ({rangeSubtitle})
+              </ThemedText>
+              <SleepStageBreakdown sleepMetrics={data} />
+            </View>
+          )}
+
+          {keyStats && !isSleepMetric && (
+            <View style={styles.highlightCard}>
+              <ThemedText style={styles.highlightTitle}>
+                {title} Stats ({rangeSubtitle})
+              </ThemedText>
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <ThemedText style={styles.statLabel}>Average</ThemedText>
+                  <ThemedText style={styles.statValue}>
+                    {keyStats.avg} {keyStats.unit}
+                  </ThemedText>
+                </View>
+                {keyStats.outlierCount > 0 && (
+                  <View style={styles.statItem}>
+                    <ThemedText style={styles.statLabel}>Outliers</ThemedText>
+                    <ThemedText style={styles.statValue}>
+                      {keyStats.outlierCount} spike
+                      {keyStats.outlierCount > 1 ? "s" : ""}
+                    </ThemedText>
+                  </View>
+                )}
+                {keyStats.dangerCount > 0 && (
+                  <View style={styles.statItem}>
+                    <ThemedText style={styles.statLabel}>
+                      High Readings
+                    </ThemedText>
+                    <ThemedText style={[styles.statValue, styles.dangerText]}>
+                      {keyStats.dangerCount}
+                    </ThemedText>
+                  </View>
+                )}
+                {keyStats.warningCount > 0 && (
+                  <View style={styles.statItem}>
+                    <ThemedText style={styles.statLabel}>Elevated</ThemedText>
+                    <ThemedText style={[styles.statValue, styles.warningText]}>
+                      {keyStats.warningCount}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {data.length > 0 && (
+            <View style={styles.highlightCard}>
+              <ThemedText style={styles.highlightTitle}>
+                AI Health Summary
+              </ThemedText>
+              <AISummary
+                data={data}
+                metricName={title}
+                timeRange={timeRange}
+                min={min}
+                max={max}
+              />
+            </View>
+          )}
+
+          {data.length > 0 && (
+            <View style={styles.timeSlicesList}>
+              <ThemedText style={styles.listHeader}>Time Slices</ThemedText>
+              <ScrollView
+                style={styles.list}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                accessibilityRole="list"
+                accessibilityLabel={`${data.length} time slices for ${title}`}
+              >
+                {data.slice(0, 24).map((item) => (
+                  <TimeSliceRow
+                    key={item.timestamp.toString()}
+                    metric={item}
+                    onFocus={() =>
+                      playToneForValue(item.value, item.range ?? "normal")
+                    }
+                    accessibilityLabel={formatSliceForVoiceOver(item)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   bg: { flex: 1 },
-  content: { padding: 16, paddingBottom: 28, gap: 12 },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
+    gap: 12,
+  },
 
   topRow: {
     paddingTop: 48,
@@ -540,71 +625,111 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  screenTitle: { fontSize: 18, fontWeight: "800" },
+  screenTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
 
   circleButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.06)",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(118,118,128,0.12)",
     alignItems: "center",
     justifyContent: "center",
   },
-  circleButtonText: { fontSize: 22, fontWeight: "900", userSelect: "none" },
+  circleButtonText: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
 
   timeRangeContainer: {
     flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.05)",
-    borderRadius: 10,
-    padding: 4,
-    gap: 4,
-    marginTop: 12,
+    backgroundColor: "rgba(118,118,128,0.12)",
+    borderRadius: 9,
+    padding: 2,
+    gap: 2,
+    marginTop: 8,
   },
   timeRangeButton: {
     flex: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    paddingVertical: 7,
     borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
   },
   timeRangeButtonActive: {
-    backgroundColor: "white",
+    backgroundColor: "#FFFFFF",
   },
   timeRangeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
-    color: "#666",
+    color: "#6B7280",
   },
   timeRangeTextActive: {
-    color: "#000",
+    color: "#111827",
     fontWeight: "700",
   },
 
-  rangeBlock: { gap: 2, marginTop: 4 },
-  rangeLabel: { fontSize: 12, opacity: 0.6, fontWeight: "800" },
-  rangeValue: { fontSize: 40, fontWeight: "900", lineHeight: 48 },
-  rangeSub: { opacity: 0.6 },
+  rangeBlock: {
+    gap: 2,
+    marginTop: 4,
+  },
+  rangeLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+  },
+  rangeValue: {
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 34,
+    color: "#111111",
+  },
+  rangeSub: {
+    fontSize: 15,
+    color: "#8E8E93",
+  },
 
   chartCard: {
-    backgroundColor: "white",
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingHorizontal: 8,
     alignItems: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(60,60,67,0.12)",
   },
 
   latestRow: {
-    backgroundColor: "rgba(0,0,0,0.04)",
-    borderRadius: 14,
-    padding: 14,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 2,
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  latestLeft: {
+    fontSize: 13,
+    color: "#8E8E93",
+    fontWeight: "500",
+  },
+  latestRight: {
+    fontSize: 13,
+    color: "#111111",
+    fontWeight: "600",
+  },
 
-  latestLeft: { opacity: 0.7, fontWeight: "600" },
-  latestRight: { fontWeight: "900" },
-
-  moreButton: { paddingVertical: 4, alignItems: "center" },
-  moreText: { color: "#007AFF", fontWeight: "700" },
+  moreButton: {
+    paddingTop: 2,
+    paddingBottom: 8,
+    alignItems: "center",
+  },
+  moreText: {
+    color: "#007AFF",
+    fontWeight: "600",
+    fontSize: 16,
+  },
 
   highlightsHeader: {
     flexDirection: "row",
@@ -612,31 +737,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  highlightsTitle: { fontSize: 22, fontWeight: "900" },
+  highlightsTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+  },
 
   highlightCard: {
-    backgroundColor: "white",
-    borderRadius: 14,
-    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
     gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(60,60,67,0.10)",
   },
-  highlightTitle: { fontWeight: 800 },
+  highlightTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
 
   timeSlicesList: {
-    marginTop: 12,
+    marginTop: 8,
     gap: 8,
   },
-
   listHeader: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "700",
     opacity: 0.8,
   },
   list: {
     maxHeight: 240,
     borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.02)",
+    backgroundColor: "rgba(118,118,128,0.08)",
   },
+
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -648,18 +781,14 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    opacity: 0.6,
+    color: "#8E8E93",
     fontWeight: "600",
     marginBottom: 2,
   },
   statValue: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "700",
   },
-  dangerText: {
-    color: "#FF3B30",
-  },
-  warningText: {
-    color: "#FF9500",
-  },
+  dangerText: { color: "#FF3B30" },
+  warningText: { color: "#FF9500" },
 });

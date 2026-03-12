@@ -87,7 +87,23 @@ export default function SummaryScreen() {
   const stepsVital = stepsMetrics.length > 0 ? stepsMetrics[0] : undefined;
 
   const sleepMetrics = getMetricsByType("sleep");
-  const sleepVital = sleepMetrics.length > 0 ? sleepMetrics[0] : undefined;
+  // Calculate total sleep duration from all sleep stages
+  const totalSleepHours = sleepMetrics.reduce(
+    (total: number, metric: HealthMetric) => {
+      // Only count actual sleep stages (exclude awake and in bed)
+      const stage = metric.metadata?.sleepStage || "";
+      if (!stage.includes("Awake") && !stage.includes("In Bed")) {
+        return total + Number(metric.value);
+      }
+      return total;
+    },
+    0,
+  );
+
+  const sleepVital =
+    sleepMetrics.length > 0
+      ? { ...sleepMetrics[0], value: Math.round(totalSleepHours * 10) / 10 }
+      : undefined;
 
   const hasAnyData = allMetrics.length > 0;
 
