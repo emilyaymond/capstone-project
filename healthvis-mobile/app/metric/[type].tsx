@@ -414,8 +414,13 @@ export default function MetricDetailScreen() {
           </AccessibleButton>
 
           <View style={styles.titleBlock} accessible accessibilityRole="header">
-            <ThemedText style={[styles.screenTitle, { fontSize: fontSize.title }]}>
-              {cfg.icon} {cfg.label}
+            <ThemedText
+              style={[styles.screenTitle, { fontSize: fontSize.title }]}
+              adjustsFontSizeToFit
+              numberOfLines={1}
+              minimumFontScale={0.7}
+            >
+              {cfg.label}
             </ThemedText>
             <ThemedText style={[styles.categoryLabel, { fontSize: fontSize.label }]}>
               {cfg.categoryLabel}
@@ -469,7 +474,12 @@ export default function MetricDetailScreen() {
           <ThemedText style={[styles.heroLabel, { fontSize: fontSize.label, color: "#8E8E93" }]}>
             {heroLabel.toUpperCase()}
           </ThemedText>
-          <ThemedText style={[styles.heroValue, { fontSize: fontSize.title + 12, color: cfg.color }]}>
+          <ThemedText
+            style={[styles.heroValue, { fontSize: Math.min(fontSize.title + 12, 48), color: cfg.color }]}
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            minimumFontScale={0.65}
+          >
             {heroValue}
           </ThemedText>
           {!isSleep && data[0]?.unit && (
@@ -498,7 +508,7 @@ export default function MetricDetailScreen() {
                   { color: latest.range === "danger" ? "#FF3B30" : "#C07000" },
                 ]}
               >
-                {latest.range === "danger" ? "⚠ Outside normal range" : "↑ Slightly elevated"}
+                {latest.range === "danger" ? "Outside normal range" : "Slightly elevated"}
               </ThemedText>
             </View>
           )}

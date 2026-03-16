@@ -59,7 +59,7 @@ export default function ExploreModesCard({
       {/* Feature buttons */}
       <View style={styles.featureList}>
         <FeatureRow
-          icon="♪"
+          iconLabel="SFX"
           title="Sonification"
           description="Listen to metric patterns as musical tones"
           onPress={onPressSonification}
@@ -70,7 +70,7 @@ export default function ExploreModesCard({
         <View style={styles.divider} />
 
         <FeatureRow
-          icon="⚡"
+          iconLabel="VBR"
           title="Haptic Pulse"
           description="Feel data rhythms through vibration patterns"
           onPress={onPressHaptics}
@@ -87,14 +87,14 @@ export default function ExploreModesCard({
 type FontSizeObj = { body: number; label: number; title: number; heading: number };
 
 function FeatureRow({
-  icon,
+  iconLabel,
   title,
   description,
   onPress,
   accessibilityHint,
   fontSize,
 }: {
-  icon: string;
+  iconLabel: string;
   title: string;
   description: string;
   onPress: () => void;
@@ -110,8 +110,8 @@ function FeatureRow({
       accessibilityHint={accessibilityHint}
     >
       <View style={styles.featureIconWrap}>
-        <ThemedText style={[styles.featureIcon, { fontSize: fontSize.body + 4 }]}>
-          {icon}
+        <ThemedText style={[styles.featureIcon, { fontSize: fontSize.label - 1 }]}>
+          {iconLabel}
         </ThemedText>
       </View>
       <View style={styles.featureText}>
