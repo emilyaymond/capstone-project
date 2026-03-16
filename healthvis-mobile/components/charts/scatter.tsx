@@ -282,6 +282,9 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
           point.range || "normal",
           settings.contrast,
         );
+        console.log(
+          `<3 point value is ${point.value} and range is ${point.range}`,
+        );
 
         return {
           x,

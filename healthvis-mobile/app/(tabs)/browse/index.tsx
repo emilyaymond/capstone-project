@@ -12,6 +12,7 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 import { LinearGradient } from "expo-linear-gradient";
+import { HealthCategory, HealthMetric } from "@/types/health-metric";
 
 type HealthCategoryKey =
   | "activity"
@@ -30,24 +31,94 @@ type HealthCategoryKey =
 const CATEGORIES: Array<{
   key: HealthCategoryKey;
   label: string;
-  icon: string; // SF-symbol-ish name (we map it)
+  icon: string;
+  metricType: string; // Maps to HealthMetricType for navigation
+  color: string;
 }> = [
-  { key: "activity", label: "Activity", icon: "flame.fill" },
-  { key: "body", label: "Body Measurements", icon: "figure.arms.open" },
+  {
+    key: "activity",
+    label: "Activity",
+    icon: "flame.fill",
+    metricType: "steps",
+    color: "#ff7d27ff",
+  },
+  {
+    key: "body",
+    label: "Body Measurements",
+    icon: "figure.arms.open",
+    metricType: "weight",
+    color: "#b734eb",
+  },
   {
     key: "cycle",
     label: "Cycle Tracking",
     icon: "dot.circle.and.hand.point.up.left.fill",
+    metricType: "menstrual_flow",
+    color: "#eb3477ff",
   },
-  { key: "hearing", label: "Hearing", icon: "ear.fill" },
-  { key: "heart", label: "Heart", icon: "heart.fill" },
-  { key: "medications", label: "Medications", icon: "pills.fill" },
-  { key: "mindfulness", label: "Mental Wellbeing", icon: "brain.head.profile" },
-  { key: "mobility", label: "Mobility", icon: "figure.walk" },
-  { key: "nutrition", label: "Nutrition", icon: "fork.knife" },
-  { key: "respiratory", label: "Respiratory", icon: "lungs.fill" },
-  { key: "sleep", label: "Sleep", icon: "bed.double.fill" },
-  { key: "vitals", label: "Vitals", icon: "waveform.path.ecg" },
+  {
+    key: "hearing",
+    label: "Hearing",
+    icon: "ear.fill",
+    metricType: "environmental_audio_exposure",
+    color: "#7a9e57ff",
+  },
+  {
+    key: "heart",
+    label: "Heart",
+    icon: "heart.fill",
+    metricType: "heart_rate",
+    color: "#fa1919ff",
+  },
+  {
+    key: "medications",
+    label: "Medications",
+    icon: "pills.fill",
+    metricType: "medications",
+    color: "#faf03aff",
+  },
+  {
+    key: "mindfulness",
+    label: "Mental Wellbeing",
+    icon: "brain.head.profile",
+    metricType: "mindfulness_minutes",
+    color: "#74c17cff",
+  },
+  {
+    key: "mobility",
+    label: "Mobility",
+    icon: "figure.walk",
+    metricType: "walking_speed",
+    color: "#63b4ffff",
+  },
+  {
+    key: "nutrition",
+    label: "Nutrition",
+    icon: "fork.knife",
+    metricType: "dietary_energy",
+    color: "#178e54ff",
+  },
+  {
+    key: "respiratory",
+    label: "Respiratory",
+    icon: "lungs.fill",
+    metricType: "respiratory_rate",
+    color: "#ff9d00ff",
+  },
+  {
+    key: "sleep",
+    label: "Sleep",
+    icon: "bed.double.fill",
+    metricType: "sleep",
+    color: "#4311b9ff",
+  },
+  {
+    key: "vitals",
+    label: "Vitals",
+    icon: "waveform.path.ecg",
+    metricType: "heart_rate",
+    color: "#34bdebff",
+  },
 ];
 
 export default function BrowseScreen() {
@@ -81,12 +152,12 @@ export default function BrowseScreen() {
             accessible
             accessibilityLabel="Search health categories"
           >
-            <IconSymbol name="magnifyingglass" size={18} color="#8E8E93" />
+            <IconSymbol name="magnifyingglass" size={18} color="#6e6e70ff" />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Search"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor="#6e6e70ff"
               style={styles.searchInput}
               accessibilityLabel="Search"
               accessibilityHint="Type to filter health categories"
@@ -96,12 +167,16 @@ export default function BrowseScreen() {
           <ThemedText style={styles.sectionHeader}>
             Health Categories
           </ThemedText>
-
           <View style={styles.listCard}>
             {filtered.map((item, idx) => (
               <Pressable
                 key={item.key}
-                onPress={() => router.push(`/browse/${item.key}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/metric/[type]",
+                    params: { type: item.metricType },
+                  })
+                }
                 style={({ pressed }) => [
                   styles.row,
                   pressed && styles.rowPressed,
@@ -116,7 +191,7 @@ export default function BrowseScreen() {
                     <IconSymbol
                       name={item.icon as any}
                       size={18}
-                      color="#FFFFFF"
+                      color={item.color as any}
                     />
                   </View>
                   <ThemedText style={styles.rowLabel}>{item.label}</ThemedText>
@@ -146,7 +221,7 @@ const styles = StyleSheet.create({
   searchWrap: {
     height: 40,
     borderRadius: 10,
-    backgroundColor: "#E5E5EA",
+    backgroundColor: "#fcfcff73",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
@@ -187,7 +262,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 7,
-    backgroundColor: "#f381bdff", // Apple-y “health” red; tweak per category later
+    backgroundColor: "#white",
     alignItems: "center",
     justifyContent: "center",
   },

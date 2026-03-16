@@ -1,8 +1,9 @@
 // healthvis-mobile/features/summary/components/PinnedSection.tsx
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, TouchableOpacity } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { PinnedKey } from "@/lib/pins";
+import { Link } from "expo-router";
 
 type VitalLike = { value?: number | string } | undefined;
 
@@ -13,7 +14,12 @@ type Props = {
   sleepVital: VitalLike;
 };
 
-export function PinnedSection({ pins, heartRateVital, stepsVital, sleepVital }: Props) {
+export function PinnedSection({
+  pins,
+  heartRateVital,
+  stepsVital,
+  sleepVital,
+}: Props) {
   const rows = useMemo(() => {
     return pins
       .map((p) => {
@@ -45,14 +51,30 @@ export function PinnedSection({ pins, heartRateVital, stepsVital, sleepVital }: 
 
   return (
     <View style={styles.sectionWrap}>
-      <ThemedText style={styles.sectionTitle}>Pinned</ThemedText>
+      <View style={styles.headerRow}>
+        <ThemedText style={styles.sectionTitle}>Pinned</ThemedText>
+
+        <View style={styles.headerRight}>
+          <Link href="/edit-pinned" asChild>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Edit pinned"
+            >
+              <ThemedText style={styles.editLink}>Edit</ThemedText>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
 
       <View style={styles.sectionCard}>
         {rows.length ? (
           rows.map((row, idx) => {
             const showDivider = idx !== rows.length - 1;
             return (
-              <View key={row.key} style={[styles.row, showDivider && styles.divider]}>
+              <View
+                key={row.key}
+                style={[styles.row, showDivider && styles.divider]}
+              >
                 <ThemedText style={styles.label}>{row.label}</ThemedText>
                 <ThemedText style={styles.value}>{row.value}</ThemedText>
               </View>
@@ -60,7 +82,9 @@ export function PinnedSection({ pins, heartRateVital, stepsVital, sleepVital }: 
           })
         ) : (
           <View style={{ padding: 16 }}>
-            <ThemedText style={{ opacity: 0.7 }}>No pinned items yet.</ThemedText>
+            <ThemedText style={{ opacity: 0.7 }}>
+              No pinned items yet.
+            </ThemedText>
           </View>
         )}
       </View>
@@ -76,7 +100,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    marginBottom: 8,
   },
   sectionCard: {
     borderRadius: 14,
@@ -102,5 +125,23 @@ const styles = StyleSheet.create({
   divider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(0,0,0,0.12)",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingBottom: 10,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  editLink: {
+    color: "#007AFF",
+    fontSize: 17,
+    fontWeight: "600",
+    paddingBottom: 6,
+    paddingRight: 6,
   },
 });

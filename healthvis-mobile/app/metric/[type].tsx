@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -19,15 +19,27 @@ import { SimpleBarChart } from "@/components/charts/barChart";
 import { ScatterPlot } from "@/components/charts/scatter";
 import { SleepChart } from "@/components/charts/sleepChart";
 
-import { HealthMetric, HealthMetricType } from "@/types/health-metric";
+import {
+  HealthMetric,
+  HealthMetricType,
+  classifyRange,
+  hasDefinedRange,
+} from "@/types/health-metric";
 import { DataPoint } from "@/types";
 import { getMetricChartKind, getMetricAggregation } from "./metricConfig";
 
 import { useAccessibility } from "@/contexts/AccessibilityContext";
+import { AccessibleButton } from "@/components/AccessibleButton";
 import { TimeSliceRow } from "@/components/TimeSliceRow";
 import { AISummary } from "@/components/ai/aiSummary";
 import { SleepStageBreakdown } from "@/components/SleepStageBreakdown";
 import { aggregateSleepByStage, formatSleepDuration } from "@/lib/sleep-utils";
+import {
+  announceNavigation,
+  announceDataUpdate,
+  announce,
+} from "@/lib/announcer";
+import { TOUCH_TARGET_SIZES } from "@/constants/accessibility";
 
 function prettyName(type: string) {
   switch (type) {
@@ -135,17 +147,17 @@ function aggregateData(
       );
     }
 
-    const mostSevereRange = metrics.some((m) => m.range === "danger")
-      ? "danger"
-      : metrics.some((m) => m.range === "warning")
-        ? "warning"
-        : "normal";
+    // Recalculate range based on the aggregated value, not the most severe in bucket
+    const metricType = metrics[0].type;
+    const range = hasDefinedRange(metricType)
+      ? classifyRange(metricType, value)
+      : undefined;
 
     aggregated.push({
       ...metrics[0],
       value: Math.round(value),
       timestamp: new Date(key),
-      range: mostSevereRange,
+      range,
     });
   });
 
@@ -158,6 +170,7 @@ export default function MetricDetailScreen() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const router = useRouter();
   const { healthMetrics, refreshData } = useHealthData();
+  const { mode, settings } = useAccessibility();
 
   const [timeRange, setTimeRange] = React.useState<
     "H" | "D" | "W" | "M" | "6M" | "Y"
@@ -195,6 +208,11 @@ export default function MetricDetailScreen() {
   const metricType = String(type ?? "") as HealthMetricType;
   const title = prettyName(metricType);
   const agg = getMetricAggregation(metricType);
+
+  // Announce screen navigation on mount
+  useEffect(() => {
+    announceNavigation(`${title} detail screen. ${rangeSubtitle}.`);
+  }, [title]);
 
   const all: HealthMetric[] = useMemo(() => {
     return [
@@ -258,30 +276,49 @@ export default function MetricDetailScreen() {
     );
 
     let bucketSize: number;
-    switch (timeRange) {
-      case "H":
-        return filtered;
-      case "D":
-        bucketSize = 5 * 60 * 1000;
-        break;
-      case "W":
-        bucketSize = 30 * 60 * 1000;
-        break;
-      case "M":
-        bucketSize = 2 * 60 * 60 * 1000;
-        break;
-      case "6M":
-        bucketSize = 12 * 60 * 60 * 1000;
-        break;
-      case "Y":
-        bucketSize = 24 * 60 * 60 * 1000;
-        break;
-      default:
-        bucketSize = 5 * 60 * 1000;
-    }
 
+    // Don't aggregate sleep data - show raw samples
+    if (metricType === "sleep") {
+      return filtered;
+    } else {
+      switch (timeRange) {
+        case "H":
+          return filtered;
+        case "D":
+          bucketSize = 5 * 60 * 1000;
+          break;
+        case "W":
+          bucketSize = 30 * 60 * 1000;
+          break;
+        case "M":
+          bucketSize = 2 * 60 * 60 * 1000;
+          break;
+        case "6M":
+          bucketSize = 12 * 60 * 60 * 1000;
+          break;
+        case "Y":
+          bucketSize = 24 * 60 * 60 * 1000;
+          break;
+        default:
+          bucketSize = 5 * 60 * 1000;
+      }
+    }
     return aggregateData(filtered, bucketSize, agg);
   }, [allDataForType, timeRange, agg]);
+
+  // Log sleep data for debugging
+  React.useEffect(() => {
+    if (metricType === "sleep") {
+      console.log(`🛌 Sleep data for ${timeRange}: ${data.length} samples`);
+      if (data.length > 0 && data.length <= 20) {
+        data.forEach((d, i) => {
+          console.log(
+            `  ${i}: ${d.metadata?.sleepStage} - ${d.metadata?.durationMinutes}min at ${new Date(d.timestamp).toLocaleTimeString()}`,
+          );
+        });
+      }
+    }
+  }, [data, metricType, timeRange]);
 
   const latest = data.length ? data[data.length - 1] : undefined;
   const { min, max } = useMemo(() => computeMinMax(data), [data]);
@@ -344,66 +381,100 @@ export default function MetricDetailScreen() {
     }
   }, [timeRange]);
 
+  // Handle time range changes with announcements
+  const handleTimeRangeChange = (range: typeof timeRange) => {
+    setTimeRange(range);
+    const rangeText =
+      range === "H"
+        ? "last hour"
+        : range === "D"
+          ? "today"
+          : range === "W"
+            ? "this week"
+            : range === "M"
+              ? "this month"
+              : range === "6M"
+                ? "last 6 months"
+                : "this year";
+    announceDataUpdate(`Showing ${rangeText} data`);
+  };
+
+  // Announce data updates
+  useEffect(() => {
+    if (data.length > 0) {
+      const dataDescription = isSleepMetric
+        ? `${data.length} sleep segments`
+        : `${data.length} data points`;
+      announce(`Loaded ${dataDescription} for ${rangeSubtitle}`);
+    }
+  }, [data.length, rangeSubtitle, isSleepMetric]);
+
+  // Calculate touch target size based on mode
+  const touchTargetSize =
+    mode === "simplified"
+      ? TOUCH_TARGET_SIZES.simplified
+      : TOUCH_TARGET_SIZES.minimum;
+
   return (
     <ThemedView style={styles.bg} lightColor="#F2F2F7" darkColor="#000">
       {isSleepMetric ? (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.topRow}>
-            <TouchableOpacity
+            <AccessibleButton
+              label="Back"
+              hint="Return to previous screen"
               onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              style={styles.circleButton}
-              activeOpacity={0.7}
+              variant="secondary"
+              style={{
+                ...styles.circleButton,
+                minWidth: touchTargetSize,
+                minHeight: touchTargetSize,
+              }}
             >
               <ThemedText style={styles.circleButtonText}>‹</ThemedText>
-            </TouchableOpacity>
-            <ThemedText style={styles.screenTitle}>{title}</ThemedText>
-            <View style={styles.circleButton} />
-          </View>
-          <View style={styles.rangeBlock}>
-            <ThemedText style={styles.rangeLabel}>
-              {timeRange === "D" ? "TIME ASLEEP" : "AVERAGE TIME ASLEEP"}
-            </ThemedText>
-            <ThemedText style={styles.rangeValue}>
-              {isSleepMetric && sleepBreakdown
-                ? formatSleepDuration(sleepBreakdown.totalSleep)
-                : min != null && max != null
-                  ? `${Math.round(min)}–${Math.round(max)}`
-                  : "—"}
-              {!isSleepMetric && latest?.unit ? ` ${latest.unit}` : ""}
-            </ThemedText>
-            <ThemedText style={styles.rangeSub}>{rangeSubtitle}</ThemedText>
-          </View>
-        </ScrollView>
-      ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.topRow}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              style={styles.circleButton}
-              activeOpacity={0.7}
-            >
-              <ThemedText style={styles.circleButtonText}>‹</ThemedText>
-            </TouchableOpacity>
+            </AccessibleButton>
             <ThemedText style={styles.screenTitle}>{title}</ThemedText>
             <View style={styles.circleButton} />
           </View>
 
           <View style={styles.timeRangeContainer}>
-            {(["H", "D", "W", "M", "6M", "Y"] as const).map((range) => (
-              <TouchableOpacity
+            {(["D", "W", "M", "6M", "Y"] as const).map((range) => (
+              <AccessibleButton
                 key={range}
-                onPress={() => setTimeRange(range)}
-                style={[
-                  styles.timeRangeButton,
-                  timeRange === range && styles.timeRangeButtonActive,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Show ${range === "H" ? "hourly" : range === "D" ? "daily" : range === "W" ? "weekly" : range === "M" ? "monthly" : range === "6M" ? "6 month" : "yearly"} data`}
-                accessibilityState={{ selected: timeRange === range }}
+                label={`Show ${
+                  range === "D"
+                    ? "daily"
+                    : range === "W"
+                      ? "weekly"
+                      : range === "M"
+                        ? "monthly"
+                        : range === "6M"
+                          ? "6 month"
+                          : "yearly"
+                } sleep data`}
+                hint={`View sleep data for ${
+                  range === "D"
+                    ? "today"
+                    : range === "W"
+                      ? "this week"
+                      : range === "M"
+                        ? "this month"
+                        : range === "6M"
+                          ? "the last 6 months"
+                          : "this year"
+                }`}
+                onPress={() => handleTimeRangeChange(range)}
+                variant="secondary"
+                style={{
+                  flex: 1,
+                  paddingVertical: 7,
+                  paddingHorizontal: 0,
+                  borderRadius: 7,
+                  backgroundColor:
+                    timeRange === range ? "#FFFFFF" : "transparent",
+                  minHeight: touchTargetSize,
+                  minWidth: 0,
+                }}
               >
                 <ThemedText
                   style={[
@@ -413,11 +484,326 @@ export default function MetricDetailScreen() {
                 >
                   {range}
                 </ThemedText>
-              </TouchableOpacity>
+              </AccessibleButton>
             ))}
           </View>
 
           <View style={styles.rangeBlock}>
+            <ThemedText style={styles.rangeLabel}>
+              {timeRange === "D" ? "TIME ASLEEP" : "AVERAGE TIME ASLEEP"}
+            </ThemedText>
+            <ThemedText style={styles.rangeValue}>
+              {sleepBreakdown
+                ? formatSleepDuration(sleepBreakdown.totalSleep)
+                : "—"}
+            </ThemedText>
+            <ThemedText style={styles.rangeSub}>{rangeSubtitle}</ThemedText>
+          </View>
+
+          <View
+            style={styles.sleepHeroCard}
+            accessible={true}
+            accessibilityRole="summary"
+            accessibilityLabel={`Sleep summary. Time in bed: ${
+              sleepBreakdown
+                ? formatSleepDuration(
+                    sleepBreakdown.totalInBed ?? sleepBreakdown.totalSleep,
+                  )
+                : "unknown"
+            }. Sleep efficiency: ${
+              sleepBreakdown?.totalInBed && sleepBreakdown.totalInBed > 0
+                ? `${Math.round((sleepBreakdown.totalSleep / sleepBreakdown.totalInBed) * 100)} percent`
+                : "unknown"
+            }. ${data.length} sleep sessions. Latest stage: ${latest?.metadata?.sleepStage ?? "unknown"}.`}
+          >
+            <View style={styles.sleepHeroRow}>
+              <View>
+                <ThemedText style={styles.sleepHeroLabel}>In Bed</ThemedText>
+                <ThemedText style={styles.sleepHeroValue}>
+                  {sleepBreakdown
+                    ? formatSleepDuration(
+                        sleepBreakdown.totalInBed ?? sleepBreakdown.totalSleep,
+                      )
+                    : "—"}
+                </ThemedText>
+              </View>
+              <View>
+                <ThemedText style={styles.sleepHeroLabel}>
+                  Efficiency
+                </ThemedText>
+                <ThemedText style={styles.sleepHeroValue}>
+                  {sleepBreakdown?.totalInBed && sleepBreakdown.totalInBed > 0
+                    ? `${Math.round((sleepBreakdown.totalSleep / sleepBreakdown.totalInBed) * 100)}%`
+                    : "—"}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.sleepHeroDivider} />
+
+            <View style={styles.sleepHeroRow}>
+              <View>
+                <ThemedText style={styles.sleepHeroLabel}>Sessions</ThemedText>
+                <ThemedText style={styles.sleepHeroValue}>
+                  {data.length}
+                </ThemedText>
+              </View>
+              <View>
+                <ThemedText style={styles.sleepHeroLabel}>
+                  Latest Stage
+                </ThemedText>
+                <ThemedText style={styles.sleepHeroValue}>
+                  {latest?.metadata?.sleepStage ?? "—"}
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.chartCard}>
+            {data.length ? (
+              <SleepChart
+                data={data}
+                width={Dimensions.get("window").width - 35}
+                height={260}
+                timeRange={timeRange}
+                accessibilityLabel={`${title} sleep stages chart`}
+              />
+            ) : (
+              <ThemedText style={{ opacity: 0.6 }}>
+                No sleep data yet.
+              </ThemedText>
+            )}
+          </View>
+
+          <View style={styles.latestRow}>
+            <ThemedText style={styles.latestLeft}>
+              Latest: {latest ? formatTime(latest.timestamp) : "—"}
+            </ThemedText>
+            <ThemedText style={styles.latestRight}>
+              {latest
+                ? `${formatSleepDuration(Number(latest.value))} ${latest.metadata?.sleepStage || ""}`
+                : "—"}
+            </ThemedText>
+          </View>
+
+          <View style={styles.highlightsHeader}>
+            <ThemedText style={styles.highlightsTitle}>
+              Sleep Highlights
+            </ThemedText>
+          </View>
+
+          <View
+            style={styles.highlightCard}
+            accessible={true}
+            accessibilityRole="summary"
+            accessibilityLabel={`Stage breakdown for ${rangeSubtitle}`}
+          >
+            <ThemedText style={styles.highlightTitle}>
+              Stage Breakdown ({rangeSubtitle})
+            </ThemedText>
+            {data.length > 0 ? (
+              <SleepStageBreakdown sleepMetrics={data} />
+            ) : (
+              <ThemedText style={styles.emptyStateText}>
+                No sleep stage data available.
+              </ThemedText>
+            )}
+          </View>
+
+          <View
+            style={styles.highlightCard}
+            accessible={true}
+            accessibilityRole="summary"
+            accessibilityLabel={`Sleep insights. Total sleep: ${
+              sleepBreakdown
+                ? formatSleepDuration(sleepBreakdown.totalSleep)
+                : "unknown"
+            }. Deep sleep: ${
+              sleepBreakdown?.deepSleep != null
+                ? formatSleepDuration(sleepBreakdown.deepSleep)
+                : "unknown"
+            }. Light sleep: ${
+              sleepBreakdown?.lightSleep != null
+                ? formatSleepDuration(sleepBreakdown.lightSleep)
+                : "unknown"
+            }. REM sleep: ${
+              sleepBreakdown?.remSleep != null
+                ? formatSleepDuration(sleepBreakdown.remSleep)
+                : "unknown"
+            }.`}
+          >
+            <ThemedText style={styles.highlightTitle}>
+              Sleep Insights
+            </ThemedText>
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <ThemedText style={styles.statLabel}>Total Sleep</ThemedText>
+                <ThemedText style={styles.statValue}>
+                  {sleepBreakdown
+                    ? formatSleepDuration(sleepBreakdown.totalSleep)
+                    : "—"}
+                </ThemedText>
+              </View>
+
+              <View style={styles.statItem}>
+                <ThemedText style={styles.statLabel}>Deep Sleep</ThemedText>
+                <ThemedText style={styles.statValue}>
+                  {sleepBreakdown?.deepSleep != null
+                    ? formatSleepDuration(sleepBreakdown.deepSleep)
+                    : "—"}
+                </ThemedText>
+              </View>
+
+              <View style={styles.statItem}>
+                <ThemedText style={styles.statLabel}>Light Sleep</ThemedText>
+                <ThemedText style={styles.statValue}>
+                  {sleepBreakdown?.lightSleep != null
+                    ? formatSleepDuration(sleepBreakdown.lightSleep)
+                    : "—"}
+                </ThemedText>
+              </View>
+
+              <View style={styles.statItem}>
+                <ThemedText style={styles.statLabel}>REM Sleep</ThemedText>
+                <ThemedText style={styles.statValue}>
+                  {sleepBreakdown?.remSleep != null
+                    ? formatSleepDuration(sleepBreakdown.remSleep)
+                    : "—"}
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.highlightCard}>
+            <ThemedText style={styles.highlightTitle}>
+              AI Sleep Summary
+            </ThemedText>
+            <View style={styles.aiPlaceholderCard}>
+              <ThemedText style={styles.aiPlaceholderText}>
+                AI summary placeholder:
+              </ThemedText>
+              <ThemedText style={styles.aiPlaceholderSubtext}>
+                Add bedtime consistency, wake trend, sleep debt, recovery score,
+                and suggested patterns here.
+              </ThemedText>
+            </View>
+            {/* Later you can replace this block with:
+      <AISummary
+        data={data}
+        metricName="Sleep"
+        timeRange={timeRange}
+        min={min}
+        max={max}
+      />
+      */}
+          </View>
+
+          <View style={styles.highlightCard}>
+            <ThemedText style={styles.highlightTitle}>
+              Weekly / Monthly Trend
+            </ThemedText>
+            <View style={styles.chartPlaceholder}>
+              <ThemedText style={styles.chartPlaceholderText}>
+                Placeholder for nightly sleep duration trend chart
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.timeSlicesList}>
+            <ThemedText style={styles.listHeader}>Sleep Segments</ThemedText>
+            <ScrollView
+              style={styles.list}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              accessibilityRole="list"
+              accessibilityLabel={`${data.length} sleep segments`}
+            >
+              {data.slice(0, 40).map((item) => (
+                <TimeSliceRow
+                  key={item.timestamp.toString()}
+                  metric={item}
+                  onFocus={() => Vibration.vibrate(20)}
+                  accessibilityLabel={formatSliceForVoiceOver(item)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.topRow}>
+            <AccessibleButton
+              label="Back"
+              hint="Return to previous screen"
+              onPress={() => router.back()}
+              variant="secondary"
+              style={{
+                ...styles.circleButton,
+                minWidth: touchTargetSize,
+                minHeight: touchTargetSize,
+              }}
+            >
+              <ThemedText style={styles.circleButtonText}>‹</ThemedText>
+            </AccessibleButton>
+            <ThemedText style={styles.screenTitle}>{title}</ThemedText>
+            <View style={styles.circleButton} />
+          </View>
+
+          <View style={styles.timeRangeContainer}>
+            {(["H", "D", "W", "M", "6M", "Y"] as const).map((range) => (
+              <AccessibleButton
+                key={range}
+                label={`Show ${range === "H" ? "hourly" : range === "D" ? "daily" : range === "W" ? "weekly" : range === "M" ? "monthly" : range === "6M" ? "6 month" : "yearly"} data`}
+                hint={`View ${title} data for ${
+                  range === "H"
+                    ? "the last hour"
+                    : range === "D"
+                      ? "today"
+                      : range === "W"
+                        ? "this week"
+                        : range === "M"
+                          ? "this month"
+                          : range === "6M"
+                            ? "the last 6 months"
+                            : "this year"
+                }`}
+                onPress={() => handleTimeRangeChange(range)}
+                variant="secondary"
+                style={{
+                  flex: 1,
+                  paddingVertical: 7,
+                  paddingHorizontal: 0,
+                  borderRadius: 7,
+                  backgroundColor:
+                    timeRange === range ? "#FFFFFF" : "transparent",
+                  minHeight: touchTargetSize,
+                  minWidth: 0,
+                }}
+              >
+                <ThemedText
+                  style={[
+                    styles.timeRangeText,
+                    timeRange === range && styles.timeRangeTextActive,
+                  ]}
+                >
+                  {range}
+                </ThemedText>
+              </AccessibleButton>
+            ))}
+          </View>
+
+          <View
+            style={styles.rangeBlock}
+            accessible={true}
+            accessibilityRole="summary"
+            accessibilityLabel={
+              isSleepMetric && sleepBreakdown
+                ? `${timeRange === "D" ? "Time asleep" : "Average time asleep"}: ${formatSleepDuration(sleepBreakdown.totalSleep)}. ${rangeSubtitle}.`
+                : min != null && max != null
+                  ? `Range: ${Math.round(min)} to ${Math.round(max)} ${latest?.unit ?? ""}. ${rangeSubtitle}.`
+                  : `No data available for ${rangeSubtitle}`
+            }
+          >
             <ThemedText style={styles.rangeLabel}>
               {isSleepMetric
                 ? timeRange === "D"
@@ -486,85 +872,33 @@ export default function MetricDetailScreen() {
               Latest: {latest ? formatTime(latest.timestamp) : "—"}
             </ThemedText>
             <ThemedText style={styles.latestRight}>
-              {latest
-                ? isSleepMetric
-                  ? `${formatSleepDuration(Number(latest.value))} ${latest.metadata?.sleepStage || ""}`
-                  : `${latest.value} ${latest.unit ?? ""}`
-                : "—"}
+              {latest ? `${latest.value} ${latest.unit ?? ""}` : "—"}
             </ThemedText>
           </View>
 
-          <TouchableOpacity
+          <AccessibleButton
+            label={`Show more ${title} data`}
+            hint={`View additional ${title} metrics and details`}
             onPress={() =>
               router.push({
                 pathname: "/metric/[type]",
                 params: { type: metricType },
               })
             }
-            accessibilityRole="button"
-            accessibilityLabel={`Show more ${title} data`}
-            style={styles.moreButton}
+            variant="secondary"
+            style={{
+              ...styles.moreButton,
+              minHeight: touchTargetSize,
+            }}
           >
             <ThemedText style={styles.moreText}>
               Show More {title} Data
             </ThemedText>
-          </TouchableOpacity>
+          </AccessibleButton>
 
           <View style={styles.highlightsHeader}>
             <ThemedText style={styles.highlightsTitle}>Highlights</ThemedText>
           </View>
-
-          {isSleepMetric && data.length > 0 && (
-            <View style={styles.highlightCard}>
-              <ThemedText style={styles.highlightTitle}>
-                Sleep Analysis ({rangeSubtitle})
-              </ThemedText>
-              <SleepStageBreakdown sleepMetrics={data} />
-            </View>
-          )}
-
-          {keyStats && !isSleepMetric && (
-            <View style={styles.highlightCard}>
-              <ThemedText style={styles.highlightTitle}>
-                {title} Stats ({rangeSubtitle})
-              </ThemedText>
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <ThemedText style={styles.statLabel}>Average</ThemedText>
-                  <ThemedText style={styles.statValue}>
-                    {keyStats.avg} {keyStats.unit}
-                  </ThemedText>
-                </View>
-                {keyStats.outlierCount > 0 && (
-                  <View style={styles.statItem}>
-                    <ThemedText style={styles.statLabel}>Outliers</ThemedText>
-                    <ThemedText style={styles.statValue}>
-                      {keyStats.outlierCount} spike
-                      {keyStats.outlierCount > 1 ? "s" : ""}
-                    </ThemedText>
-                  </View>
-                )}
-                {keyStats.dangerCount > 0 && (
-                  <View style={styles.statItem}>
-                    <ThemedText style={styles.statLabel}>
-                      High Readings
-                    </ThemedText>
-                    <ThemedText style={[styles.statValue, styles.dangerText]}>
-                      {keyStats.dangerCount}
-                    </ThemedText>
-                  </View>
-                )}
-                {keyStats.warningCount > 0 && (
-                  <View style={styles.statItem}>
-                    <ThemedText style={styles.statLabel}>Elevated</ThemedText>
-                    <ThemedText style={[styles.statValue, styles.warningText]}>
-                      {keyStats.warningCount}
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
 
           {data.length > 0 && (
             <View style={styles.highlightCard}>
@@ -664,7 +998,7 @@ const styles = StyleSheet.create({
   timeRangeText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#6B7280",
+    color: "#000000ff",
   },
   timeRangeTextActive: {
     color: "#111827",
@@ -726,7 +1060,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   moreText: {
-    color: "#007AFF",
+    paddingTop: 4,
+    color: "#000000ff",
     fontWeight: "600",
     fontSize: 16,
   },
@@ -740,6 +1075,7 @@ const styles = StyleSheet.create({
   highlightsTitle: {
     fontSize: 28,
     fontWeight: "800",
+    padding: 6,
   },
 
   highlightCard: {
@@ -791,4 +1127,75 @@ const styles = StyleSheet.create({
   },
   dangerText: { color: "#FF3B30" },
   warningText: { color: "#FF9500" },
+  sleepHeroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(60,60,67,0.10)",
+  },
+
+  sleepHeroRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  sleepHeroLabel: {
+    fontSize: 12,
+    color: "#8E8E93",
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+
+  sleepHeroValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111111",
+  },
+
+  sleepHeroDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(60,60,67,0.12)",
+  },
+
+  aiPlaceholderCard: {
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: "rgba(118,118,128,0.08)",
+    gap: 4,
+  },
+
+  aiPlaceholderText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111111",
+  },
+
+  aiPlaceholderSubtext: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
+  },
+
+  chartPlaceholder: {
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: "rgba(118,118,128,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+
+  chartPlaceholderText: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+  },
+
+  emptyStateText: {
+    fontSize: 14,
+    color: "#8E8E93",
+  },
 });

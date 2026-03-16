@@ -7,9 +7,7 @@
 
 import { DataRange } from "./index";
 
-// ============================================================================
 // Health Metric Types
-// ============================================================================
 
 /**
  * Categories of health metrics
@@ -131,9 +129,7 @@ export function classifyRange(
   }
 }
 
-// ============================================================================
 // Migration Functions
-// ============================================================================
 
 /**
  * Organize an array of HealthMetrics into categorized structure

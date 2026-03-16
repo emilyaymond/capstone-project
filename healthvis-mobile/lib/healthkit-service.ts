@@ -1687,8 +1687,10 @@ export const healthKitService: HealthKitService = {
       const healthKitOptions = {
         startDate: options.startDate.toISOString(),
         endDate: options.endDate.toISOString(),
-        limit: options.limit,
+        limit: options.limit || 10000, // Use provided limit or default to 10000
       };
+
+      console.log(`🛌 Fetching sleep with limit: ${healthKitOptions.limit}`);
 
       AppleHealthKit.getSleepSamples(
         healthKitOptions,
@@ -1704,10 +1706,22 @@ export const healthKitService: HealthKitService = {
             return;
           }
 
+          // Log raw sleep samples from HealthKit for debugging
+          console.log(`📊 HealthKit returned ${results.length} sleep samples`);
+
           // Convert sleep samples to HealthMetric format
           // Sleep samples are categorical (INBED, ASLEEP, ASLEEP_CORE, ASLEEP_DEEP, ASLEEP_REM, AWAKE)
           // We need to calculate duration from startDate and endDate
-          const metrics = results.map((sample) => {
+          const metrics = results.map((sample, index) => {
+            // Log first 20 samples for debugging
+            if (index < 20) {
+              console.log(`Sleep sample ${index}:`, {
+                startDate: sample.startDate,
+                endDate: sample.endDate,
+                value: sample.value,
+                sleepStage: sample.sleepStage,
+              });
+            }
             // Calculate duration in hours from startDate to endDate
             const start = new Date(sample.startDate);
             const end = new Date(sample.endDate);
@@ -1748,6 +1762,9 @@ export const healthKitService: HealthKitService = {
             return convertHealthKitSample(healthValue, "sleep");
           });
 
+          console.log(
+            `✅ Converted ${metrics.length} sleep samples to HealthMetrics`,
+          );
           resolve(metrics);
         },
       );

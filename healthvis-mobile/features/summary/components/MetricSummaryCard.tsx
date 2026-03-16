@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { HealthMetric } from "@/types/health-metric";
+import { aggregateSleepByStage, formatSleepDuration } from "@/lib/sleep-utils";
+import { getHours } from "@/features/summary/SummaryScreen";
 
 type Props = {
   metric: HealthMetric;
@@ -12,6 +14,7 @@ type Props = {
 
 export function MetricSummaryCard({ metric, title, subtitle }: Props) {
   const router = useRouter();
+  const totalSleep = formatSleepDuration(getHours());
 
   return (
     <Pressable
@@ -22,7 +25,7 @@ export function MetricSummaryCard({ metric, title, subtitle }: Props) {
         })
       }
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${metric.value} ${metric.unit ?? ""}. Opens details.`}
+      accessibilityLabel={`${title}. ${totalSleep ?? ""}. Opens details.`}
       style={styles.card}
     >
       <View style={styles.headerRow}>
@@ -31,8 +34,10 @@ export function MetricSummaryCard({ metric, title, subtitle }: Props) {
       </View>
 
       <View style={styles.valueRow}>
-        <ThemedText style={styles.value}>{String(metric.value)}</ThemedText>
-        {!!metric.unit && (
+        <ThemedText style={styles.value}>
+          {metric.type === "sleep" ? String(totalSleep) : String(metric.value)}
+        </ThemedText>
+        {!!metric.unit && metric.type !== "sleep" && (
           <ThemedText style={styles.unit}>{metric.unit}</ThemedText>
         )}
       </View>

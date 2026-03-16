@@ -49,13 +49,6 @@ export function aggregateSleepByStage(
         ? metric.metadata.durationMinutes / 60
         : Number(metric.value);
 
-    console.log("sleep metric", {
-      id: metric.id,
-      timestamp: metric.timestamp,
-      value: metric.value,
-      durationMinutes: metric.metadata?.durationMinutes,
-      stage: metric.metadata?.sleepStage,
-    });
     const stage =
       metric.metadata?.sleepStage || metric.metadata?.rawSleepStage || "Asleep";
 

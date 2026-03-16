@@ -1,20 +1,28 @@
 /**
  * AccessibilityContext
- * 
+ *
  * Manages accessibility mode and user preferences for the HealthVis application.
  * Provides mode validation, settings validation, and persistence integration.
- * 
+ *
  * Requirements: 1.2, 1.3, 2.4, 2.5
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AccessibilityMode, AccessibilitySettings } from '../types';
-import { useStorage } from '../hooks/useStorage';
-import { announceModeChange, announceSettingsChange, announceError } from '../lib/announcer';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { AccessibilityMode, AccessibilitySettings } from "../types";
+import { useStorage } from "../hooks/useStorage";
+import {
+  announceModeChange,
+  announceSettingsChange,
+  announceError,
+} from "../lib/announcer";
 
-// ============================================================================
 // Context Value Interface
-// ============================================================================
 
 export interface AccessibilityContextValue {
   mode: AccessibilityMode;
@@ -26,95 +34,98 @@ export interface AccessibilityContextValue {
   clearError: () => void;
 }
 
-// ============================================================================
 // Default Values
-// ============================================================================
 
-const DEFAULT_MODE: AccessibilityMode = 'visual';
+const DEFAULT_MODE: AccessibilityMode = "visual";
 
 const DEFAULT_SETTINGS: AccessibilitySettings = {
-  fontSize: 'medium',
-  contrast: 'normal',
+  fontSize: "medium",
+  contrast: "normal",
   audioEnabled: true,
   hapticsEnabled: true,
 };
 
-// ============================================================================
 // Validation Functions
-// ============================================================================
 
 /**
  * Validates if a given string is a valid AccessibilityMode
  */
 function isValidMode(mode: any): mode is AccessibilityMode {
-  return ['visual', 'audio', 'hybrid', 'simplified'].includes(mode);
+  return ["visual", "audio", "hybrid", "simplified"].includes(mode);
 }
 
 /**
  * Validates if a given value is a valid font size
  */
-function isValidFontSize(size: any): size is 'small' | 'medium' | 'large' {
-  return ['small', 'medium', 'large'].includes(size);
+function isValidFontSize(size: any): size is "small" | "medium" | "large" {
+  return ["small", "medium", "large"].includes(size);
 }
 
 /**
  * Validates if a given value is a valid contrast level
  */
-function isValidContrast(contrast: any): contrast is 'normal' | 'high' {
-  return ['normal', 'high'].includes(contrast);
+function isValidContrast(contrast: any): contrast is "normal" | "high" {
+  return ["normal", "high"].includes(contrast);
 }
 
 /**
  * Validates and sanitizes accessibility settings
  * Invalid values are replaced with defaults
  */
-function validateSettings(settings: Partial<AccessibilitySettings>): AccessibilitySettings {
+function validateSettings(
+  settings: Partial<AccessibilitySettings>,
+): AccessibilitySettings {
   return {
-    fontSize: isValidFontSize(settings.fontSize) ? settings.fontSize : DEFAULT_SETTINGS.fontSize,
-    contrast: isValidContrast(settings.contrast) ? settings.contrast : DEFAULT_SETTINGS.contrast,
-    audioEnabled: typeof settings.audioEnabled === 'boolean' ? settings.audioEnabled : DEFAULT_SETTINGS.audioEnabled,
-    hapticsEnabled: typeof settings.hapticsEnabled === 'boolean' ? settings.hapticsEnabled : DEFAULT_SETTINGS.hapticsEnabled,
+    fontSize: isValidFontSize(settings.fontSize)
+      ? settings.fontSize
+      : DEFAULT_SETTINGS.fontSize,
+    contrast: isValidContrast(settings.contrast)
+      ? settings.contrast
+      : DEFAULT_SETTINGS.contrast,
+    audioEnabled:
+      typeof settings.audioEnabled === "boolean"
+        ? settings.audioEnabled
+        : DEFAULT_SETTINGS.audioEnabled,
+    hapticsEnabled:
+      typeof settings.hapticsEnabled === "boolean"
+        ? settings.hapticsEnabled
+        : DEFAULT_SETTINGS.hapticsEnabled,
   };
 }
 
-// ============================================================================
 // Context Creation
-// ============================================================================
 
-const AccessibilityContext = createContext<AccessibilityContextValue | undefined>(undefined);
+const AccessibilityContext = createContext<
+  AccessibilityContextValue | undefined
+>(undefined);
 
-// ============================================================================
 // Provider Props
-// ============================================================================
 
 interface AccessibilityProviderProps {
   children: ReactNode;
 }
 
-// ============================================================================
 // Provider Component
-// ============================================================================
 
-export function AccessibilityProvider({ children }: AccessibilityProviderProps) {
+export function AccessibilityProvider({
+  children,
+}: AccessibilityProviderProps) {
   const [mode, setModeState] = useState<AccessibilityMode>(DEFAULT_MODE);
-  const [settings, setSettingsState] = useState<AccessibilitySettings>(DEFAULT_SETTINGS);
+  const [settings, setSettingsState] =
+    useState<AccessibilitySettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
   // Initialize storage hook
   const storage = useStorage();
 
-  // ============================================================================
   // Load Settings on Mount
-  // ============================================================================
 
   useEffect(() => {
     loadSettingsFromStorage();
   }, []);
 
-  // ============================================================================
   // Load Settings Function
-  // ============================================================================
 
   async function loadSettingsFromStorage() {
     try {
@@ -123,13 +134,14 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
 
       // Check if storage is available
       if (!storage.isAvailable) {
-        console.warn('AsyncStorage is not available, using default settings');
+        console.warn("AsyncStorage is not available, using default settings");
         setIsLoading(false);
         return;
       }
 
       // Load settings using the storage hook
-      const { mode: savedMode, settings: savedSettings } = await storage.loadSettings();
+      const { mode: savedMode, settings: savedSettings } =
+        await storage.loadSettings();
 
       // Load and validate mode
       if (savedMode && isValidMode(savedMode)) {
@@ -142,38 +154,40 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
         setSettingsState(validatedSettings);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err : new Error('Failed to load settings');
+      const errorMessage =
+        err instanceof Error ? err : new Error("Failed to load settings");
       setError(errorMessage);
-      console.error('Error loading accessibility settings:', errorMessage);
+      console.error("Error loading accessibility settings:", errorMessage);
       // Continue with defaults
     } finally {
       setIsLoading(false);
     }
   }
 
-  // ============================================================================
   // Save Settings Function
-  // ============================================================================
 
-  async function saveSettingsToStorage(newMode: AccessibilityMode, newSettings: AccessibilitySettings) {
+  async function saveSettingsToStorage(
+    newMode: AccessibilityMode,
+    newSettings: AccessibilitySettings,
+  ) {
     try {
       // Check if storage is available
       if (!storage.isAvailable) {
-        console.warn('AsyncStorage is not available, settings will not persist');
+        console.warn(
+          "AsyncStorage is not available, settings will not persist",
+        );
         return;
       }
 
       // Save settings using the storage hook (with 100ms debounce)
       await storage.saveSettings(newMode, newSettings);
     } catch (err) {
-      console.error('Error saving accessibility settings:', err);
+      console.error("Error saving accessibility settings:", err);
       // Don't throw - settings are still applied in memory
     }
   }
 
-  // ============================================================================
   // Set Mode Function with Validation
-  // ============================================================================
 
   const setMode = (newMode: AccessibilityMode) => {
     try {
@@ -194,16 +208,15 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       // Clear any previous errors
       setError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err : new Error('Failed to set mode');
+      const errorMessage =
+        err instanceof Error ? err : new Error("Failed to set mode");
       setError(errorMessage);
-      announceError('Failed to change accessibility mode');
-      console.error('Error setting accessibility mode:', errorMessage);
+      announceError("Failed to change accessibility mode");
+      console.error("Error setting accessibility mode:", errorMessage);
     }
   };
 
-  // ============================================================================
   // Update Settings Function with Validation
-  // ============================================================================
 
   const updateSettings = (partialSettings: Partial<AccessibilitySettings>) => {
     try {
@@ -222,7 +235,10 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       // Announce each setting change to screen readers
       Object.entries(partialSettings).forEach(([key, value]) => {
         if (value !== undefined) {
-          const settingName = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+          const settingName = key
+            .replace(/([A-Z])/g, " $1")
+            .toLowerCase()
+            .trim();
           announceSettingsChange(settingName, value);
         }
       });
@@ -233,24 +249,21 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
       // Clear any previous errors
       setError(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err : new Error('Failed to update settings');
+      const errorMessage =
+        err instanceof Error ? err : new Error("Failed to update settings");
       setError(errorMessage);
-      announceError('Failed to update settings');
-      console.error('Error updating accessibility settings:', errorMessage);
+      announceError("Failed to update settings");
+      console.error("Error updating accessibility settings:", errorMessage);
     }
   };
 
-  // ============================================================================
   // Clear Error Function
-  // ============================================================================
 
   const clearError = () => {
     setError(null);
   };
 
-  // ============================================================================
   // Context Value
-  // ============================================================================
 
   const value: AccessibilityContextValue = {
     mode,
@@ -269,9 +282,7 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
   );
 }
 
-// ============================================================================
 // Custom Hook
-// ============================================================================
 
 /**
  * Hook to access the AccessibilityContext
@@ -279,10 +290,12 @@ export function AccessibilityProvider({ children }: AccessibilityProviderProps) 
  */
 export function useAccessibility(): AccessibilityContextValue {
   const context = useContext(AccessibilityContext);
-  
+
   if (context === undefined) {
-    throw new Error('useAccessibility must be used within an AccessibilityProvider');
+    throw new Error(
+      "useAccessibility must be used within an AccessibilityProvider",
+    );
   }
-  
+
   return context;
 }
