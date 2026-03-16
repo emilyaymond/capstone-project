@@ -362,11 +362,27 @@ export function SleepChart({
   return null;
 }
 
+const LEGEND_COLOR_NAMES: Record<StageKey, string> = {
+  awake: "orange",
+  rem: "light blue",
+  core: "blue",
+  deep: "purple",
+};
+
 function Legend() {
   return (
-    <View style={styles.legendRow}>
+    <View
+      style={styles.legendRow}
+      accessible={true}
+      accessibilityLabel={`Sleep stage legend: Deep sleep is purple, Core sleep is blue, REM sleep is light blue, Awake is orange`}
+    >
       {STAGE_ORDER.map((stage) => (
-        <View key={stage} style={styles.legendItem}>
+        <View
+          key={stage}
+          style={styles.legendItem}
+          accessible={true}
+          accessibilityLabel={`${STAGE_LABELS[stage]}: ${LEGEND_COLOR_NAMES[stage]}`}
+        >
           <View
             style={[styles.legendDot, { backgroundColor: COLORS[stage] }]}
           />

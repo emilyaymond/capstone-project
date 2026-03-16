@@ -217,7 +217,7 @@ function SummaryMetricCard({
           </ThemedText>
         </View>
 
-        <ThemedText style={[styles.metricValue]}>{card.valueText}</ThemedText>
+        <ThemedText style={[styles.metricValue, { fontSize: fontSize.body + 26 }]}>{card.valueText}</ThemedText>
 
         <ThemedText
           style={[styles.metricSubtitle, { fontSize: fontSize.body - 1 }]}
@@ -489,7 +489,10 @@ export default function SummaryScreen() {
             accessibilityLabel="Summary screen"
           >
             <View style={styles.header}>
-              <ThemedText style={[styles.largeTitle, { fontSize: 40 }]}>
+              <ThemedText
+                style={[styles.largeTitle, { fontSize: fontSize.body + 22 }]}
+                accessibilityRole="header"
+              >
                 Summary
               </ThemedText>
               <ThemedText

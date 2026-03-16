@@ -43,12 +43,16 @@ import {
   PermissionStatus,
   FetchOptions,
 } from "../lib/healthkit-service";
+import { buildMockHealthData, MOCK_PERMISSIONS } from "../lib/mock-data";
 import {
   getMetricAggregation,
   getMetricChartKind,
   MetricChartKind,
   MetricAggregation,
 } from "@/app/metric/metricConfig";
+
+// Set to true to always use mock data (useful for simulator / demo mode)
+const USE_MOCK_DATA = false;
 
 // ============================================================================
 // Storage Keys
@@ -326,6 +330,20 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
       setIsLoading(true);
       setError(null);
 
+      // ── Demo / simulator fallback ───────────────────────────────────────────
+      if (USE_MOCK_DATA) {
+        console.log("🎭 Using mock health data (demo mode)");
+        await new Promise((r) => setTimeout(r, 600)); // realistic loading feel
+        const mockData = buildMockHealthData();
+        setHealthMetrics(mockData);
+        setPermissions(MOCK_PERMISSIONS as any);
+        setIsInitialized(true);
+        setIsLoading(false);
+        announceHealthKitFetch(undefined, Object.values(mockData).flat().length);
+        haptics.triggerLight();
+        return;
+      }
+
       // Initialize HealthKit if not already initialized
       if (!isInitialized) {
         console.log("Initializing HealthKit...");
@@ -358,7 +376,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
           }
         } catch (initError) {
           console.error("HealthKit initialization failed:", initError);
-          // Continue with cached data if available
+          // Try cache first, then fall back to mock data for simulator/demo
           const cachedMetrics = await loadHealthMetricsFromCache();
           if (
             cachedMetrics &&
@@ -367,8 +385,13 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
             setHealthMetrics(cachedMetrics);
             announceSuccess("Using cached health data");
           } else {
-            throw initError; // Re-throw if no cached data available
+            console.log("🎭 HealthKit unavailable — loading demo data");
+            const mockData = buildMockHealthData();
+            setHealthMetrics(mockData);
+            setPermissions(MOCK_PERMISSIONS as any);
+            announceSuccess("Loaded demo health data");
           }
+          setIsInitialized(true);
           setIsLoading(false);
           return;
         }

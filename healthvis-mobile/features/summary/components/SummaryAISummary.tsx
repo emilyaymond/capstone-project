@@ -48,6 +48,9 @@ export function SummaryAISummary({
 
   const fallback = useMemo(() => buildFallback(cards), [cards]);
 
+  // Stable key: only regenerate when the actual values change, not on every reference change
+  const cardsKey = cards.map((c) => `${c.type}:${c.valueText}`).join("|");
+
   useEffect(() => {
     if (!cards.length) {
       setSummary("");
@@ -55,7 +58,8 @@ export function SummaryAISummary({
     }
 
     generateSummary();
-  }, [JSON.stringify(cards), allMetrics.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardsKey, allMetrics.length]);
 
   const generateSummary = async () => {
     setLoading(true);

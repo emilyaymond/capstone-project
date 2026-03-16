@@ -674,40 +674,20 @@ export default function MetricDetailScreen() {
             </View>
           </View>
 
-          <View style={styles.highlightCard}>
-            <ThemedText style={styles.highlightTitle}>
-              AI Sleep Summary
-            </ThemedText>
-            <View style={styles.aiPlaceholderCard}>
-              <ThemedText style={styles.aiPlaceholderText}>
-                AI summary placeholder:
+          {data.length > 0 && (
+            <View style={styles.highlightCard}>
+              <ThemedText style={styles.highlightTitle}>
+                AI Sleep Summary
               </ThemedText>
-              <ThemedText style={styles.aiPlaceholderSubtext}>
-                Add bedtime consistency, wake trend, sleep debt, recovery score,
-                and suggested patterns here.
-              </ThemedText>
+              <AISummary
+                data={data}
+                metricName="Sleep"
+                timeRange={timeRange}
+                min={min}
+                max={max}
+              />
             </View>
-            {/* Later you can replace this block with:
-      <AISummary
-        data={data}
-        metricName="Sleep"
-        timeRange={timeRange}
-        min={min}
-        max={max}
-      />
-      */}
-          </View>
-
-          <View style={styles.highlightCard}>
-            <ThemedText style={styles.highlightTitle}>
-              Weekly / Monthly Trend
-            </ThemedText>
-            <View style={styles.chartPlaceholder}>
-              <ThemedText style={styles.chartPlaceholderText}>
-                Placeholder for nightly sleep duration trend chart
-              </ThemedText>
-            </View>
-          </View>
+          )}
 
           <View style={styles.timeSlicesList}>
             <ThemedText style={styles.listHeader}>Sleep Segments</ThemedText>
@@ -877,15 +857,15 @@ export default function MetricDetailScreen() {
           </View>
 
           <TouchableOpacity
-            label={`Show more ${title} data`}
-            hint={`View additional ${title} metrics and details`}
+            accessibilityRole="button"
+            accessibilityLabel={`Show more ${title} data`}
+            accessibilityHint={`View additional ${title} metrics and details`}
             onPress={() =>
               router.push({
                 pathname: "/metric/[type]",
                 params: { type: metricType },
               })
             }
-            variant="secondary"
             style={{
               ...styles.moreButton,
               minHeight: touchTargetSize,

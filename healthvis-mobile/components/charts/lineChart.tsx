@@ -67,11 +67,11 @@ const getColorForRange = (
     // Normal contrast colors
     switch (range) {
       case 'normal':
-        return '#ff0d00ff'; 
+        return '#007AFF'; // iOS blue
       case 'warning':
-        return '#b70b0bff'; 
+        return '#FF9500'; // iOS orange
       case 'danger':
-        return '#8B0000'; 
+        return '#FF3B30'; // iOS red
     }
   }
 };
