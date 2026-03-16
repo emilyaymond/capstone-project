@@ -203,6 +203,79 @@ function buildSleep(): HealthMetric[] {
   return out;
 }
 
+// ─── missing vitals ─────────────────────────────────────────────────────────
+
+function buildBloodPressure(): HealthMetric[] {
+  const out: HealthMetric[] = [];
+  for (let day = 29; day >= 0; day--) {
+    [8, 14, 20].forEach((hour) => {
+      // Natural variation; slightly elevated some days
+      const systolic = Math.round(112 + (Math.random() - 0.5) * 18);
+      const diastolic = Math.round(74 + (Math.random() - 0.5) * 12);
+      const ts = daysAgo(day, hour, Math.floor(Math.random() * 30));
+      out.push(metric("blood_pressure_systolic", "vitals", systolic, "mmHg", ts));
+      out.push(metric("blood_pressure_diastolic", "vitals", diastolic, "mmHg", ts));
+    });
+  }
+  return out;
+}
+
+function buildBodyTemperature(): HealthMetric[] {
+  const out: HealthMetric[] = [];
+  for (let day = 29; day >= 0; day--) {
+    [7, 16].forEach((hour) => {
+      // Normal body temp 97-99°F with morning dip
+      const base = hour < 12 ? 97.8 : 98.4;
+      const val = Math.round((base + (Math.random() - 0.5) * 0.8) * 10) / 10;
+      out.push(metric("body_temperature", "vitals", val, "°F", daysAgo(day, hour)));
+    });
+  }
+  return out;
+}
+
+function buildBloodGlucose(): HealthMetric[] {
+  const out: HealthMetric[] = [];
+  for (let day = 29; day >= 0; day--) {
+    // Fasting (morning), post-meal (1h after meals)
+    [7, 9, 13, 19].forEach((hour) => {
+      const isFasting = hour === 7;
+      const base = isFasting ? 90 : 110;
+      const val = Math.round(base + (Math.random() - 0.5) * 20);
+      out.push(metric("blood_glucose", "vitals", Math.max(70, Math.min(160, val)), "mg/dL", daysAgo(day, hour)));
+    });
+  }
+  return out;
+}
+
+// ─── missing activity ─────────────────────────────────────────────────────────
+
+function buildDistance(): HealthMetric[] {
+  const out: HealthMetric[] = [];
+  for (let day = 29; day >= 0; day--) {
+    // Daily distance 1.5–5 miles, logged once at end of day
+    const val = Math.round((1.5 + Math.random() * 3.5) * 100) / 100;
+    out.push(metric("distance", "activity", val, "mi", daysAgo(day, 20)));
+  }
+  return out;
+}
+
+// ─── missing body ─────────────────────────────────────────────────────────────
+
+function buildHeight(): HealthMetric[] {
+  // Height is static — one reading, in inches (5'9" = 69in)
+  return [metric("height", "body", 69, "in", daysAgo(90, 9))];
+}
+
+function buildBMI(): HealthMetric[] {
+  const out: HealthMetric[] = [];
+  // BMI calculated from weight (~165 lbs, 69 in height → ~24.4)
+  for (let day = 29; day >= 0; day -= 7) {
+    const val = Math.round((23.8 + (Math.random() - 0.5) * 0.6) * 10) / 10;
+    out.push(metric("bmi", "body", val, "kg/m²", daysAgo(day, 8)));
+  }
+  return out;
+}
+
 // ─── mindfulness ─────────────────────────────────────────────────────────────
 
 function buildMindfulness(): HealthMetric[] {
@@ -236,14 +309,18 @@ export function buildMockHealthData(): CategorizedHealthData {
       ...buildHeartRate(),
       ...buildRespiratoryRate(),
       ...buildOxygenSaturation(),
+      ...buildBloodPressure(),
+      ...buildBodyTemperature(),
+      ...buildBloodGlucose(),
     ],
     activity: [
       ...buildSteps(),
       ...buildActiveEnergy(),
       ...buildExerciseMinutes(),
       ...buildFlightsClimbed(),
+      ...buildDistance(),
     ],
-    body: [...buildWeight(), ...buildBodyFat()],
+    body: [...buildWeight(), ...buildBodyFat(), ...buildHeight(), ...buildBMI()],
     nutrition: buildNutrition(),
     sleep: buildSleep(),
     mindfulness: buildMindfulness(),
