@@ -1,17 +1,23 @@
 /**
  * LoadingIndicator Component
- * 
+ *
  * Reusable loading indicator with accessibility support.
  * Announces loading state to screen readers and provides visual feedback.
  * Includes timeout handling for long-running operations.
- * 
+ *
  * Requirements: 16.2
  */
 
-import React, { useEffect, useRef } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet, ViewStyle } from 'react-native';
-import { useAccessibility } from '../contexts/AccessibilityContext';
-import { announceLoading } from '../lib/announcer';
+import React, { useEffect, useRef } from "react";
+import {
+  View,
+  ActivityIndicator,
+  Text,
+  StyleSheet,
+  ViewStyle,
+} from "react-native";
+import { useAccessibility } from "../contexts/AccessibilityContext";
+import { announceLoading } from "../lib/announcer";
 
 // ============================================================================
 // Component Props
@@ -21,7 +27,7 @@ export interface LoadingIndicatorProps {
   /** Loading message to display and announce */
   message?: string;
   /** Size of the activity indicator */
-  size?: 'small' | 'large';
+  size?: "small" | "large";
   /** Custom color for the indicator */
   color?: string;
   /** Whether to show the text message */
@@ -40,8 +46,8 @@ export interface LoadingIndicatorProps {
 // Default Values
 // ============================================================================
 
-const DEFAULT_MESSAGE = 'Loading';
-const DEFAULT_SIZE = 'large';
+const DEFAULT_MESSAGE = "Loading";
+const DEFAULT_SIZE = "large";
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
 // ============================================================================
@@ -62,22 +68,22 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAnnouncedRef = useRef(false);
 
-  // ============================================================================
   // Determine Colors Based on Settings
-  // ============================================================================
 
-  const indicatorColor = color || (settings.contrast === 'high' ? '#000000' : '#007AFF');
-  const textColor = settings.contrast === 'high' ? '#000000' : '#666666';
+  const indicatorColor =
+    color || (settings.contrast === "high" ? "#000000" : "#007AFF");
+  const textColor = settings.contrast === "high" ? "#000000" : "#666666";
 
-  // ============================================================================
   // Determine Font Size Based on Settings
-  // ============================================================================
 
-  const fontSize = settings.fontSize === 'small' ? 14 : settings.fontSize === 'large' ? 20 : 16;
+  const fontSize =
+    settings.fontSize === "small"
+      ? 14
+      : settings.fontSize === "large"
+        ? 20
+        : 16;
 
-  // ============================================================================
   // Announce Loading State on Mount
-  // ============================================================================
 
   useEffect(() => {
     // Announce loading state to screen readers (only once)
@@ -102,16 +108,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     };
   }, [message, timeout, onTimeout]);
 
-  // ============================================================================
   // Render
-  // ============================================================================
 
   return (
     <View
-      style={[
-        centered ? styles.centeredContainer : styles.container,
-        style,
-      ]}
+      style={[centered ? styles.centeredContainer : styles.container, style]}
       accessible={true}
       accessibilityLabel={message}
       accessibilityRole="progressbar"
@@ -124,12 +125,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         testID="loading-indicator"
       />
       {showMessage && (
-        <Text
-          style={[
-            styles.message,
-            { color: textColor, fontSize },
-          ]}
-        >
+        <Text style={[styles.message, { color: textColor, fontSize }]}>
           {message}
         </Text>
       )}
@@ -143,19 +139,19 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'column',
-    alignItems: 'center',
+    flexDirection: "column",
+    alignItems: "center",
     padding: 16,
   },
   centeredContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 16,
   },
   message: {
     marginTop: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 

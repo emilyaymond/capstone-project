@@ -745,9 +745,7 @@ export const healthKitService: HealthKitService = {
     }
   },
 
-  // ============================================================================
   // Helper: Fetch with Error Handling and Retry
-  // ============================================================================
 
   /**
    * Wrap a HealthKit fetch operation with error handling and retry logic

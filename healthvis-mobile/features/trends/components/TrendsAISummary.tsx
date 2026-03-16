@@ -39,14 +39,20 @@ type Props = {
 
 // ── fallback (no API key) ────────────────────────────────────────────────────
 
-function buildFallback(series: SeriesSummary[], timeRange: TimeRangeKey): string {
-  if (!series.length) return "Select metrics above to see a comparative trend summary.";
+function buildFallback(
+  series: SeriesSummary[],
+  timeRange: TimeRangeKey,
+): string {
+  if (!series.length)
+    return "Select metrics above to see a comparative trend summary.";
 
   const period = rangeLabel(timeRange);
   const lines = series.map(
     (s) =>
       `${s.label} ranged from ${Math.round(s.min)} to ${Math.round(s.max)} ${s.unit} with an average of ${s.avg.toFixed(1)} ${s.unit}` +
-      (s.outlierCount > 0 ? `, including ${s.outlierCount} outlier${s.outlierCount > 1 ? "s" : ""}` : "")
+      (s.outlierCount > 0
+        ? `, including ${s.outlierCount} outlier${s.outlierCount > 1 ? "s" : ""}`
+        : ""),
   );
 
   return `Here is your trend comparison for ${period}. ${lines.join(". ")}.`;
@@ -63,7 +69,10 @@ export default function TrendsAISummary({ timeRange, series }: Props) {
   const [isReading, setIsReading] = useState(false);
   const [error, setError] = useState("");
 
-  const fallback = useMemo(() => buildFallback(series, timeRange), [series, timeRange]);
+  const fallback = useMemo(
+    () => buildFallback(series, timeRange),
+    [series, timeRange],
+  );
 
   // Stable key to avoid regenerating on unrelated re-renders
   const seriesKey = series.map((s) => `${s.key}:${s.avg.toFixed(1)}`).join("|");
@@ -97,7 +106,7 @@ export default function TrendsAISummary({ timeRange, series }: Props) {
       const metricLines = series
         .map(
           (s) =>
-            `- ${s.label}: range ${Math.round(s.min)}–${Math.round(s.max)} ${s.unit}, avg ${s.avg.toFixed(1)} ${s.unit}, ${s.count} readings, ${s.outlierCount} outlier(s)`
+            `- ${s.label}: range ${Math.round(s.min)}–${Math.round(s.max)} ${s.unit}, avg ${s.avg.toFixed(1)} ${s.unit}, ${s.count} readings, ${s.outlierCount} outlier(s)`,
         )
         .join("\n");
 
@@ -119,28 +128,32 @@ Write:
 
 Return only the summary text. No headers.`;
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 200,
+            temperature: 0.5,
+          }),
         },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 200,
-          temperature: 0.5,
-        }),
-      });
+      );
 
       if (!response.ok) throw new Error(`OpenAI error: ${response.status}`);
 
       const result = await response.json();
-      const content = result?.choices?.[0]?.message?.content?.trim() || fallback;
+      const content =
+        result?.choices?.[0]?.message?.content?.trim() || fallback;
       setSummary(content);
     } catch (err) {
       console.error("TrendsAISummary error:", err);
-      setError("Could not generate AI summary right now.");
+      // Use fallback silently - don't show error to user since fallback works fine
       setSummary(fallback);
     } finally {
       setLoading(false);
@@ -180,7 +193,9 @@ Return only the summary text. No headers.`;
           AI Trend Summary
         </ThemedText>
         <View style={styles.badge}>
-          <ThemedText style={[styles.badgeText, { fontSize: fontSize.label - 1 }]}>
+          <ThemedText
+            style={[styles.badgeText, { fontSize: fontSize.label - 1 }]}
+          >
             Assistive
           </ThemedText>
         </View>
@@ -189,12 +204,19 @@ Return only the summary text. No headers.`;
       {loading ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color="#0A84FF" />
-          <ThemedText style={[styles.loadingText, { fontSize: fontSize.label }]}>
+          <ThemedText
+            style={[styles.loadingText, { fontSize: fontSize.label }]}
+          >
             Analyzing trends...
           </ThemedText>
         </View>
       ) : (
-        <ThemedText style={[styles.bodyText, { fontSize: fontSize.body, lineHeight: fontSize.body * 1.6 }]}>
+        <ThemedText
+          style={[
+            styles.bodyText,
+            { fontSize: fontSize.body, lineHeight: fontSize.body * 1.6 },
+          ]}
+        >
           {displayText}
         </ThemedText>
       )}
@@ -202,7 +224,11 @@ Return only the summary text. No headers.`;
       <AccessibleButton
         onPress={handleHear}
         label={isReading ? "Stop Reading" : "Hear Summary"}
-        hint={isReading ? "Stop reading the trend summary aloud" : "Read the trend comparison aloud"}
+        hint={
+          isReading
+            ? "Stop reading the trend summary aloud"
+            : "Read the trend comparison aloud"
+        }
         variant="outline"
         style={styles.hearButton}
       />

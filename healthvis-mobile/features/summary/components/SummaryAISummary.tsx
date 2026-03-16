@@ -58,7 +58,7 @@ export function SummaryAISummary({
     }
 
     generateSummary();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardsKey, allMetrics.length]);
 
   const generateSummary = async () => {
@@ -134,7 +134,7 @@ Return only the summary text.`;
       setSummary(content);
     } catch (err) {
       console.error("Summary AI error:", err);
-      setError("Unable to generate AI summary right now.");
+      // Use fallback silently - don't show error to user since fallback works fine
       setSummary(fallback);
     } finally {
       setLoading(false);

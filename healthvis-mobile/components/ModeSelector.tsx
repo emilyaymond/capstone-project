@@ -1,33 +1,33 @@
 /**
  * ModeSelector Component
- * 
+ *
  * Allows users to switch between accessibility modes (Visual, Audio, Hybrid, Simplified).
  * Provides a radio group interface with proper accessibility labels and audio feedback.
- * 
+ *
  * Requirements: 1.1, 1.2, 1.6
  */
 
-import React from 'react';
+import React from "react";
 import {
   View,
   TouchableOpacity,
   StyleSheet,
   ViewStyle,
   Platform,
-} from 'react-native';
-import { ThemedText } from './themed-text';
-import { useAccessibility } from '../contexts/AccessibilityContext';
-import { useAudio } from '../hooks/useAudio';
-import { AccessibilityMode } from '../types';
-import { 
-  ACCESSIBILITY_MODES, 
+} from "react-native";
+import { ThemedText } from "./themed-text";
+import { useAccessibility } from "../contexts/AccessibilityContext";
+import { useAudio } from "../hooks/useAudio";
+import { AccessibilityMode } from "../types";
+import {
+  ACCESSIBILITY_MODES,
   MODE_DESCRIPTIONS,
   FONT_SIZES,
   TOUCH_TARGET_SIZES,
   HIGH_CONTRAST_COLORS,
   NORMAL_CONTRAST_COLORS,
-} from '../constants/accessibility';
-import { announceModeChange } from '../lib/announcer';
+} from "../constants/accessibility";
+import { announceModeChange } from "../lib/announcer";
 
 // ============================================================================
 // Component Props Interface
@@ -36,10 +36,10 @@ import { announceModeChange } from '../lib/announcer';
 export interface ModeSelectorProps {
   /** Current accessibility mode */
   currentMode: AccessibilityMode;
-  
+
   /** Callback when mode changes */
   onModeChange: (mode: AccessibilityMode) => void;
-  
+
   /** Custom container style */
   style?: ViewStyle;
 }
@@ -49,10 +49,10 @@ export interface ModeSelectorProps {
 // ============================================================================
 
 const MODE_LABELS: Record<AccessibilityMode, string> = {
-  visual: 'Visual',
-  audio: 'Audio',
-  hybrid: 'Hybrid',
-  simplified: 'Simplified',
+  visual: "Visual",
+  audio: "Audio",
+  hybrid: "Hybrid",
+  simplified: "Simplified",
 };
 
 // ============================================================================
@@ -64,16 +64,12 @@ export function ModeSelector({
   onModeChange,
   style,
 }: ModeSelectorProps) {
-  // ============================================================================
   // Hooks
-  // ============================================================================
 
   const { settings, mode: contextMode } = useAccessibility();
   const { playModeChangeSound } = useAudio();
 
-  // ============================================================================
   // Handle Mode Selection
-  // ============================================================================
 
   /**
    * Handles mode selection with audio feedback and announcements
@@ -97,24 +93,22 @@ export function ModeSelector({
     onModeChange(selectedMode);
   };
 
-  // ============================================================================
   // Compute Styles Based on Settings
-  // ============================================================================
 
   const fontSize = FONT_SIZES[settings.fontSize].body;
   const labelFontSize = FONT_SIZES[settings.fontSize].label;
-  const colors = settings.contrast === 'high' 
-    ? HIGH_CONTRAST_COLORS 
-    : NORMAL_CONTRAST_COLORS;
+  const colors =
+    settings.contrast === "high"
+      ? HIGH_CONTRAST_COLORS
+      : NORMAL_CONTRAST_COLORS;
 
   // Touch target size based on mode
-  const touchTargetSize = contextMode === 'simplified'
-    ? TOUCH_TARGET_SIZES.simplified
-    : TOUCH_TARGET_SIZES.minimum;
+  const touchTargetSize =
+    contextMode === "simplified"
+      ? TOUCH_TARGET_SIZES.simplified
+      : TOUCH_TARGET_SIZES.minimum;
 
-  // ============================================================================
   // Render
-  // ============================================================================
 
   return (
     <View
@@ -137,9 +131,7 @@ export function ModeSelector({
               styles.option,
               {
                 minHeight: touchTargetSize,
-                backgroundColor: isSelected 
-                  ? colors.primary 
-                  : colors.surface,
+                backgroundColor: isSelected ? colors.primary : colors.surface,
                 borderColor: colors.border,
               },
             ]}
@@ -181,23 +173,27 @@ export function ModeSelector({
                     styles.label,
                     {
                       fontSize,
-                      color: isSelected 
-                        ? (settings.contrast === 'high' ? '#000000' : '#ffffff')
+                      color: isSelected
+                        ? settings.contrast === "high"
+                          ? "#000000"
+                          : "#ffffff"
                         : colors.text,
-                      fontWeight: isSelected ? '700' : '600',
+                      fontWeight: isSelected ? "700" : "600",
                     },
                   ]}
                 >
                   {label}
                 </ThemedText>
-                
+
                 <ThemedText
                   style={[
                     styles.description,
                     {
                       fontSize: labelFontSize,
                       color: isSelected
-                        ? (settings.contrast === 'high' ? '#000000' : 'rgba(255, 255, 255, 0.8)')
+                        ? settings.contrast === "high"
+                          ? "#000000"
+                          : "rgba(255, 255, 255, 0.8)"
                         : colors.textSecondary,
                     },
                   ]}
@@ -219,55 +215,55 @@ export function ModeSelector({
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: "100%",
     gap: 12,
   },
-  
+
   option: {
     borderRadius: 12,
     borderWidth: 2,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    
+
     // Platform-specific adjustments
     ...Platform.select({
       web: {
-        cursor: 'pointer',
-        userSelect: 'none',
+        cursor: "pointer",
+        userSelect: "none",
       },
     }),
   },
-  
+
   optionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
-  
+
   radioIndicator: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  
+
   radioIndicatorInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
   },
-  
+
   textContainer: {
     flex: 1,
     gap: 4,
   },
-  
+
   label: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
-  
+
   description: {
     lineHeight: 18,
   },

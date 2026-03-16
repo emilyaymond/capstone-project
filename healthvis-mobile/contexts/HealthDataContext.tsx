@@ -207,9 +207,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   const haptics = useHaptics();
   const speech = useSpeech();
 
-  // ============================================================================
   // Cache Management Functions
-  // ============================================================================
 
   /**
    * Save health metrics to cache (new format)
@@ -313,9 +311,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     }
   }
 
-  // ============================================================================
   // Fetch Data Function (Requirement 10.1, 10.7, 4.1, 4.2, 9.2)
-  // ============================================================================
 
   /**
    * Fetches health data from HealthKit with cache-first loading for offline support
@@ -339,7 +335,10 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         setPermissions(MOCK_PERMISSIONS as any);
         setIsInitialized(true);
         setIsLoading(false);
-        announceHealthKitFetch(undefined, Object.values(mockData).flat().length);
+        announceHealthKitFetch(
+          undefined,
+          Object.values(mockData).flat().length,
+        );
         haptics.triggerLight();
         return;
       }
@@ -524,9 +523,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     }
   }, [isInitialized, audio, haptics]);
 
-  // ============================================================================
   // Request Analysis Function (Requirement 10.1, 10.2)
-  // ============================================================================
 
   /**
    * Requests AI-powered analysis of health data
@@ -569,9 +566,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     [audio],
   );
 
-  // ============================================================================
   // Request Chat Function (Requirement 10.3)
-  // ============================================================================
 
   /**
    * Sends a message to the AI chat assistant
@@ -615,17 +610,13 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     [audio, healthMetrics],
   );
 
-  // ============================================================================
   // Clear Error Function
-  // ============================================================================
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  // ============================================================================
   // Refresh Data Function
-  // ============================================================================
 
   /**
    * Forces a refresh of health data, bypassing cache
@@ -644,9 +635,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     await fetchData();
   }, [fetchData]);
 
-  // ============================================================================
   // Helper Functions
-  // ============================================================================
 
   /**
    * Triggers appropriate TTS, haptics, or sonification based on backend responses
@@ -785,9 +774,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     [healthMetrics],
   );
 
-  // ============================================================================
   // Context Value
-  // ============================================================================
 
   const value: HealthDataContextValue = {
     healthMetrics,

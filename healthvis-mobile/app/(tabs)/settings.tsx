@@ -95,25 +95,19 @@ function PermissionItem({
 // ============================================================================
 
 export default function SettingsScreen() {
-  // ============================================================================
   // Hooks
-  // ============================================================================
 
   const { mode, setMode, settings, updateSettings } = useAccessibility();
   const { permissions, isInitialized, isLoading, fetchData, refreshData } =
     useHealthData();
 
-  // ============================================================================
   // Local State
-  // ============================================================================
 
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataRange, setDataRange] = useState<7 | 30 | 90>(30); // Default 30 days
 
-  // ============================================================================
   // Load Last Sync Time and Data Range
-  // ============================================================================
 
   useEffect(() => {
     loadLastSyncTime();
@@ -142,9 +136,7 @@ export default function SettingsScreen() {
     }
   }
 
-  // ============================================================================
   // Manual Sync Handler
-  // ============================================================================
 
   /**
    * Handles manual sync button press
@@ -212,9 +204,7 @@ export default function SettingsScreen() {
     }
   };
 
-  // ============================================================================
   // Compute Styles Based on Settings
-  // ============================================================================
 
   const fontSize = FONT_SIZES[settings.fontSize];
   const colors =
@@ -222,9 +212,7 @@ export default function SettingsScreen() {
       ? HIGH_CONTRAST_COLORS
       : NORMAL_CONTRAST_COLORS;
 
-  // ============================================================================
   // Font Size Handlers
-  // ============================================================================
 
   /**
    * Handles font size change
@@ -236,9 +224,7 @@ export default function SettingsScreen() {
     announceSettingsChange("font size", size);
   };
 
-  // ============================================================================
   // Contrast Handlers
-  // ============================================================================
 
   /**
    * Handles contrast mode change
@@ -250,9 +236,7 @@ export default function SettingsScreen() {
     announceSettingsChange("contrast", contrast);
   };
 
-  // ============================================================================
   // Audio Feedback Handler
-  // ============================================================================
 
   /**
    * Handles audio feedback toggle
@@ -264,9 +248,7 @@ export default function SettingsScreen() {
     announceSettingsChange("audio feedback", enabled);
   };
 
-  // ============================================================================
   // Haptics Handler
-  // ============================================================================
 
   /**
    * Handles haptics toggle
@@ -277,9 +259,7 @@ export default function SettingsScreen() {
     announceSettingsChange("haptic feedback", enabled);
   };
 
-  // ============================================================================
   // Render
-  // ============================================================================
 
   return (
     <ScrollView
