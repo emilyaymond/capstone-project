@@ -353,8 +353,12 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
   }
 
   const visibleValues = chartData.map((d) => d.y);
-  const minValue = visibleValues.length ? Math.min(...visibleValues) : 0;
-  const maxValue = visibleValues.length ? Math.max(...visibleValues) : 0;
+  const minValue = visibleValues.length
+    ? Math.round(Math.min(...visibleValues))
+    : 0;
+  const maxValue = visibleValues.length
+    ? Math.round(Math.max(...visibleValues))
+    : 0;
 
   const chartAccessibilityLabel =
     accessibilityLabel ||

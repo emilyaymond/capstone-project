@@ -9,6 +9,12 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { HealthMetric } from "@/types/health-metric";
+import {
+  aggregateSleepByStage,
+  calculateSleepEfficiency,
+  calculateSleepQuality,
+  formatSleepDuration,
+} from "@/lib/sleep-utils";
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
@@ -87,20 +93,17 @@ export function AISummary({
         return;
       }
 
-      const stats = calculateStats();
+      const isSleep = data[0]?.type === "sleep";
 
-      if (!stats) {
-        setSummary("Not enough data to generate summary.");
-        setLoading(false);
-        return;
-      }
+      if (isSleep) {
+        // Sleep-specific summary generation
+        const sleepBreakdown = aggregateSleepByStage(data);
+        const sleepQuality = calculateSleepQuality(sleepBreakdown);
+        const sleepEfficiency = calculateSleepEfficiency(sleepBreakdown);
 
-      const unit = data[0]?.unit || "";
-      const timeRangeText =
-        timeRange === "H"
-          ? "last hour"
-          : timeRange === "D"
-            ? "today"
+        const timeRangeText =
+          timeRange === "D"
+            ? "last night"
             : timeRange === "W"
               ? "this week"
               : timeRange === "M"
@@ -109,7 +112,76 @@ export function AISummary({
                   ? "last 6 months"
                   : "this year";
 
-      const prompt = `You are a health coach analyzing ${metricName} data. Generate a 1 sentence summary.
+        const prompt = `You are a sleep coach analyzing sleep data. Generate a 1-2 sentence summary.
+
+Sleep data for ${timeRangeText}:
+- Time in bed: ${formatSleepDuration(sleepBreakdown.totalInBed)}
+- Time asleep: ${formatSleepDuration(sleepBreakdown.totalSleep)}
+- Sleep efficiency: ${sleepEfficiency}%
+- Sleep quality: ${sleepQuality}
+- Deep sleep: ${formatSleepDuration(sleepBreakdown.deepSleep)} (${sleepBreakdown.totalSleep > 0 ? Math.round((sleepBreakdown.deepSleep / sleepBreakdown.totalSleep) * 100) : 0}%)
+- REM sleep: ${formatSleepDuration(sleepBreakdown.remSleep)} (${sleepBreakdown.totalSleep > 0 ? Math.round((sleepBreakdown.remSleep / sleepBreakdown.totalSleep) * 100) : 0}%)
+- Light sleep: ${formatSleepDuration(sleepBreakdown.lightSleep)} (${sleepBreakdown.totalSleep > 0 ? Math.round((sleepBreakdown.lightSleep / sleepBreakdown.totalSleep) * 100) : 0}%)
+- Awake time: ${formatSleepDuration(sleepBreakdown.awake)}
+- Total sessions: ${data.length}
+
+Focus on:
+1. Sleep quality and efficiency
+2. Balance of sleep stages (deep, REM, light)
+3. Brief, actionable insight or reassurance
+
+Keep it conversational and supportive. Don't use medical jargon.`;
+
+        const response = await fetch(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [{ role: "user", content: prompt }],
+              max_tokens: 150,
+              temperature: 0.7,
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const content =
+          result.choices[0]?.message?.content || "Unable to generate summary.";
+        setSummary(content);
+      } else {
+        // Regular metric summary generation
+        const stats = calculateStats();
+
+        if (!stats) {
+          setSummary("Not enough data to generate summary.");
+          setLoading(false);
+          return;
+        }
+
+        const unit = data[0]?.unit || "";
+        const timeRangeText =
+          timeRange === "H"
+            ? "last hour"
+            : timeRange === "D"
+              ? "today"
+              : timeRange === "W"
+                ? "this week"
+                : timeRange === "M"
+                  ? "this month"
+                  : timeRange === "6M"
+                    ? "last 6 months"
+                    : "this year";
+
+        const prompt = `You are a health coach analyzing ${metricName} data. Generate a 1 sentence summary.
 
 Data for ${timeRangeText}:
 - Range: ${stats.min}-${stats.max} ${unit}
@@ -129,32 +201,32 @@ Focus on:
 
 Keep it conversational and supportive. Don't use medical jargon.`;
 
-      // Use fetch API to call OpenAI directly (works in React Native)
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
+        const response = await fetch(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [{ role: "user", content: prompt }],
+              max_tokens: 150,
+              temperature: 0.7,
+            }),
           },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 150,
-            temperature: 0.7,
-          }),
-        },
-      );
+        );
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const content =
+          result.choices[0]?.message?.content || "Unable to generate summary.";
+        setSummary(content);
       }
-
-      const result = await response.json();
-      const content =
-        result.choices[0]?.message?.content || "Unable to generate summary.";
-      setSummary(content);
     } catch (err) {
       console.error("AI Summary error:", err);
       setError("Unable to generate AI summary at this time.");

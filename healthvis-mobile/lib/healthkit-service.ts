@@ -35,9 +35,7 @@ import {
   RetryOptions,
 } from "./retry-utils";
 
-// ============================================================================
 // Type Definitions
-// ============================================================================
 
 /**
  * Options for fetching health data
@@ -99,9 +97,7 @@ export interface PermissionStatus {
   };
 }
 
-// ============================================================================
 // HealthKit Type Mappings
-// ============================================================================
 
 /**
  * Mapping of app metric types to HealthKit permission constants
@@ -209,9 +205,7 @@ const METRIC_TYPE_TO_CATEGORY: Record<HealthMetricType, HealthCategory> = {
   mindfulness: "mindfulness",
 };
 
-// ============================================================================
 // Retry Configuration
-// ============================================================================
 
 /**
  * Default retry options for HealthKit operations
@@ -242,9 +236,7 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   },
 };
 
-// ============================================================================
 // HealthKit Service Interface
-// ============================================================================
 
 /**
  * Service interface for HealthKit interactions
@@ -305,9 +297,7 @@ export interface HealthKitService {
   fetchAllHealthData(options: FetchOptions): Promise<CategorizedHealthData>;
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Convert a HealthKit sample to a HealthMetric
@@ -455,9 +445,7 @@ function createDefaultPermissionStatus(): PermissionStatus {
   };
 }
 
-// ============================================================================
 // Service Implementation
-// ============================================================================
 
 /**
  * Default HealthKit service implementation

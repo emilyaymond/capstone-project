@@ -1,18 +1,18 @@
 /**
  * SimpleLineChart Component
- * 
+ *
  * Visual line chart component using react-native-gifted-charts.
  * Provides visual representation of time-series data with accessibility support.
  * Includes loading states and empty data handling.
- * 
+ *
  * Requirements: 11.1, 11.2, 11.3, 11.5
  */
 
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import { DataPoint } from '../../types';
-import { useAccessibility } from '../../contexts/AccessibilityContext';
-import { LineChart } from 'react-native-gifted-charts';
+import React, { useMemo } from "react";
+import { View, StyleSheet, Text, ActivityIndicator } from "react-native";
+import { DataPoint } from "../../types";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
+import { LineChart } from "react-native-gifted-charts";
 
 // ============================================================================
 // Component Props Interface
@@ -34,7 +34,7 @@ export interface SimpleLineChartProps {
   /** Accessibility label for the chart */
   accessibilityLabel?: string;
   /** Time range for label formatting (H, D, W, M, 6M, Y) */
-  timeRange?: 'H' | 'D' | 'W' | 'M' | '6M' | 'Y';
+  timeRange?: "H" | "D" | "W" | "M" | "6M" | "Y";
 }
 
 // ============================================================================
@@ -50,28 +50,28 @@ const DEFAULT_HEIGHT = 200;
  * Gets color based on data range and accessibility mode
  */
 const getColorForRange = (
-  range: 'normal' | 'warning' | 'danger',
-  contrast: 'normal' | 'high'
+  range: "normal" | "warning" | "danger",
+  contrast: "normal" | "high",
 ): string => {
-  if (contrast === 'high') {
+  if (contrast === "high") {
     // WCAG AAA compliant high contrast colors
     switch (range) {
-      case 'normal':
-        return '#000000'; // Black
-      case 'warning':
-        return '#B35900'; // Dark orange
-      case 'danger':
-        return '#8B0000'; // Dark red
+      case "normal":
+        return "#000000"; // Black
+      case "warning":
+        return "#B35900"; // Dark orange
+      case "danger":
+        return "#8B0000"; // Dark red
     }
   } else {
     // Normal contrast colors
     switch (range) {
-      case 'normal':
-        return '#007AFF'; // iOS blue
-      case 'warning':
-        return '#FF9500'; // iOS orange
-      case 'danger':
-        return '#FF3B30'; // iOS red
+      case "normal":
+        return "#007AFF"; // iOS blue
+      case "warning":
+        return "#FF9500"; // iOS orange
+      case "danger":
+        return "#FF3B30"; // iOS red
     }
   }
 };
@@ -86,106 +86,148 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   height,
   isLoading = false,
   accessibilityLabel,
-  timeRange = 'D',
+  timeRange = "D",
 }) => {
   const { settings, mode } = useAccessibility();
 
   // Memoized Calculations
 
-
   /*
-  * Todo I have to change the daily tab to only show 24 hours of data 
-  * (past 24, so if it is 11pm now it would show from 11pm yesterday) and then label the 12-6
-  */
+   * Todo I have to change the daily tab to only show 24 hours of data
+   * (past 24, so if it is 11pm now it would show from 11pm yesterday) and then label the 12-6
+   */
   const chartData = useMemo(() => {
-    return data.map((point, idx) => {
+    const sortedData = [...data].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+    const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+    });
+
+    return sortedData.map((point) => {
       const d = new Date(point.timestamp);
       let label = "";
-      
-      // Format labels based on time range
+
       switch (timeRange) {
-        case 'H': // Hourly - show time for all points
+        case "H": {
           label = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
           break;
-          
-        case 'D': // Day - show 12am, 6am, 12pm, 6pm
+        }
 
+        case "D": {
           const hour = d.getHours();
-          if (hour === 0 || hour === 6 || hour === 12 || hour === 18) {
-            if(d.getMinutes() === 0)
-              label = hour === 0 ? '12am' : hour === 6 ? '6am' : hour === 12 ? '12pm' : '6pm';
-          }
-          else
-            label = `${hour}`;
-          break;
-          
-        case 'W': // Weekly - show day of week
-          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-          // Show label if it's a new day or first/last point
-          if (idx === 0 || idx === data.length - 1 || 
-              (idx > 0 && d.getDate() !== new Date(data[idx - 1].timestamp).getDate())) {
-            label = days[d.getDay()];
+          if (
+            (hour === 0 || hour === 6 || hour === 12 || hour === 18) &&
+            d.getMinutes() === 0
+          ) {
+            label =
+              hour === 0
+                ? "12am"
+                : hour === 6
+                  ? "6am"
+                  : hour === 12
+                    ? "12pm"
+                    : "6pm";
           }
           break;
-          
-        case 'M': // Monthly - show day of month in increments of ~7
-          const dayOfMonth = d.getDate();
-          if (idx === 0 || idx === data.length - 1 || 
-              dayOfMonth % 7 === 1 || dayOfMonth === 1) {
-            label = `${dayOfMonth}`;
+        }
+
+        case "W": {
+          const current = new Date(d);
+          current.setHours(0, 0, 0, 0);
+
+          const diffMs = today.getTime() - current.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+          // show labels only for the last 7 days
+          if (diffDays >= 0 && diffDays <= 6) {
+            label = weekdayFormatter.format(current);
           }
           break;
-          
-        case '6M': // 6 months - show month abbreviation
-          const months6 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          // Show label if it's a new month or first/last point
-          if (idx === 0 || idx === data.length - 1 || 
-              (idx > 0 && d.getMonth() !== new Date(data[idx - 1].timestamp).getMonth())) {
-            label = months6[d.getMonth()];
+        }
+
+        case "M": {
+          const current = new Date(d);
+          current.setHours(0, 0, 0, 0);
+
+          const diffMs = today.getTime() - current.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+          // show labels roughly weekly across last 30 days
+          if ([29, 22, 15, 8, 1].includes(29 - diffDays)) {
+            label = `${current.getDate()}`;
           }
           break;
-          
-        case 'Y': // Yearly - show month abbreviation
-          const monthsY = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          // Show label if it's a new month or first/last point
-          if (idx === 0 || idx === data.length - 1 || 
-              (idx > 0 && d.getMonth() !== new Date(data[idx - 1].timestamp).getMonth())) {
-            label = monthsY[d.getMonth()];
+        }
+
+        case "6M": {
+          const monthDiff =
+            (now.getFullYear() - d.getFullYear()) * 12 +
+            (now.getMonth() - d.getMonth());
+
+          // current month = 5, previous = 4, etc.
+          const rollingIndex = 5 - monthDiff;
+
+          if (rollingIndex >= 0 && rollingIndex <= 5) {
+            label = monthFormatter.format(d);
           }
           break;
+        }
+
+        case "Y": {
+          const monthDiff =
+            (now.getFullYear() - d.getFullYear()) * 12 +
+            (now.getMonth() - d.getMonth());
+
+          // current month = 11, previous = 10, etc.
+          const rollingIndex = 11 - monthDiff;
+
+          // only label every other month like your scatter ticks
+          if (
+            rollingIndex >= 0 &&
+            rollingIndex <= 11 &&
+            [0, 2, 4, 6, 8, 10].includes(rollingIndex)
+          ) {
+            label = monthFormatter.format(d);
+          }
+          break;
+        }
       }
-      
-      // Get color for this specific data point based on its range
-      const pointColor = getColorForRange(point.range || 'normal', settings.contrast);
-      
-      // delete
-      if(label)
-        console.log(point.timestamp, "🦺 value:", point.value, "label", label, "dataPointText:", point.value, "dataPointColor:", pointColor);
+
+      const pointColor = getColorForRange(
+        point.range || "normal",
+        settings.contrast,
+      );
 
       return {
         value: point.value,
         label,
         dataPointText: `${point.value}`,
-        dataPointColor: pointColor,  // Individual point color
-        dataPointRadius: mode === 'simplified' ? 6 : 4,
+        dataPointColor: pointColor,
+        dataPointRadius: mode === "simplified" ? 6 : 4,
       };
     });
   }, [data, settings.contrast, mode, timeRange]);
-
-
   // Get primary color based on overall data state (just use normal always)
   const primaryColor = useMemo(() => {
-    if (data.length === 0) return getColorForRange('normal', settings.contrast);
-    return getColorForRange('normal', settings.contrast);
+    if (data.length === 0) return getColorForRange("normal", settings.contrast);
+    return getColorForRange("normal", settings.contrast);
   }, [data, settings.contrast]);
 
   // Font Size Scaling
 
   const fontSize = useMemo(() => {
     switch (settings.fontSize) {
-      case 'small':
+      case "small":
         return 12;
-      case 'large':
+      case "large":
         return 18;
       default:
         return 14;
@@ -194,9 +236,9 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
 
   const titleFontSize = useMemo(() => {
     switch (settings.fontSize) {
-      case 'small':
+      case "small":
         return 16;
-      case 'large':
+      case "large":
         return 22;
       default:
         return 18;
@@ -211,7 +253,12 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { width: chartWidth, height: chartHeight + 60 }]}>
+      <View
+        style={[
+          styles.container,
+          { width: chartWidth, height: chartHeight + 60 },
+        ]}
+      >
         {title && (
           <Text style={[styles.title, { fontSize: titleFontSize }]}>
             {title}
@@ -232,9 +279,12 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   if (data.length === 0) {
     return (
       <View
-        style={[styles.container, { width: chartWidth, height: chartHeight + 60 }]}
+        style={[
+          styles.container,
+          { width: chartWidth, height: chartHeight + 60 },
+        ]}
         accessible={true}
-        accessibilityLabel={accessibilityLabel || 'Empty chart'}
+        accessibilityLabel={accessibilityLabel || "Empty chart"}
         accessibilityHint="No data available to display"
       >
         {title && (
@@ -255,34 +305,42 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
   }
 
   // Render Chart
-  
-  const chartAccessibilityLabel = accessibilityLabel || 
-    `${title || 'Line chart'} showing ${data.length} data points`;
 
-  const minValue = Math.min(...data.map(d => d.value));
-  const maxValue = Math.max(...data.map(d => d.value));
+  const chartAccessibilityLabel =
+    accessibilityLabel ||
+    `${title || "Line chart"} showing ${data.length} data points`;
+
+  const minValue = Math.round(Math.min(...data.map((d) => d.value)));
+  const maxValue = Math.round(Math.max(...data.map((d) => d.value)));
 
   return (
     <View
-      style={[styles.container, { width: chartWidth, height: chartHeight + 60 }]}
+      style={[
+        styles.container,
+        { width: chartWidth, height: chartHeight + 60 },
+      ]}
       accessible={true}
       accessibilityLabel={chartAccessibilityLabel}
       accessibilityRole="image"
     >
       {title && (
-        <Text style={[styles.title, { fontSize: titleFontSize }]}>
-          {title}
-        </Text>
+        <Text style={[styles.title, { fontSize: titleFontSize }]}>{title}</Text>
       )}
-      
+
       <View style={styles.chartWrapper}>
         <LineChart
           data={chartData}
           width={chartWidth}
-          height={chartHeight}  
-          spacing={Math.max(8, Math.min(24, Math.floor(chartWidth/ Math.max(chartData.length, 8))))}
+          height={chartHeight}
+          spacing={Math.max(
+            8,
+            Math.min(
+              24,
+              Math.floor(chartWidth / Math.max(chartData.length, 8)),
+            ),
+          )}
           color={primaryColor}
-          thickness={mode === 'simplified' ? 3 : 2.5}
+          thickness={mode === "simplified" ? 3 : 2.5}
           curved
           hideDataPoints
           // showTextOnFocus
@@ -290,7 +348,7 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
           rulesColor="#E5E5E5"
           xAxisColor="#E5E5E5"
           yAxisColor="#E5E5E5"
-          yAxisTextStyle={{ fontSize: fontSize - 2, color: '#403e3eff' }}
+          yAxisTextStyle={{ fontSize: fontSize - 2, color: "#403e3eff" }}
           backgroundColor="transparent"
           isAnimated
           animationDuration={800}
@@ -306,9 +364,10 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
       {/* Data summary */}
       <View style={styles.summary}>
         <Text style={[styles.summaryText, { fontSize: fontSize - 2 }]}>
-          {data.length} data point{data.length !== 1 ? 's' : ''}
-          {' • '}
-          Range: {minValue} - {maxValue}{unit ? ` ${unit}` : ''}
+          {data.length} data point{data.length !== 1 ? "s" : ""}
+          {" • "}
+          Range: {minValue} - {maxValue}
+          {unit ? ` ${unit}` : ""}
         </Text>
       </View>
     </View>
@@ -321,54 +380,54 @@ export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 8,
   },
   title: {
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
-    color: '#000',
-    textAlign: 'center',
+    color: "#000",
+    textAlign: "center",
   },
   chartWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
     borderRadius: 8,
-    width: '100%',
+    width: "100%",
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
+    color: "#666",
   },
   emptyContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
     borderRadius: 8,
-    width: '100%',
+    width: "100%",
     padding: 20,
   },
   emptyText: {
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
     marginBottom: 8,
   },
   emptyHint: {
-    color: '#999',
-    textAlign: 'center',
+    color: "#999",
+    textAlign: "center",
   },
   summary: {
     marginTop: 8,
     paddingHorizontal: 16,
   },
   summaryText: {
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
   },
 });
 

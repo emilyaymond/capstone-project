@@ -133,7 +133,7 @@ export default function BrowseScreen() {
 
   return (
     <LinearGradient
-      colors={["#C2D9FF", "#FFDDFC", "#E8F1F9", "#f4f4f4ff"]}
+      colors={["#ffffffff", "#edededff", "#f5f5f5ff", "#f4f4f4ff"]}
       style={styles.container}
       start={{ x: 0.3, y: 0 }}
       end={{ x: 0.5, y: 1 }}
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   searchWrap: {
     height: 40,
     borderRadius: 10,
-    backgroundColor: "#fcfcff73",
+    backgroundColor: "#ffffffff",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,

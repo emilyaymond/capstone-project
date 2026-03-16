@@ -8,13 +8,14 @@ import {
   View,
   Linking,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Link } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { AccessibleButton } from "@/components/AccessibleButton";
 import { ErrorDisplay } from "@/components/ErrorDisplay";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 
 import { useHealthData } from "@/contexts/HealthDataContext";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
@@ -202,7 +203,6 @@ function SummaryMetricCard({
       accessibilityLabel={card.accessibilityLabel}
       accessibilityHint={`Open ${card.title} details`}
     >
-      <View style={[styles.metricAccent, { backgroundColor: accent }]} />
       <View style={styles.metricCardContent}>
         <View style={styles.metricTopRow}>
           <ThemedText
@@ -217,7 +217,11 @@ function SummaryMetricCard({
           </ThemedText>
         </View>
 
-        <ThemedText style={[styles.metricValue, { fontSize: fontSize.body + 26 }]}>{card.valueText}</ThemedText>
+        <ThemedText
+          style={[styles.metricValue, { fontSize: fontSize.body + 26 }]}
+        >
+          {card.valueText}
+        </ThemedText>
 
         <ThemedText
           style={[styles.metricSubtitle, { fontSize: fontSize.body - 1 }]}
@@ -459,7 +463,7 @@ export default function SummaryScreen() {
 
   return (
     <LinearGradient
-      colors={["#C2D9FF", "#FFDDFC", "#E8F1F9", "#f4f4f4ff"]}
+      colors={["#ffffffff", "#edededff", "#f5f5f5ff", "#f4f4f4ff"]}
       start={{ x: 0.1, y: 0 }}
       end={{ x: 0.9, y: 1 }}
       style={styles.background}
@@ -488,13 +492,43 @@ export default function SummaryScreen() {
             }
             accessibilityLabel="Summary screen"
           >
-            <View style={styles.header}>
-              <ThemedText
-                style={[styles.largeTitle, { fontSize: fontSize.body + 22 }]}
-                accessibilityRole="header"
-              >
-                Summary
-              </ThemedText>
+            {isLoading && (
+              <View style={styles.loadingBanner}>
+                <LoadingIndicator
+                  message="Loading health data"
+                  size="small"
+                  showMessage={false}
+                  centered={false}
+                  style={styles.loadingIndicator}
+                />
+              </View>
+            )}
+
+            <View style={styles.headerContainer}>
+              <View style={styles.headerRow}>
+                <ThemedText
+                  style={[styles.largeTitle, { fontSize: fontSize.body + 22 }]}
+                  accessibilityRole="header"
+                >
+                  Summary
+                </ThemedText>
+                <Link href="/edit-pinned" asChild>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit pinned metrics"
+                    accessibilityHint="Customize which metrics appear on your summary"
+                  >
+                    <ThemedText
+                      style={[
+                        styles.editButton,
+                        { fontSize: fontSize.body + 2 },
+                      ]}
+                    >
+                      Edit
+                    </ThemedText>
+                  </TouchableOpacity>
+                </Link>
+              </View>
               <ThemedText
                 style={[styles.subheading, { fontSize: fontSize.body }]}
               >
@@ -637,7 +671,29 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 14,
   },
-  header: {
+  loadingBanner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    zIndex: 1000,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  loadingIndicator: {
+    padding: 0,
+  },
+  headerContainer: {
+    marginBottom: 4,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 4,
   },
   largeTitle: {
@@ -645,7 +701,11 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontWeight: "800",
     color: "#111827",
-    marginBottom: 4,
+  },
+  editButton: {
+    color: "#0A84FF",
+    fontWeight: "600",
+    paddingRight: 6,
   },
   subheading: {
     color: "#6B7280",
@@ -700,37 +760,6 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
 
-  pinnedList: {
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 1,
-  },
-  pinnedRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E5E7EB",
-  },
-  pinnedRowLast: {
-    borderBottomWidth: 0,
-  },
-  pinnedLabel: {
-    fontWeight: "700",
-    color: "#111827",
-  },
-  pinnedValue: {
-    fontWeight: "800",
-    color: "#1F2937",
-  },
-
   highlightStack: {
     gap: 10,
   },
@@ -747,22 +776,23 @@ const styles = StyleSheet.create({
   },
 
   metricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 12,
   },
   metricCard: {
     backgroundColor: "rgba(255,255,255,0.96)",
+    width: "48%",
     borderRadius: 24,
     overflow: "hidden",
     flexDirection: "row",
-    minHeight: 132,
+    minHeight: 100,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
-  },
-  metricAccent: {
-    width: 8,
   },
   metricCardContent: {
     flex: 1,

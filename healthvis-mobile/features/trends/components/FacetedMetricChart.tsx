@@ -11,16 +11,17 @@
  */
 
 import React, { useMemo } from "react";
-import {
-  Dimensions,
-  StyleSheet,
-  View,
-  AccessibilityInfo,
-} from "react-native";
-import { LineChart } from "react-native-gifted-charts";
+import { Dimensions, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { FONT_SIZES } from "@/constants/accessibility";
+import { SimpleLineChart } from "@/components/charts/lineChart";
+import { SimpleBarChart } from "@/components/charts/barChart";
+import { ScatterPlot } from "@/components/charts/scatter";
+import { SleepChart } from "@/components/charts/sleepChart";
+import { DataPoint } from "@/types";
+import { HealthMetric, HealthMetricType } from "@/types/health-metric";
+import { getMetricChartKind } from "@/app/metric/metricConfig";
 
 const SCREEN_W = Dimensions.get("window").width;
 const CHART_W = SCREEN_W - 64; // card padding × 2 + outer padding × 2
@@ -28,10 +29,11 @@ const CHART_W = SCREEN_W - 64; // card padding × 2 + outer padding × 2
 export type FacetedPoint = {
   value: number;
   timestamp: Date;
+  metadata?: Record<string, any>;
 };
 
 type Props = {
-  metricKey: string;
+  metricKey: HealthMetricType;
   label: string;
   unit: string;
   color: string;
@@ -47,7 +49,8 @@ function computeStats(values: number[]) {
   const min = sorted[0];
   const max = sorted[sorted.length - 1];
   const avg = values.reduce((s, v) => s + v, 0) / values.length;
-  const variance = values.reduce((s, v) => s + (v - avg) ** 2, 0) / values.length;
+  const variance =
+    values.reduce((s, v) => s + (v - avg) ** 2, 0) / values.length;
   const stdDev = Math.sqrt(variance);
   // Outlier = more than 2 standard deviations from mean
   const outliers = values.filter((v) => Math.abs(v - avg) > 2 * stdDev);
@@ -82,38 +85,32 @@ function buildVoiceOverLabel(
   return `${label} chart, ${timeRange}. ${rangeText} ${avgText}${outlierText}`;
 }
 
-// ── chart label formatter ────────────────────────────────────────────────────
+// ── Convert FacetedPoint to DataPoint ────────────────────────────────────────
 
-function formatChartLabel(idx: number, total: number, timestamp: Date, timeRange: string): string {
-  // Show a sparse set of x-axis labels to avoid clutter
-  const showEvery = Math.max(1, Math.floor(total / 5));
-  if (idx % showEvery !== 0 && idx !== total - 1) return "";
+function toDataPoints(points: FacetedPoint[]): DataPoint[] {
+  return points.map((p) => ({
+    value: p.value,
+    timestamp: p.timestamp,
+    range: "normal" as const, // Faceted charts don't use range classification
+  }));
+}
 
-  switch (timeRange) {
-    case "H": {
-      return timestamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-    case "D": {
-      const h = timestamp.getHours();
-      if (h === 0) return "12am";
-      if (h === 6) return "6am";
-      if (h === 12) return "12pm";
-      if (h === 18) return "6pm";
-      return "";
-    }
-    case "W": {
-      return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][timestamp.getDay()];
-    }
-    case "M": {
-      return String(timestamp.getDate());
-    }
-    case "6M":
-    case "Y": {
-      return timestamp.toLocaleDateString([], { month: "short" });
-    }
-    default:
-      return "";
-  }
+// ── Convert FacetedPoint to HealthMetric ──────────────────────────────────────
+
+function toHealthMetrics(
+  points: FacetedPoint[],
+  metricType: HealthMetricType,
+  unit: string,
+): HealthMetric[] {
+  return points.map((p, idx) => ({
+    id: `${metricType}-${p.timestamp.getTime()}-${idx}`,
+    type: metricType,
+    category: "sleep" as const,
+    value: p.value,
+    timestamp: p.timestamp,
+    unit,
+    metadata: p.metadata,
+  }));
 }
 
 // ── component ────────────────────────────────────────────────────────────────
@@ -129,22 +126,22 @@ export default function FacetedMetricChart({
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
 
+  const isSleep = metricKey === "sleep";
+  const chartKind = useMemo(() => getMetricChartKind(metricKey), [metricKey]);
+
   const values = useMemo(() => points.map((p) => p.value), [points]);
   const stats = useMemo(() => computeStats(values), [values]);
 
   const voiceOverLabel = useMemo(
     () => buildVoiceOverLabel(label, unit, stats, timeRange),
-    [label, unit, stats, timeRange]
+    [label, unit, stats, timeRange],
   );
 
-  const chartData = useMemo(() => {
-    if (!points.length) return [];
-    return points.map((p, idx) => ({
-      value: p.value,
-      label: formatChartLabel(idx, points.length, p.timestamp, timeRange),
-      dataPointColor: color,
-    }));
-  }, [points, timeRange, color]);
+  const chartDataPoints = useMemo(() => toDataPoints(points), [points]);
+  const sleepMetrics = useMemo(
+    () => (isSleep ? toHealthMetrics(points, metricKey, unit) : []),
+    [isSleep, points, metricKey, unit],
+  );
 
   const hasData = points.length > 0;
 
@@ -163,45 +160,57 @@ export default function FacetedMetricChart({
         )}
       </View>
 
-      {/* Chart — accessibilityLabel reads range+outliers only in VoiceOver */}
+      {/* Chart — intelligently selects chart type based on metric */}
       <View
-        accessible={true}
+        style={styles.chartWrap}
+        accessible
         accessibilityRole="image"
         accessibilityLabel={voiceOverLabel}
-        style={styles.chartWrap}
       >
         {hasData ? (
-          <LineChart
-            data={chartData}
-            width={CHART_W}
-            height={120}
-            color={color}
-            thickness={2}
-            curved
-            hideDataPoints
-            areaChart
-            startFillColor={color}
-            startOpacity={0.25}
-            endOpacity={0.02}
-            hideRules={false}
-            rulesColor="rgba(0,0,0,0.06)"
-            xAxisColor="rgba(0,0,0,0.1)"
-            yAxisColor="rgba(0,0,0,0.1)"
-            yAxisTextStyle={{ fontSize: 10, color: "#8E8E93" }}
-            xAxisLabelTextStyle={{ fontSize: 10, color: "#8E8E93" }}
-            backgroundColor="transparent"
-            isAnimated
-            animationDuration={600}
-            disableScroll
-            // Show data point on press (gives sighted users exact values)
-            focusEnabled
-            showTextOnFocus
-            textFontSize={11}
-            textColor="#1C1C1E"
-          />
+          isSleep ? (
+            <SleepChart
+              data={sleepMetrics}
+              width={CHART_W}
+              height={120}
+              timeRange={timeRange as "H" | "D" | "W" | "M" | "6M" | "Y"}
+              accessibilityLabel={voiceOverLabel}
+            />
+          ) : chartKind === "scatter" ? (
+            <ScatterPlot
+              data={chartDataPoints}
+              title=""
+              unit={unit}
+              width={CHART_W}
+              height={120}
+              accessibilityLabel={voiceOverLabel}
+              timeRange={timeRange as "H" | "D" | "W" | "M" | "6M" | "Y"}
+            />
+          ) : chartKind === "bar" ? (
+            <SimpleBarChart
+              data={chartDataPoints}
+              title=""
+              unit={unit}
+              width={CHART_W}
+              height={120}
+              accessibilityLabel={voiceOverLabel}
+            />
+          ) : (
+            <SimpleLineChart
+              data={chartDataPoints}
+              title=""
+              unit={unit}
+              width={CHART_W}
+              height={120}
+              accessibilityLabel={voiceOverLabel}
+              timeRange={timeRange as "H" | "D" | "W" | "M" | "6M" | "Y"}
+            />
+          )
         ) : (
           <View style={styles.emptyChart}>
-            <ThemedText style={[styles.emptyText, { fontSize: fontSize.label }]}>
+            <ThemedText
+              style={[styles.emptyText, { fontSize: fontSize.label }]}
+            >
               No {label.toLowerCase()} data for this period
             </ThemedText>
           </View>
@@ -215,11 +224,28 @@ export default function FacetedMetricChart({
           accessible={true}
           accessibilityLabel={`${label} stats: min ${Math.round(stats.min)}, average ${stats.avg.toFixed(1)}, max ${Math.round(stats.max)} ${unit}`}
         >
-          <StatPill label="Min" value={Math.round(stats.min)} unit={unit} fontSize={fontSize.label} />
+          <StatPill
+            label="Min"
+            value={Math.round(stats.min)}
+            unit={unit}
+            fontSize={fontSize.label}
+          />
           <View style={styles.statDivider} />
-          <StatPill label="Avg" value={parseFloat(stats.avg.toFixed(1))} unit={unit} fontSize={fontSize.label} highlight color={color} />
+          <StatPill
+            label="Avg"
+            value={parseFloat(stats.avg.toFixed(1))}
+            unit={unit}
+            fontSize={fontSize.label}
+            highlight
+            color={color}
+          />
           <View style={styles.statDivider} />
-          <StatPill label="Max" value={Math.round(stats.max)} unit={unit} fontSize={fontSize.label} />
+          <StatPill
+            label="Max"
+            value={Math.round(stats.max)}
+            unit={unit}
+            fontSize={fontSize.label}
+          />
 
           {stats.outliers.length > 0 && (
             <>
@@ -229,8 +255,11 @@ export default function FacetedMetricChart({
                 accessible={true}
                 accessibilityLabel={`${stats.outliers.length} outlier${stats.outliers.length > 1 ? "s" : ""} detected`}
               >
-                <ThemedText style={[styles.outlierText, { fontSize: fontSize.label - 1 }]}>
-                  ⚠ {stats.outliers.length} outlier{stats.outliers.length > 1 ? "s" : ""}
+                <ThemedText
+                  style={[styles.outlierText, { fontSize: fontSize.label - 1 }]}
+                >
+                  ⚠ {stats.outliers.length} outlier
+                  {stats.outliers.length > 1 ? "s" : ""}
                 </ThemedText>
               </View>
             </>
@@ -270,7 +299,8 @@ function StatPill({
       >
         {value}
         <ThemedText style={[styles.statUnit, { fontSize: fontSize - 2 }]}>
-          {" "}{unit}
+          {" "}
+          {unit}
         </ThemedText>
       </ThemedText>
     </View>
@@ -309,6 +339,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   chartWrap: {
+    width: "100%",
     alignItems: "center",
   },
   emptyChart: {
