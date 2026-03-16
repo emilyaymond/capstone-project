@@ -876,7 +876,7 @@ export default function MetricDetailScreen() {
             </ThemedText>
           </View>
 
-          <AccessibleButton
+          <TouchableOpacity
             label={`Show more ${title} data`}
             hint={`View additional ${title} metrics and details`}
             onPress={() =>
@@ -894,7 +894,7 @@ export default function MetricDetailScreen() {
             <ThemedText style={styles.moreText}>
               Show More {title} Data
             </ThemedText>
-          </AccessibleButton>
+          </TouchableOpacity>
 
           <View style={styles.highlightsHeader}>
             <ThemedText style={styles.highlightsTitle}>Highlights</ThemedText>
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   },
   moreText: {
     paddingTop: 4,
-    color: "#000000ff",
+    color: "#007AFF",
     fontWeight: "600",
     fontSize: 16,
   },

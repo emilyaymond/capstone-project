@@ -1,5 +1,5 @@
 // healthvis-mobile/features/summary/SummaryScreen.tsx
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -29,6 +29,8 @@ import {
 
 import { HealthMetric } from "@/types/health-metric";
 import { SummaryStateGate } from "@/features/summary/components/SummaryStateGate";
+import * as Speech from "expo-speech";
+import { SummaryAISummary } from "@/features/summary/components/SummaryAISummary";
 
 type SummaryMetricType = "sleep" | "heart_rate" | "steps" | "respiratory_rate";
 
@@ -241,6 +243,8 @@ export default function SummaryScreen() {
     getMetricsByType,
   } = useHealthData();
 
+  const [isReadingAISummary, setIsReadingAISummary] = useState(false);
+
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
 
@@ -272,6 +276,26 @@ export default function SummaryScreen() {
   const heartRateMetrics = getMetricsByType("heart_rate");
   const stepsMetrics = getMetricsByType("steps");
   const respiratoryRateMetrics = getMetricsByType("respiratory_rate");
+
+  const handleHearAISummary = useCallback((text: string) => {
+    if (!text) return;
+
+    Speech.stop();
+    setIsReadingAISummary(true);
+
+    Speech.speak(text, {
+      rate: 0.92,
+      pitch: 1.0,
+      onDone: () => setIsReadingAISummary(false),
+      onStopped: () => setIsReadingAISummary(false),
+      onError: () => setIsReadingAISummary(false),
+    });
+  }, []);
+
+  const handleStopAISummary = useCallback(() => {
+    Speech.stop();
+    setIsReadingAISummary(false);
+  }, []);
 
   const todaySleepHours = useMemo(
     () => getTodaySleepHours(sleepMetrics),
@@ -370,10 +394,6 @@ export default function SummaryScreen() {
     respiratoryRateMetrics,
   ]);
 
-  const pinnedRows = useMemo(() => {
-    return summaryCards.slice(0, 3);
-  }, [summaryCards]);
-
   const highlightLines = useMemo(
     () => buildHighlightLines(summaryCards),
     [summaryCards],
@@ -439,7 +459,7 @@ export default function SummaryScreen() {
 
   return (
     <LinearGradient
-      colors={["#EAF2FF", "#F8ECFF", "#F7F8FB"]}
+      colors={["#C2D9FF", "#FFDDFC", "#E8F1F9", "#f4f4f4ff"]}
       start={{ x: 0.1, y: 0 }}
       end={{ x: 0.9, y: 1 }}
       style={styles.background}
@@ -479,110 +499,34 @@ export default function SummaryScreen() {
               </ThemedText>
             </View>
 
-            <View
-              style={styles.aiCard}
-              accessible={true}
-              accessibilityRole="summary"
-              accessibilityLabel={`AI Summary. ${aiSummaryText}`}
-            >
-              <View style={styles.aiHeaderRow}>
-                <ThemedText
-                  style={[styles.sectionTitle, { fontSize: fontSize.body + 8 }]}
-                >
-                  AI Summary
-                </ThemedText>
-                <View style={styles.aiBadge}>
-                  <ThemedText
-                    style={[styles.aiBadgeText, { fontSize: fontSize.label }]}
-                  >
-                    Assistive
-                  </ThemedText>
-                </View>
-              </View>
-
-              <ThemedText
-                style={[styles.aiSummaryText, { fontSize: fontSize.body + 1 }]}
-              >
-                {aiSummaryText}
-              </ThemedText>
-
-              <View style={styles.aiActions}>
-                <AccessibleButton
-                  onPress={handleHearSummary}
-                  label={isSpeaking ? "Stop Speaking" : "Hear Screen Summary"}
-                  hint={
-                    isSpeaking
-                      ? "Stop reading the screen summary aloud"
-                      : "Read the current summary screen aloud"
-                  }
-                  variant="outline"
-                  style={styles.aiActionButton}
-                />
-                <AccessibleButton
-                  onPress={handleHearHighlights}
-                  label="Hear Highlights"
-                  hint="Read the most important highlights aloud"
-                  variant="outline"
-                  style={styles.aiActionButton}
-                />
-              </View>
-            </View>
-
-            <View style={styles.sectionHeaderRow}>
-              <ThemedText
-                style={[styles.sectionTitle, { fontSize: fontSize.body + 8 }]}
-              >
-                Pinned
-              </ThemedText>
-            </View>
-
-            <View
-              style={styles.pinnedList}
-              accessible={true}
-              accessibilityRole="summary"
-              accessibilityLabel={`${pinnedRows.length} pinned health metrics`}
-            >
-              {pinnedRows.length > 0 ? (
-                pinnedRows.map((card, index) => (
-                  <TouchableOpacity
+            <View style={styles.metricGrid}>
+              {summaryCards.length > 0 ? (
+                summaryCards.map((card) => (
+                  <SummaryMetricCard
                     key={card.type}
+                    card={card}
+                    fontSize={fontSize}
                     onPress={() => handleOpenMetric(card.type)}
-                    style={[
-                      styles.pinnedRow,
-                      index === pinnedRows.length - 1 && styles.pinnedRowLast,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={card.accessibilityLabel}
-                    accessibilityHint={`Open ${card.title} details`}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.pinnedLabel,
-                        { fontSize: fontSize.body + 3 },
-                      ]}
-                    >
-                      {card.title}
-                    </ThemedText>
-                    <ThemedText
-                      style={[
-                        styles.pinnedValue,
-                        { fontSize: fontSize.body + 3 },
-                      ]}
-                    >
-                      {card.valueText}
-                    </ThemedText>
-                  </TouchableOpacity>
+                  />
                 ))
               ) : (
                 <View style={styles.emptyBlock}>
                   <ThemedText
                     style={[styles.emptyText, { fontSize: fontSize.body }]}
                   >
-                    No pinned metrics available yet.
+                    No health data available yet.
                   </ThemedText>
                 </View>
               )}
             </View>
+
+            <SummaryAISummary
+              cards={summaryCards}
+              allMetrics={allMetrics}
+              onHearSummary={handleHearAISummary}
+              onStopSummary={handleStopAISummary}
+              isReading={isReadingAISummary}
+            />
 
             <View style={styles.sectionHeaderRow}>
               <ThemedText
@@ -618,35 +562,6 @@ export default function SummaryScreen() {
                     style={[styles.emptyText, { fontSize: fontSize.body }]}
                   >
                     Highlights will appear here once data is available.
-                  </ThemedText>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.sectionHeaderRow}>
-              <ThemedText
-                style={[styles.sectionTitle, { fontSize: fontSize.body + 8 }]}
-              >
-                Browse Metrics
-              </ThemedText>
-            </View>
-
-            <View style={styles.metricGrid}>
-              {summaryCards.length > 0 ? (
-                summaryCards.map((card) => (
-                  <SummaryMetricCard
-                    key={card.type}
-                    card={card}
-                    fontSize={fontSize}
-                    onPress={() => handleOpenMetric(card.type)}
-                  />
-                ))
-              ) : (
-                <View style={styles.emptyBlock}>
-                  <ThemedText
-                    style={[styles.emptyText, { fontSize: fontSize.body }]}
-                  >
-                    No health data available yet.
                   </ThemedText>
                 </View>
               )}
@@ -719,21 +634,17 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 14,
   },
-
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 6,
+  header: {
+    marginBottom: 4,
   },
-
   largeTitle: {
     fontSize: 34,
     lineHeight: 40,
     fontWeight: "800",
     color: "#111827",
+    marginBottom: 4,
   },
-  eading: {
+  subheading: {
     color: "#6B7280",
     fontWeight: "500",
   },
