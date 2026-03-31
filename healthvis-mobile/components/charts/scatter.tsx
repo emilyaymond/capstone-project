@@ -12,6 +12,8 @@ import {
   CartesianChart,
   Scatter,
   useChartPressState,
+  type CartesianChartRenderArg,
+  type PointsArray,
 } from "victory-native";
 import { Circle, Line as SkiaLine } from "@shopify/react-native-skia";
 import { useAnimatedReaction, runOnJS } from "react-native-reanimated";
@@ -479,7 +481,7 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
           domainPadding={{ top: 20, bottom: 10, left: 10, right: 10 }}
           xAxis={{
             tickValues: timeScale.ticks,
-            formatXLabel: (label) => timeScale.timeLabels[label as number] ?? "",
+            formatXLabel: (label: string | number) => timeScale.timeLabels[label as number] ?? "",
             labelColor: "#403e3e",
             lineColor: "rgba(229, 229, 229, 0.5)",
           }}
@@ -488,7 +490,7 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
             lineColor: "rgba(255, 255, 255, 0)",
           }]}
         >
-          {({ points, chartBounds }) => (
+          {({ points, chartBounds }: CartesianChartRenderArg<CartesianDataPoint, "value">) => (
             <>
               {/* Render scatter points with per-point colors */}
               {points.value.map((pt, i) => {
