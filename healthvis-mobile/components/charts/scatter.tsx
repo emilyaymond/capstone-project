@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   View,
   Vibration,
@@ -9,12 +9,13 @@ import {
 import { DataPoint } from "../../types";
 import { useAccessibility } from "../../contexts/AccessibilityContext";
 import {
-  VictoryChart,
-  VictoryScatter,
-  VictoryAxis,
-  VictoryTheme,
-  VictoryLabel,
+  CartesianChart,
+  Scatter,
+  useChartPressState,
 } from "victory-native";
+import { Circle, Line as SkiaLine } from "@shopify/react-native-skia";
+import { useAnimatedReaction, runOnJS } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 
 export interface ScatterPlotProps {
   data: DataPoint[];
@@ -229,6 +230,11 @@ function getTimeScaleConfig(
   }
 }
 
+type CartesianDataPoint = {
+  date: number;
+  value: number;
+};
+
 export const ScatterPlot: React.FC<ScatterPlotProps> = ({
   data,
   title,
@@ -240,6 +246,7 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
   timeRange = "D",
 }) => {
   const { settings, mode } = useAccessibility();
+  const [isPressed, setIsPressed] = useState(false);
 
   const fontSize = useMemo(() => {
     switch (settings.fontSize) {
@@ -297,9 +304,89 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
       .filter((point): point is ChartPoint => point !== null);
   }, [data, settings.contrast, timeScale]);
 
+  const cartesianData = useMemo<CartesianDataPoint[]>(() => {
+    return chartData
+      .map((pt) => ({ date: pt.x, value: pt.y }))
+      .sort((a, b) => a.date - b.date);
+  }, [chartData]);
+
+  const colorMap = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const pt of chartData) {
+      map[`${pt.x}_${pt.y}`] = pt.fill;
+    }
+    return map;
+  }, [chartData]);
+
   const primaryColor = useMemo(() => {
     return getColorForRange("normal", settings.contrast);
   }, [settings.contrast]);
+
+  const { state: chartPressedState } = useChartPressState({
+    x: 0 as number,
+    y: { value: 0 },
+  });
+
+  const triggerHaptic = useCallback(() => {
+    Haptics.selectionAsync();
+  }, []);
+
+  const setPressed = useCallback((pressed: boolean) => {
+    setIsPressed(pressed);
+  }, []);
+
+  const onSelectData = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < chartData.length) {
+        const pt = chartData[index];
+        if (pt) {
+          playToneForValue(pt.originalPoint.value, pt.originalPoint.range || "normal");
+          console.log(
+            `Touched point: ${pt.originalPoint.value}${unit ? ` ${unit}` : ""} at ${new Date(
+              pt.originalPoint.timestamp,
+            ).toLocaleTimeString()}`,
+          );
+        }
+      }
+    },
+    [chartData, unit],
+  );
+
+  // Trigger haptic when matched index changes during active press
+  useAnimatedReaction(
+    () => ({
+      index: chartPressedState.matchedIndex.value,
+      active: chartPressedState.isActive.value,
+    }),
+    (current, previous) => {
+      if (current.active && previous && current.index !== previous.index) {
+        runOnJS(triggerHaptic)();
+      }
+    },
+  );
+
+  // Sync isActive to React state for conditional rendering outside Skia
+  useAnimatedReaction(
+    () => chartPressedState.isActive.value,
+    (active, previousActive) => {
+      if (active !== previousActive) {
+        runOnJS(setPressed)(active);
+      }
+    },
+  );
+
+  // Fire onSelectData callback when matched index changes
+  useAnimatedReaction(
+    () => ({
+      index: chartPressedState.matchedIndex.value,
+      active: chartPressedState.isActive.value,
+    }),
+    (current, previous) => {
+      if (current.active && previous && current.index !== previous.index) {
+        runOnJS(onSelectData)(current.index);
+      }
+    },
+  );
 
   if (isLoading) {
     return (
@@ -366,6 +453,8 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
       chartData.length !== 1 ? "s" : ""
     }. Range ${minValue} to ${maxValue}${unit ? ` ${unit}` : ""}.`;
 
+  const dotRadius = mode === "simplified" ? 7 : 5.5;
+
   return (
     <View
       style={[
@@ -380,97 +469,81 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
         <Text style={[styles.title, { fontSize: titleFontSize }]}>{title}</Text>
       )}
 
-      <View style={styles.chartWrapper}>
-        <VictoryChart
-          width={chartWidth}
-          height={chartHeight + 20}
-          theme={VictoryTheme.material}
+      <View style={[styles.chartWrapper, { height: chartHeight + 20 }]}>
+        <CartesianChart
+          data={cartesianData}
+          xKey="date"
+          yKeys={["value"]}
+          chartPressState={chartPressedState}
           padding={{ top: 20, bottom: 25, left: 40, right: 10 }}
-          domainPadding={{ x: 10, y: [10, 20] }}
+          domainPadding={{ top: 20, bottom: 10, left: 10, right: 10 }}
+          xAxis={{
+            tickValues: timeScale.ticks,
+            formatXLabel: (label) => timeScale.timeLabels[label as number] ?? "",
+            labelColor: "#403e3e",
+            lineColor: "rgba(229, 229, 229, 0.5)",
+          }}
+          yAxis={[{
+            labelColor: "#403e3e",
+            lineColor: "rgba(255, 255, 255, 0)",
+          }]}
         >
-          <VictoryAxis
-            tickValues={timeScale.ticks}
-            tickFormat={(t: number) => timeScale.timeLabels[t] || ""}
-            style={{
-              grid: { stroke: "rgba(229, 229, 229, 0.5)" },
-              tickLabels: { fontSize: fontSize - 2, fill: "#403e3e", angle: 0 },
-              axisLabel: { fontSize: fontSize, fill: "#403e3e" },
-            }}
-          />
+          {({ points, chartBounds }) => (
+            <>
+              {/* Render scatter points with per-point colors */}
+              {points.value.map((pt, i) => {
+                if (pt.y == null) return null;
+                const key = `${pt.xValue}_${pt.yValue}`;
+                const color = colorMap[key] ?? primaryColor;
+                return (
+                  <Circle
+                    key={i}
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={dotRadius}
+                    color={color}
+                  />
+                );
+              })}
 
-          <VictoryAxis
-            dependentAxis
-            label={() => null}
-            style={{
-              grid: { stroke: "rgba(255, 255, 255, 0)" },
-              tickLabels: { fontSize: fontSize - 2, fill: "#403e3e" },
-              axisLabel: { fontSize: fontSize, fill: "#403e3e" },
-            }}
-          />
-
-          <VictoryScatter
-            data={chartData}
-            style={{
-              data: {
-                fill: ({ datum }) => datum.fill || primaryColor,
-              },
-              labels: {
-                fill: "transparent",
-                fontSize: 0,
-              },
-            }}
-            size={mode === "simplified" ? 7 : 5.5}
-            symbol="circle"
-            labelComponent={<VictoryLabel dy={-15} />}
-            events={[
-              {
-                target: "data",
-                eventHandlers: {
-                  onPressIn: () => {
-                    return [
-                      {
-                        target: "data",
-                        mutation: (props) => {
-                          const { datum } = props;
-                          const dataPoint = datum.originalPoint as DataPoint;
-
-                          if (dataPoint) {
-                            playToneForValue(
-                              dataPoint.value,
-                              dataPoint.range || "normal",
-                            );
-
-                            console.log(
-                              `Touched point: ${dataPoint.value}${unit ? ` ${unit}` : ""} at ${new Date(
-                                dataPoint.timestamp,
-                              ).toLocaleTimeString()}`,
-                            );
-                          }
-
-                          return { size: mode === "simplified" ? 10 : 8 };
-                        },
-                      },
-                    ];
-                  },
-                  onPressOut: () => {
-                    return [
-                      {
-                        target: "data",
-                        mutation: () => null,
-                      },
-                    ];
-                  },
-                },
-              },
-            ]}
-          />
-        </VictoryChart>
+              {/* Crosshair and highlight when pressed */}
+              {isPressed && (
+                <>
+                  <SkiaLine
+                    p1={{ x: chartPressedState.x.position.value, y: chartBounds.top }}
+                    p2={{ x: chartPressedState.x.position.value, y: chartBounds.bottom }}
+                    color="rgba(0,0,0,0.3)"
+                    strokeWidth={1}
+                  />
+                  {chartPressedState.y.value.position.value != null && (
+                    <Circle
+                      cx={chartPressedState.x.position.value}
+                      cy={chartPressedState.y.value.position.value}
+                      r={dotRadius + 3}
+                      color={primaryColor}
+                      opacity={0.4}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </CartesianChart>
       </View>
+
+      {isPressed && (
+        <View style={styles.tooltipContainer}>
+          <Text style={[styles.tooltipText, { fontSize: fontSize - 1 }]}>
+            {chartPressedState.y.value.value.value.toFixed(1)}
+            {unit ? ` ${unit}` : ""}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.summary}>
         <Text style={[styles.summaryText, { fontSize: fontSize - 2 }]}>
           {chartData.length} data point{chartData.length !== 1 ? "s" : ""}
-          {" • "}
+          {" \u2022 "}
           Range: {minValue} - {maxValue}
           {unit ? ` ${unit}` : ""}
         </Text>
@@ -492,7 +565,6 @@ const styles = StyleSheet.create({
   },
   chartWrapper: {
     width: "100%",
-    height: "90%",
     alignItems: "center",
   },
   loadingContainer: {
@@ -522,6 +594,17 @@ const styles = StyleSheet.create({
   emptyHint: {
     color: "#999",
     textAlign: "center",
+  },
+  tooltipContainer: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  tooltipText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   summary: {
     marginTop: 10,
