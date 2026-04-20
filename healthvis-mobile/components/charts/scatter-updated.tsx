@@ -1,10 +1,4 @@
-import React, {
-  useMemo,
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -12,7 +6,6 @@ import {
   ActivityIndicator,
   Platform,
   Vibration,
-  AccessibilityInfo,
 } from "react-native";
 import { DataPoint } from "../../types";
 import { useAccessibility } from "../../contexts/AccessibilityContext";
@@ -32,8 +25,6 @@ export interface ScatterPlotProps {
   isLoading?: boolean;
   accessibilityLabel?: string;
   timeRange?: "H" | "D" | "W" | "M" | "6M" | "Y";
-  color?: string;
-  aggregation?: "avg" | "sum";
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,8 +60,8 @@ type HapticZone = "below" | "normal" | "elevated" | "high";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEFAULT_WIDTH = 360;
-const DEFAULT_HEIGHT = 250;
+const DEFAULT_WIDTH = 320;
+const DEFAULT_HEIGHT = 220;
 
 // ─── Helpers: delay ───────────────────────────────────────────────────────────
 
@@ -78,80 +69,11 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ─── Helpers: Y-axis ticks ────────────────────────────────────────────────────
-
-function getYTickValues(min: number, max: number, count = 4): number[] {
-  if (min === max) return [min];
-
-  const range = max - min;
-  const rawStep = range / (count - 1);
-
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const normalized = rawStep / magnitude;
-
-  let niceStep = magnitude;
-  if (normalized >= 5) niceStep = 5 * magnitude;
-  else if (normalized >= 2) niceStep = 2 * magnitude;
-
-  const niceMin = Math.floor(min / niceStep) * niceStep;
-  const niceMax = Math.ceil(max / niceStep) * niceStep;
-
-  const ticks: number[] = [];
-  for (let v = niceMin; v <= niceMax + 0.0001; v += niceStep) {
-    ticks.push(v);
-  }
-
-  return ticks;
-}
-
-function getChartValueBounds(values: number[]) {
-  if (!values.length) return { min: 0, max: 100 };
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  if (min === max) {
-    return { min: min - 5, max: max + 5 };
-  }
-
-  const padding = (max - min) * 0.1;
-  return {
-    min: Math.floor(min - padding),
-    max: Math.ceil(max + padding),
-  };
-}
-
 // ─── Helpers: color ───────────────────────────────────────────────────────────
-
-/**
- * Darkens a hex color by a percentage
- * @param hex - Color in #RRGGBB format
- * @param percent - Percentage to darken (0-100)
- */
-function darkenColor(hex: string, percent: number): string {
-  // Remove # if present
-  const color = hex.replace("#", "");
-
-  // Parse RGB
-  const r = parseInt(color.substring(0, 2), 16);
-  const g = parseInt(color.substring(2, 4), 16);
-  const b = parseInt(color.substring(4, 6), 16);
-
-  // Darken by reducing each channel
-  const factor = 1 - percent / 100;
-  const newR = Math.round(r * factor);
-  const newG = Math.round(g * factor);
-  const newB = Math.round(b * factor);
-
-  // Convert back to hex
-  const toHex = (n: number) => n.toString(16).padStart(2, "0");
-  return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
-}
 
 const getColorForRange = (
   range: "normal" | "warning" | "danger",
   contrast: "normal" | "high",
-  baseColor?: string,
 ): string => {
   if (contrast === "high") {
     switch (range) {
@@ -163,20 +85,7 @@ const getColorForRange = (
         return "#8B0000";
     }
   }
-
-  // If base color provided, use shades of that color
-  if (baseColor) {
-    switch (range) {
-      case "normal":
-        return baseColor;
-      case "warning":
-        return darkenColor(baseColor, 25); // 25% darker
-      case "danger":
-        return darkenColor(baseColor, 45); // 45% darker
-    }
-  }
-
-  // Default red palette for heart rate
+  // Restored old color palette (preferred look)
   switch (range) {
     case "normal":
       return "#ff0d00";
@@ -252,10 +161,10 @@ async function hapticForZone(zone: HapticZone): Promise<void> {
     } else {
       // Android: map to Vibration patterns [delay, vibrate, pause, vibrate, ...]
       const patterns: Record<HapticZone, number[]> = {
-        below: [0, 60, 180, 60],
-        normal: [0, 40],
+        below:    [0, 60, 180, 60],
+        normal:   [0, 40],
         elevated: [0, 60, 80, 60],
-        high: [0, 80, 60, 100],
+        high:     [0, 80, 60, 100],
       };
       Vibration.vibrate(patterns[zone]);
     }
@@ -299,10 +208,7 @@ function getSixMonthWeekLabels(now = new Date()): Record<number, string> {
     );
     const weekIndex = 25 - Math.floor(diffDays / 7);
     if (weekIndex >= 0 && weekIndex <= 25) {
-      monthStarts.push({
-        tick: weekIndex,
-        label: formatter.format(monthStart),
-      });
+      monthStarts.push({ tick: weekIndex, label: formatter.format(monthStart) });
     }
   }
 
@@ -316,22 +222,17 @@ function getSixMonthWeekLabels(now = new Date()): Record<number, string> {
 
 function getTickConfig(timeRange: TimeRangeKey, now = new Date()): TickConfig {
   switch (timeRange) {
-    case "H": {
-      const formatter = new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
+    case "H":
       return {
         ticks: [0, 15, 30, 45, 60],
         timeLabels: {
-          0: formatter.format(new Date(now.getTime() - 60 * 60 * 1000)),
-          15: formatter.format(new Date(now.getTime() - 45 * 60 * 1000)),
-          30: formatter.format(new Date(now.getTime() - 30 * 60 * 1000)),
-          45: formatter.format(new Date(now.getTime() - 15 * 60 * 1000)),
-          60: formatter.format(now),
+          0: "-60m",
+          15: "-45m",
+          30: "-30m",
+          45: "-15m",
+          60: "Now",
         },
       };
-    }
     case "D":
       return {
         ticks: [0, 6, 12, 18, 24],
@@ -340,7 +241,7 @@ function getTickConfig(timeRange: TimeRangeKey, now = new Date()): TickConfig {
           6: "6am",
           12: "12pm",
           18: "6pm",
-          24: "12am",
+          24: "",
         },
       };
     case "W":
@@ -389,8 +290,7 @@ function formatDateTimeRange(
   timeRange: TimeRangeKey,
 ) {
   if (timeRange === "H") return formatShortTime(end);
-  if (timeRange === "D")
-    return `${formatShortTime(start)}–${formatShortTime(end)}`;
+  if (timeRange === "D") return `${formatShortTime(start)}–${formatShortTime(end)}`;
   if (timeRange === "W" || timeRange === "M") return formatShortDate(start);
   if (timeRange === "6M" || timeRange === "Y") {
     return `${formatShortDate(start)}–${formatShortDate(end)}`;
@@ -404,7 +304,6 @@ function buildHourlyPoints(
   data: DataPoint[],
   contrast: "normal" | "high",
   now = new Date(),
-  baseColor?: string,
 ): HourlyPoint[] {
   return data
     .map((point) => {
@@ -417,7 +316,7 @@ function buildHourlyPoints(
       return {
         date: x,
         value: point.value,
-        fill: getColorForRange(point.range || "normal", contrast, baseColor),
+        fill: getColorForRange(point.range || "normal", contrast),
         originalPoint: point,
       };
     })
@@ -473,8 +372,6 @@ function buildRangeBuckets(
   timeRange: Exclude<TimeRangeKey, "H">,
   contrast: "normal" | "high",
   now = new Date(),
-  baseColor?: string,
-  aggregation: "avg" | "sum" = "avg",
 ): RangeBucket[] {
   const groups = new Map<number, DataPoint[]>();
 
@@ -490,23 +387,9 @@ function buildRangeBuckets(
     .sort((a, b) => a[0] - b[0])
     .map(([x, points]) => {
       const values = points.map((p) => p.value);
-
-      // For sum aggregation, we want the total as both low and high (single value)
-      // For avg aggregation, we want the range (min to max)
-      let low: number;
-      let high: number;
-      let avg: number;
-
-      if (aggregation === "sum") {
-        const total = values.reduce((sum, v) => sum + v, 0);
-        low = total;
-        high = total;
-        avg = total;
-      } else {
-        low = Math.min(...values);
-        high = Math.max(...values);
-        avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-      }
+      const low = Math.min(...values);
+      const high = Math.max(...values);
+      const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
 
       const sortedByTime = [...points].sort(
         (a, b) =>
@@ -525,7 +408,7 @@ function buildRangeBuckets(
         high,
         avg,
         count: points.length,
-        fill: getColorForRange(severity, contrast, baseColor),
+        fill: getColorForRange(severity, contrast),
         startDate: sortedByTime[0].timestamp,
         endDate: sortedByTime[sortedByTime.length - 1].timestamp,
         label:
@@ -535,99 +418,6 @@ function buildRangeBuckets(
       };
     });
 }
-
-// ─── Sub-component: ManualAxisTicks ──────────────────────────────────────────
-
-type AxisTicksProps = {
-  xTicks: number[];
-  xLabels: Record<number, string>;
-  yTicks: number[];
-  chartWidth: number;
-  chartHeight: number;
-  leftPad: number;
-  rightPad: number;
-  topPad: number;
-  bottomPad: number;
-  fontSize: number;
-};
-
-const ManualAxisTicks: React.FC<AxisTicksProps> = ({
-  xTicks,
-  xLabels,
-  yTicks,
-  chartWidth,
-  chartHeight,
-  leftPad,
-  rightPad,
-  topPad,
-  bottomPad,
-  fontSize,
-}) => {
-  const innerWidth = chartWidth - leftPad - rightPad;
-  const innerHeight = chartHeight - topPad - bottomPad;
-
-  const minX = Math.min(...xTicks);
-  const maxX = Math.max(...xTicks);
-
-  // Account for domainPadding in the chart (8px on each side)
-  const domainPaddingX = 8;
-  const effectiveInnerWidth = innerWidth - 2 * domainPaddingX;
-
-  return (
-    <View
-      pointerEvents="none"
-      style={[
-        StyleSheet.absoluteFillObject,
-        { width: chartWidth, height: chartHeight },
-      ]}
-    >
-      {/* X tick labels */}
-      {xTicks.map((tick) => {
-        const ratio = maxX === minX ? 0 : (tick - minX) / (maxX - minX);
-        const x = leftPad + domainPaddingX + ratio * effectiveInnerWidth;
-
-        return (
-          <Text
-            key={`x-${tick}`}
-            style={[
-              styles.manualXTick,
-              {
-                left: x - 24,
-                top: chartHeight - bottomPad + 10,
-                width: 48,
-                fontSize: fontSize - 2,
-              },
-            ]}
-          >
-            {xLabels[tick] ?? ""}
-          </Text>
-        );
-      })}
-
-      {/* Y tick labels */}
-      {yTicks.map((tick, index) => {
-        const ratio = yTicks.length <= 1 ? 0 : index / (yTicks.length - 1);
-        const y = chartHeight - bottomPad - ratio * innerHeight;
-
-        return (
-          <Text
-            key={`y-${tick}`}
-            style={[
-              styles.manualYTick,
-              {
-                top: y - 10,
-                width: leftPad - 10,
-                fontSize: fontSize - 2,
-              },
-            ]}
-          >
-            {Math.round(tick)}
-          </Text>
-        );
-      })}
-    </View>
-  );
-};
 
 // ─── Sub-component: HourlyScatterChart ───────────────────────────────────────
 
@@ -640,7 +430,6 @@ type HourlyChartProps = {
   tickConfig: TickConfig;
   primaryColor: string;
   unit?: string;
-  title?: string;
   onSelectionChange?: (point: HourlyPoint | null) => void;
 };
 
@@ -653,23 +442,11 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
   tickConfig,
   primaryColor,
   unit,
-  title,
   onSelectionChange,
 }) => {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isPressed, setIsPressed] = useState(false);
   const lastZoneRef = useRef<HapticZone | null>(null);
-
-  const [voiceOverOn, setVoiceOverOn] = useState(false);
-
-  useEffect(() => {
-    AccessibilityInfo.isScreenReaderEnabled().then(setVoiceOverOn);
-    const sub = AccessibilityInfo.addEventListener(
-      "screenReaderChanged",
-      setVoiceOverOn,
-    );
-    return () => sub.remove();
-  }, []);
 
   const activePoint =
     activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
@@ -678,14 +455,6 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
     x: 0,
     y: { value: 0 },
   });
-
-  const leftPad = 44;
-  const rightPad = 18;
-  const topPad = 16;
-  const bottomPad = 34;
-
-  const yBounds = getChartValueBounds(data.map((d) => d.value));
-  const yTicks = getYTickValues(yBounds.min, yBounds.max, 4);
 
   // Zone-aware haptic — fires pattern based on clinical significance of point.
   // Only re-fires if the zone changes, preventing haptic spam on same-zone drag.
@@ -738,66 +507,23 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
   }, [isActive, updatePressed]);
 
   return (
-    <View
-      accessible={voiceOverOn}
-      accessibilityRole={voiceOverOn ? "adjustable" : undefined}
-      accessibilityLabel={`${title || "Heart rate"} chart. ${data.length} data point${data.length !== 1 ? "s" : ""}.`}
-      accessibilityValue={{
-        text: activePoint
-          ? `${Math.round(activePoint.value)}${unit ? " " + unit : ""}, ${formatShortTime(activePoint.originalPoint.timestamp)}`
-          : `Range ${data.length > 0 ? Math.round(Math.min(...data.map((d) => d.value))) : 0} to ${data.length > 0 ? Math.round(Math.max(...data.map((d) => d.value))) : 0}${unit ? " " + unit : ""}`,
-        min: 0,
-        max: Math.max(data.length - 1, 0),
-        now: activeIndex >= 0 ? activeIndex : 0,
-      }}
-      accessibilityHint={
-        voiceOverOn ? "Swipe up to advance, swipe down to go back" : undefined
-      }
-      accessibilityActions={
-        voiceOverOn ? [{ name: "increment" }, { name: "decrement" }] : undefined
-      }
-      onAccessibilityAction={
-        voiceOverOn
-          ? (event) => {
-              if (event.nativeEvent.actionName === "increment") {
-                const next = Math.min(activeIndex + 1, data.length - 1);
-                updateActiveIndex(next);
-                hapticForZone(getHapticZone(data[next]?.originalPoint.range));
-              } else if (event.nativeEvent.actionName === "decrement") {
-                const prev = Math.max(activeIndex - 1, 0);
-                updateActiveIndex(prev);
-                hapticForZone(getHapticZone(data[prev]?.originalPoint.range));
-              }
-            }
-          : undefined
-      }
-    >
-      <View
-        style={{
-          width: chartWidth,
-          height: chartHeight,
-          position: "relative",
-          alignSelf: "center",
-        }}
-      >
+    <>
+      <View style={{ height: chartHeight - 8, width: chartWidth }}>
         <CartesianChart
           data={data}
           xKey="date"
           yKeys={["value"]}
           chartPressState={chartPressedState}
-          padding={{
-            top: topPad,
-            bottom: bottomPad,
-            left: leftPad,
-            right: rightPad,
-          }}
+          padding={{ top: 14, bottom: 24, left: 36, right: 10 }}
           domainPadding={{ left: 8, right: 8, top: 10, bottom: 8 }}
           xAxis={{
             tickValues: tickConfig.ticks,
-            formatXLabel: () => "",
-            labelColor: "rgba(0,0,0,0)",
+            formatXLabel: (label) =>
+              tickConfig.timeLabels[label as number] ?? "",
+            // Restored warm axis label color from old scatter
+            labelColor: "#403e3e",
             lineColor: "rgba(229, 229, 229, 0.5)",
-            labelOffset: 0,
+            labelOffset: 8,
           }}
           yAxis={[
             {
@@ -812,8 +538,7 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
                 points={points.value}
                 shape="circle"
                 radius={dotRadius}
-                style="fill"
-                color={primaryColor}
+                style={{ fill: { color: primaryColor } }}
               />
               {(() => {
                 const selectedPoint = points.value[activeIndex];
@@ -832,18 +557,6 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
             </>
           )}
         </CartesianChart>
-        <ManualAxisTicks
-          xTicks={tickConfig.ticks}
-          xLabels={tickConfig.timeLabels}
-          yTicks={yTicks}
-          chartWidth={chartWidth}
-          chartHeight={chartHeight}
-          leftPad={leftPad}
-          rightPad={rightPad}
-          topPad={topPad}
-          bottomPad={bottomPad}
-          fontSize={fontSize}
-        />
       </View>
 
       <View style={styles.summary}>
@@ -867,7 +580,7 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
           </Text>
         </View>
       )}
-    </View>
+    </>
   );
 };
 
@@ -882,7 +595,6 @@ type RangeChartProps = {
   primaryColor: string;
   timeRange: Exclude<TimeRangeKey, "H">;
   unit?: string;
-  title?: string;
   onSelectionChange?: (bucket: RangeBucket | null) => void;
 };
 
@@ -895,23 +607,11 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
   primaryColor,
   timeRange,
   unit,
-  title,
   onSelectionChange,
 }) => {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isPressed, setIsPressed] = useState(false);
   const lastZoneRef = useRef<HapticZone | null>(null);
-
-  const [voiceOverOn, setVoiceOverOn] = useState(false);
-
-  useEffect(() => {
-    AccessibilityInfo.isScreenReaderEnabled().then(setVoiceOverOn);
-    const sub = AccessibilityInfo.addEventListener(
-      "screenReaderChanged",
-      setVoiceOverOn,
-    );
-    return () => sub.remove();
-  }, []);
 
   const activeBucket =
     activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
@@ -973,81 +673,29 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
 
   const strokeWidth = timeRange === "D" ? 10 : 8;
 
-  const leftPad = 38;
-  const rightPad = 20;
-  const topPad = 16;
-  const bottomPad = 34;
-
-  const bucketValues = data.flatMap((d) => [d.low, d.high]);
-  const yBounds = getChartValueBounds(bucketValues);
-  const yTicks = getYTickValues(yBounds.min, yBounds.max, 4);
-
   return (
-    <View
-      accessible={voiceOverOn}
-      accessibilityRole={voiceOverOn ? "adjustable" : undefined}
-      accessibilityLabel={`${title || "Heart rate"} range chart. ${data.reduce((s, b) => s + b.count, 0)} data points.`}
-      accessibilityValue={{
-        text: activeBucket
-          ? `${Math.round(activeBucket.low)} to ${Math.round(activeBucket.high)}${unit ? " " + unit : ""}, ${formatDateTimeRange(activeBucket.startDate, activeBucket.endDate, timeRange)}`
-          : `${data.length} buckets`,
-        min: 0,
-        max: Math.max(data.length - 1, 0),
-        now: activeIndex >= 0 ? activeIndex : 0,
-      }}
-      accessibilityHint={
-        voiceOverOn ? "Swipe up to advance, swipe down to go back" : undefined
-      }
-      accessibilityActions={
-        voiceOverOn ? [{ name: "increment" }, { name: "decrement" }] : undefined
-      }
-      onAccessibilityAction={
-        voiceOverOn
-          ? (event) => {
-              if (event.nativeEvent.actionName === "increment") {
-                const next = Math.min(activeIndex + 1, data.length - 1);
-                updateActiveIndex(next);
-                hapticForZone(getBucketHapticZone(data[next]));
-              } else if (event.nativeEvent.actionName === "decrement") {
-                const prev = Math.max(activeIndex - 1, 0);
-                updateActiveIndex(prev);
-                hapticForZone(getBucketHapticZone(data[prev]));
-              }
-            }
-          : undefined
-      }
-    >
-      <View
-        style={{
-          width: chartWidth,
-          height: chartHeight,
-          position: "relative",
-          alignSelf: "center",
-        }}
-      >
+    <>
+      <View style={{ height: chartHeight - 8, width: chartWidth }}>
         <CartesianChart
           data={data}
           xKey="x"
           yKeys={["low", "high", "avg"]}
           chartPressState={chartPressedState}
-          padding={{
-            top: topPad,
-            bottom: bottomPad,
-            left: leftPad,
-            right: rightPad,
-          }}
+          padding={{ top: 14, bottom: 24, left: 36, right: 10 }}
           domainPadding={{ left: 8, right: 8, top: 10, bottom: 8 }}
           xAxis={{
             tickValues: tickConfig.ticks,
-            formatXLabel: () => "",
-            labelColor: "rgba(0, 0, 0, 1)",
-            lineColor: "rgba(0, 0, 0, 0.2)",
-            labelOffset: 0,
+            formatXLabel: (label) =>
+              tickConfig.timeLabels[label as number] ?? "",
+            // Restored warm axis label color from old scatter
+            labelColor: "#403e3e",
+            lineColor: "rgba(229, 229, 229, 0.5)",
+            labelOffset: 8,
           }}
           yAxis={[
             {
               labelColor: "rgba(0,0,0,0)",
-              lineColor: "rgba(0,0,0,0)",
+              lineColor: "rgba(0,0,0,0.04)",
             },
           ]}
         >
@@ -1059,7 +707,11 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
                 const bucket = data[i];
 
                 if (!lowPt || !highPt || !avgPt || !bucket) return null;
-                if (lowPt.y == null || highPt.y == null || avgPt.y == null) {
+                if (
+                  lowPt.y == null ||
+                  highPt.y == null ||
+                  avgPt.y == null
+                ) {
                   return null;
                 }
 
@@ -1111,18 +763,6 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
             </>
           )}
         </CartesianChart>
-        <ManualAxisTicks
-          xTicks={tickConfig.ticks}
-          xLabels={tickConfig.timeLabels}
-          yTicks={yTicks}
-          chartWidth={chartWidth}
-          chartHeight={chartHeight}
-          leftPad={leftPad}
-          rightPad={rightPad}
-          topPad={topPad}
-          bottomPad={bottomPad}
-          fontSize={fontSize}
-        />
       </View>
 
       <View style={styles.summary}>
@@ -1147,7 +787,7 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
           </Text>
         </View>
       )}
-    </View>
+    </>
   );
 };
 
@@ -1162,8 +802,6 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
   isLoading = false,
   accessibilityLabel,
   timeRange = "D",
-  color,
-  aggregation = "avg",
 }) => {
   const { settings, mode } = useAccessibility();
 
@@ -1200,15 +838,13 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
   );
 
   const primaryColor = useMemo(() => {
-    return color || getColorForRange("normal", settings.contrast);
-  }, [color, settings.contrast]);
+    return getColorForRange("normal", settings.contrast);
+  }, [settings.contrast]);
 
   const hourlyData = useMemo(
     () =>
-      timeRange === "H"
-        ? buildHourlyPoints(data, settings.contrast, now, color)
-        : [],
-    [data, settings.contrast, timeRange, now, color],
+      timeRange === "H" ? buildHourlyPoints(data, settings.contrast, now) : [],
+    [data, settings.contrast, timeRange, now],
   );
 
   const bucketedData = useMemo(
@@ -1219,11 +855,9 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
             timeRange as Exclude<TimeRangeKey, "H">,
             settings.contrast,
             now,
-            color,
-            aggregation,
           )
         : [],
-    [data, settings.contrast, timeRange, now, color, aggregation],
+    [data, settings.contrast, timeRange, now],
   );
 
   const visibleValues =
@@ -1286,9 +920,7 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
           </Text>
         )}
         <View style={[styles.emptyContainer, { height: chartHeight }]}>
-          <Text style={[styles.emptyText, { fontSize }]}>
-            No data available
-          </Text>
+          <Text style={[styles.emptyText, { fontSize }]}>No data available</Text>
           <Text style={[styles.emptyHint, { fontSize: fontSize - 2 }]}>
             Upload or sync data to view chart
           </Text>
@@ -1299,10 +931,7 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
 
   return (
     <View
-      style={[
-        styles.container,
-        { width: chartWidth, minHeight: chartHeight + 56 },
-      ]}
+      style={[styles.container, { width: chartWidth, minHeight: chartHeight + 92 }]}
       accessible
       accessibilityRole="image"
       accessibilityLabel={chartAccessibilityLabel}
@@ -1322,7 +951,6 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
             tickConfig={tickConfig}
             primaryColor={primaryColor}
             unit={unit}
-            title={title}
           />
         ) : (
           <BucketedRangeChart
@@ -1334,7 +962,6 @@ export const ScatterPlot: React.FC<ScatterPlotProps> = ({
             primaryColor={primaryColor}
             timeRange={timeRange as Exclude<TimeRangeKey, "H">}
             unit={unit}
-            title={title}
           />
         )}
       </View>
@@ -1411,7 +1038,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   summary: {
-    marginTop: 4,
+    marginTop: 8,
     paddingHorizontal: 16,
   },
   summaryText: {
@@ -1419,25 +1046,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   rangeFooter: {
-    marginTop: 2,
+    marginTop: 4,
   },
   rangeFooterText: {
     color: "#6E6E73",
     textAlign: "center",
-  },
-  manualXTick: {
-    paddingLeft: 14,
-    position: "absolute",
-    color: "#6e6e73",
-    textAlign: "center",
-    includeFontPadding: false,
-  },
-  manualYTick: {
-    position: "absolute",
-    left: 0,
-    color: "#6e6e73",
-    textAlign: "right",
-    includeFontPadding: false,
   },
 });
 

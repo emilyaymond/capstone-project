@@ -392,6 +392,9 @@ export default function MetricDetailScreen() {
     // No aggregation for hourly
     if (timeRange === "H") return filtered;
 
+    // Scatter charts handle their own bucketing for daily view
+    if (chartKind === "scatter" && timeRange === "D") return filtered;
+
     let bucketSize: number;
     switch (timeRange) {
       case "D":
@@ -413,7 +416,7 @@ export default function MetricDetailScreen() {
         bucketSize = 5 * 60 * 1000;
     }
     return aggregateData(filtered, bucketSize, agg);
-  }, [allRaw, timeRange, isSleep, agg]);
+  }, [allRaw, timeRange, isSleep, agg, chartKind]);
 
   // ── Hero stat computation ─────────────────────────────────────────────────
   const heroValue = useMemo<string>(() => {
@@ -795,6 +798,8 @@ export default function MetricDetailScreen() {
                 height={260}
                 accessibilityLabel={`${cfg.label} scatter plot`}
                 timeRange={timeRange}
+                color={cfg.color}
+                aggregation={agg === "latest" ? "avg" : agg}
               />
             ) : chartKind === "bar" ? (
               <SimpleBarChart
@@ -867,30 +872,6 @@ export default function MetricDetailScreen() {
           </View>
         )}
 
-        {/* ── Data list ──────────────────────────────────────────────── */}
-        {data.length > 0 && (
-          <View style={styles.card}>
-            <ThemedText
-              style={[styles.cardTitle, { fontSize: fontSize.body + 2 }]}
-            >
-              {isSleep ? "Sleep Segments" : "Readings"}
-            </ThemedText>
-            <View
-              accessibilityRole="list"
-              accessibilityLabel={`${data.length} ${isSleep ? "sleep segments" : "readings"}`}
-            >
-              {data.slice(0, 40).map((item, idx) => (
-                <TimeSliceRow
-                  key={`${item.timestamp}-${idx}`}
-                  metric={item}
-                  onFocus={() => Vibration.vibrate(20)}
-                  accessibilityLabel={formatRowForVoiceOver(item, timeRange)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
         <View style={{ height: 40 }} />
       </ScrollView>
     </ThemedView>
@@ -901,7 +882,7 @@ export default function MetricDetailScreen() {
 
 const styles = StyleSheet.create({
   bg: { flex: 1 },
-  content: { padding: 16, paddingTop: 56, gap: 12 },
+  content: { padding: 14, paddingTop: 56, gap: 12 },
   rangeBlock: {
     gap: 2,
     marginTop: 4,
@@ -985,14 +966,6 @@ const styles = StyleSheet.create({
   heroValue: { fontWeight: "800", marginTop: 4 },
   heroUnit: { color: "#8E8E93", fontWeight: "500", marginTop: 2 },
   heroSub: { color: "#8E8E93", marginTop: 6 },
-  rangeBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  rangeBadgeText: { fontWeight: "700", fontSize: 13 },
 
   // Stats container
   statsContainer: {
@@ -1076,15 +1049,11 @@ const styles = StyleSheet.create({
   // Chart
   chartCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 12,
+    borderRadius: 10,
+    padding: 10,
     alignItems: "center",
     minHeight: 120,
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
   },
   emptyChart: { color: "#8E8E93", textAlign: "center", paddingVertical: 32 },
 

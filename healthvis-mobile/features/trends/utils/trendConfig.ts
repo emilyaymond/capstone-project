@@ -33,7 +33,7 @@ export const METRIC_CHIPS: MetricChip[] = [
     key: "respiratory_rate",
     label: "Respiratory Rate",
     unit: "br/min",
-    color: "#34C759",
+    color: "#00b7ff",
     aggregation: "avg",
     category: "vitals",
   },
@@ -109,7 +109,7 @@ export const METRIC_CHIPS: MetricChip[] = [
 
 /** Lookup by key */
 export const METRIC_MAP = new Map<string, MetricChip>(
-  METRIC_CHIPS.map((m) => [m.key, m])
+  METRIC_CHIPS.map((m) => [m.key, m]),
 );
 
 export const DEFAULT_COMPARE_METRICS = ["heart_rate", "steps", "sleep"];
@@ -118,34 +118,59 @@ export const DEFAULT_COMPARE_METRICS = ["heart_rate", "steps", "sleep"];
 
 export function getBucketMs(range: TimeRangeKey): number {
   switch (range) {
-    case "H": return 5 * 60 * 1000;          // 5-min buckets
-    case "D": return 30 * 60 * 1000;          // 30-min buckets
-    case "W": return 3 * 60 * 60 * 1000;      // 3-hour buckets
-    case "M": return 12 * 60 * 60 * 1000;     // 12-hour buckets
-    case "6M": return 24 * 60 * 60 * 1000;   // daily buckets
-    case "Y": return 7 * 24 * 60 * 60 * 1000; // weekly buckets
+    case "H":
+      return 5 * 60 * 1000; // 5-min buckets
+    case "D":
+      return 30 * 60 * 1000; // 30-min buckets
+    case "W":
+      return 3 * 60 * 60 * 1000; // 3-hour buckets
+    case "M":
+      return 12 * 60 * 60 * 1000; // 12-hour buckets
+    case "6M":
+      return 24 * 60 * 60 * 1000; // daily buckets
+    case "Y":
+      return 7 * 24 * 60 * 60 * 1000; // weekly buckets
   }
 }
 
 export function getStartDate(range: TimeRangeKey): Date {
   const now = new Date();
   switch (range) {
-    case "H":  return new Date(now.getTime() - 60 * 60 * 1000);
-    case "D":  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    case "W":  return new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-    case "M":  return new Date(now.getFullYear(), now.getMonth(), 1);
-    case "6M": return new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
-    case "Y":  return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    case "H":
+      return new Date(now.getTime() - 60 * 60 * 1000);
+    case "D":
+      return new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        0,
+        0,
+        0,
+      );
+    case "W":
+      return new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+    case "M":
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    case "6M":
+      return new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+    case "Y":
+      return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
   }
 }
 
 export function rangeLabel(range: TimeRangeKey): string {
   switch (range) {
-    case "H": return "last hour";
-    case "D": return "today";
-    case "W": return "this week";
-    case "M": return "this month";
-    case "6M": return "last 6 months";
-    case "Y": return "this year";
+    case "H":
+      return "last hour";
+    case "D":
+      return "today";
+    case "W":
+      return "this week";
+    case "M":
+      return "this month";
+    case "6M":
+      return "last 6 months";
+    case "Y":
+      return "this year";
   }
 }

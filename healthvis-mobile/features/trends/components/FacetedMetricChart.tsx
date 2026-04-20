@@ -185,6 +185,7 @@ export default function FacetedMetricChart({
               height={120}
               accessibilityLabel={voiceOverLabel}
               timeRange={timeRange as "H" | "D" | "W" | "M" | "6M" | "Y"}
+              color={color}
             />
           ) : chartKind === "bar" ? (
             <SimpleBarChart
