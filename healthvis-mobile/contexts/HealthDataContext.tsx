@@ -437,17 +437,34 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         const freshMetrics =
           await healthKitService.fetchAllHealthData(fetchOptions);
 
-        // Update state with fresh data
-        setHealthMetrics(freshMetrics);
-
-        // Save to cache
-        await saveHealthMetricsToCache(freshMetrics);
-
         // Calculate total metrics fetched
         const totalMetrics = Object.values(freshMetrics).reduce(
           (sum, category) => sum + category.length,
           0,
         );
+
+        // Every per-category fetcher degrades to [] on failure, so a total
+        // HealthKit failure arrives here as a well-formed but empty result.
+        // Overwriting good cached data with it would blank the dashboard, so
+        // keep what we already showed and leave the cache untouched.
+        const hasCachedMetrics =
+          !!cachedMetrics &&
+          Object.values(cachedMetrics).some((cat) => cat.length > 0);
+
+        if (totalMetrics === 0 && hasCachedMetrics) {
+          console.warn(
+            "HealthKit returned no metrics; keeping cached data instead of clearing the dashboard",
+          );
+          announceSuccess("Using cached health data");
+          setIsLoading(false);
+          return;
+        }
+
+        // Update state with fresh data
+        setHealthMetrics(freshMetrics);
+
+        // Save to cache
+        await saveHealthMetricsToCache(freshMetrics);
 
         console.log(`✅ Fetched ${totalMetrics} health metrics from HealthKit`);
 

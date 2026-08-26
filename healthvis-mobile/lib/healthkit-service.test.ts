@@ -5,7 +5,6 @@
  * of the HealthKit service.
  */
 
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import AppleHealthKit from 'react-native-health';
 import {
   healthKitService,
@@ -24,8 +23,11 @@ jest.mock('react-native-health', () => ({
   getOxygenSaturationSamples: jest.fn(),
   getBloodGlucoseSamples: jest.fn(),
   getStepCount: jest.fn(),
+  getDailyStepCountSamples: jest.fn(),
   getDistanceWalkingRunning: jest.fn(),
+  getDailyDistanceWalkingRunningSamples: jest.fn(),
   getFlightsClimbed: jest.fn(),
+  getDailyFlightsClimbedSamples: jest.fn(),
   getActiveEnergyBurned: jest.fn(),
   getAppleExerciseTime: jest.fn(),
   getWeightSamples: jest.fn(),
@@ -45,8 +47,11 @@ jest.mock('react-native-health', () => ({
     getOxygenSaturationSamples: jest.fn(),
     getBloodGlucoseSamples: jest.fn(),
     getStepCount: jest.fn(),
+    getDailyStepCountSamples: jest.fn(),
     getDistanceWalkingRunning: jest.fn(),
+    getDailyDistanceWalkingRunningSamples: jest.fn(),
     getFlightsClimbed: jest.fn(),
+    getDailyFlightsClimbedSamples: jest.fn(),
     getActiveEnergyBurned: jest.fn(),
     getAppleExerciseTime: jest.fn(),
     getWeightSamples: jest.fn(),
@@ -667,31 +672,43 @@ describe('HealthKit Service - Activity Metrics Fetching', () => {
     limit: 100,
   };
 
-  describe('fetchSteps', () => {
-    it('should fetch step count successfully', async () => {
-      const mockResult = {
-        value: 10000,
-        startDate: '2024-01-15T00:00:00Z',
-        endDate: '2024-01-15T23:59:59Z',
-      };
+  /** Registers a mock HealthKit query that calls back with the given sample array. */
+  function mockQuery(fn: any, samples: any[]) {
+    (fn as jest.Mock).mockImplementation(
+      (options: any, callback: (err: string, results: any) => void) => {
+        callback('', samples);
+      }
+    );
+  }
 
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', mockResult);
-        }
-      );
+  describe('fetchSteps', () => {
+    it('should return one metric per day from getDailyStepCountSamples', async () => {
+      mockQuery(AppleHealthKit.getDailyStepCountSamples, [
+        { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+        { value: 8200, startDate: '2024-01-16T00:00:00Z', endDate: '2024-01-16T23:59:59Z' },
+        { value: 11350, startDate: '2024-01-17T00:00:00Z', endDate: '2024-01-17T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchSteps(mockFetchOptions);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(3);
       expect(results[0].type).toBe('steps');
       expect(results[0].category).toBe('activity');
-      expect(results[0].value).toBe(10000);
       expect(results[0].unit).toBe('steps');
+      expect(results.map((m) => m.value)).toEqual([10000, 8200, 11350]);
+    });
+
+    it('should not use the range-aggregate getStepCount API', async () => {
+      mockQuery(AppleHealthKit.getDailyStepCountSamples, []);
+
+      await healthKitService.fetchSteps(mockFetchOptions);
+
+      expect(AppleHealthKit.getStepCount).not.toHaveBeenCalled();
+      expect(AppleHealthKit.getDailyStepCountSamples).toHaveBeenCalled();
     });
 
     it('should return empty array on error', async () => {
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyStepCountSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
           callback('Permission denied', null);
         }
@@ -704,22 +721,15 @@ describe('HealthKit Service - Activity Metrics Fetching', () => {
   });
 
   describe('fetchDistance', () => {
-    it('should fetch distance samples successfully', async () => {
-      const mockResult = {
-        value: 5.2,
-        startDate: '2024-01-15T10:00:00Z',
-        endDate: '2024-01-15T11:00:00Z',
-      };
-
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', mockResult);
-        }
-      );
+    it('should return one metric per day from getDailyDistanceWalkingRunningSamples', async () => {
+      mockQuery(AppleHealthKit.getDailyDistanceWalkingRunningSamples, [
+        { value: 5.2, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+        { value: 3.1, startDate: '2024-01-16T00:00:00Z', endDate: '2024-01-16T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchDistance(mockFetchOptions);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].type).toBe('distance');
       expect(results[0].category).toBe('activity');
       expect(results[0].value).toBe(5.2);
@@ -728,22 +738,15 @@ describe('HealthKit Service - Activity Metrics Fetching', () => {
   });
 
   describe('fetchFlightsClimbed', () => {
-    it('should fetch flights climbed samples successfully', async () => {
-      const mockResult = {
-        value: 10,
-        startDate: '2024-01-15T10:00:00Z',
-        endDate: '2024-01-15T11:00:00Z',
-      };
-
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', mockResult);
-        }
-      );
+    it('should return one metric per day from getDailyFlightsClimbedSamples', async () => {
+      mockQuery(AppleHealthKit.getDailyFlightsClimbedSamples, [
+        { value: 10, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+        { value: 4, startDate: '2024-01-16T00:00:00Z', endDate: '2024-01-16T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchFlightsClimbed(mockFetchOptions);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].type).toBe('flights_climbed');
       expect(results[0].value).toBe(10);
       expect(results[0].unit).toBe('flights');
@@ -751,22 +754,17 @@ describe('HealthKit Service - Activity Metrics Fetching', () => {
   });
 
   describe('fetchActiveEnergy', () => {
-    it('should fetch active energy burned successfully', async () => {
-      const mockResult = {
-        value: 450,
-        startDate: '2024-01-15T00:00:00Z',
-        endDate: '2024-01-15T23:59:59Z',
-      };
-
-      (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', mockResult);
-        }
-      );
+    // getActiveEnergyBurned calls back with an array; treating it as a single
+    // HealthValue silently produced zero metrics for this type.
+    it('should convert every sample in the returned array', async () => {
+      mockQuery(AppleHealthKit.getActiveEnergyBurned, [
+        { value: 450, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+        { value: 380, startDate: '2024-01-16T00:00:00Z', endDate: '2024-01-16T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchActiveEnergy(mockFetchOptions);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].type).toBe('active_energy');
       expect(results[0].value).toBe(450);
       expect(results[0].unit).toBe('kcal');
@@ -774,22 +772,16 @@ describe('HealthKit Service - Activity Metrics Fetching', () => {
   });
 
   describe('fetchExerciseMinutes', () => {
-    it('should fetch exercise minutes successfully', async () => {
-      const mockResult = {
-        value: 45,
-        startDate: '2024-01-15T00:00:00Z',
-        endDate: '2024-01-15T23:59:59Z',
-      };
-
-      (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', mockResult);
-        }
-      );
+    // getAppleExerciseTime also calls back with an array.
+    it('should convert every sample in the returned array', async () => {
+      mockQuery(AppleHealthKit.getAppleExerciseTime, [
+        { value: 45, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+        { value: 30, startDate: '2024-01-16T00:00:00Z', endDate: '2024-01-16T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchExerciseMinutes(mockFetchOptions);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].type).toBe('exercise_minutes');
       expect(results[0].value).toBe(45);
       expect(results[0].unit).toBe('min');
@@ -798,93 +790,66 @@ describe('HealthKit Service - Activity Metrics Fetching', () => {
 
   describe('fetchAllActivity', () => {
     it('should fetch all activity metrics in parallel and combine results', async () => {
-      // Mock all activity fetchers
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
-
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 5.2, startDate: '2024-01-15T10:00:00Z', endDate: '2024-01-15T11:00:00Z' });
-        }
-      );
-
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 10, startDate: '2024-01-15T12:00:00Z', endDate: '2024-01-15T13:00:00Z' });
-        }
-      );
-
-      (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 450, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
-
-      (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 45, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
+      mockQuery(AppleHealthKit.getDailyStepCountSamples, [
+        { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
+      mockQuery(AppleHealthKit.getDailyDistanceWalkingRunningSamples, [
+        { value: 5.2, startDate: '2024-01-15T10:00:00Z', endDate: '2024-01-15T11:00:00Z' },
+      ]);
+      mockQuery(AppleHealthKit.getDailyFlightsClimbedSamples, [
+        { value: 10, startDate: '2024-01-15T12:00:00Z', endDate: '2024-01-15T13:00:00Z' },
+      ]);
+      mockQuery(AppleHealthKit.getActiveEnergyBurned, [
+        { value: 450, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
+      mockQuery(AppleHealthKit.getAppleExerciseTime, [
+        { value: 45, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchAllActivity(mockFetchOptions);
 
-      // Should have: 1 steps + 1 distance + 1 flights + 1 active energy + 1 exercise = 5 metrics
+      // 1 steps + 1 distance + 1 flights + 1 active energy + 1 exercise
       expect(results.length).toBe(5);
-      
-      // Verify all categories are activity
-      results.forEach(metric => {
+
+      results.forEach((metric) => {
         expect(metric.category).toBe('activity');
       });
 
       // Verify results are sorted by timestamp (most recent first)
       for (let i = 0; i < results.length - 1; i++) {
-        expect(results[i].timestamp.getTime()).toBeGreaterThanOrEqual(results[i + 1].timestamp.getTime());
+        expect(results[i].timestamp.getTime()).toBeGreaterThanOrEqual(
+          results[i + 1].timestamp.getTime()
+        );
       }
     });
 
     it('should continue fetching even if one activity type fails', async () => {
-      // Mock some success, some failures
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
-
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(
+      mockQuery(AppleHealthKit.getDailyStepCountSamples, [
+        { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
+      (AppleHealthKit.getDailyDistanceWalkingRunningSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
           callback('Permission denied', null);
         }
       );
-
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
-
-      (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 450, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
-
-      (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(
-        (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
-        }
-      );
+      mockQuery(AppleHealthKit.getDailyFlightsClimbedSamples, [
+        { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
+      mockQuery(AppleHealthKit.getActiveEnergyBurned, [
+        { value: 450, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
+      mockQuery(AppleHealthKit.getAppleExerciseTime, [
+        { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' },
+      ]);
 
       const results = await healthKitService.fetchAllActivity(mockFetchOptions);
 
       // Should have steps, flights (0), active energy, and exercise (0)
       expect(results.length).toBe(4);
-      expect(results.some(m => m.type === 'steps')).toBe(true);
-      expect(results.some(m => m.type === 'active_energy')).toBe(true);
-      expect(results.some(m => m.type === 'flights_climbed')).toBe(true);
-      expect(results.some(m => m.type === 'exercise_minutes')).toBe(true);
+      expect(results.some((m) => m.type === 'steps')).toBe(true);
+      expect(results.some((m) => m.type === 'active_energy')).toBe(true);
+      expect(results.some((m) => m.type === 'flights_climbed')).toBe(true);
+      expect(results.some((m) => m.type === 'exercise_minutes')).toBe(true);
     });
   });
 });
@@ -1544,29 +1509,29 @@ describe('HealthKit Service - Comprehensive Data Fetching', () => {
       );
 
       // Mock all activity
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyStepCountSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
+          callback('', [{ value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' }]);
         }
       );
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyDistanceWalkingRunningSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
           callback('', []);
         }
       );
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyFlightsClimbedSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
           callback('', []);
         }
       );
       (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
+          callback('', [{ value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' }]);
         }
       );
       (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
+          callback('', [{ value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' }]);
         }
       );
 
@@ -1697,9 +1662,9 @@ describe('HealthKit Service - Comprehensive Data Fetching', () => {
       const mockError = (options: any, callback: (err: string, results: any) => void) => {
         callback('Permission denied', null);
       };
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(mockError);
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(mockError);
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(mockError);
+      (AppleHealthKit.getDailyStepCountSamples as jest.Mock).mockImplementation(mockError);
+      (AppleHealthKit.getDailyDistanceWalkingRunningSamples as jest.Mock).mockImplementation(mockError);
+      (AppleHealthKit.getDailyFlightsClimbedSamples as jest.Mock).mockImplementation(mockError);
       (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(mockError);
       (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(mockError);
 
@@ -1764,7 +1729,7 @@ describe('HealthKit Service - Comprehensive Data Fetching', () => {
       expect(results.mindfulness).toEqual([]);
     });
 
-    it('should return empty categorized data if all fetches fail', async () => {
+    it('should return empty categories when every underlying query fails', async () => {
       // Mock all categories to fail
       const mockError = (options: any, callback: (err: string, results: any) => void) => {
         callback('Permission denied', null);
@@ -1779,9 +1744,9 @@ describe('HealthKit Service - Comprehensive Data Fetching', () => {
       (AppleHealthKit.getBloodGlucoseSamples as jest.Mock).mockImplementation(mockError);
 
       // Activity
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(mockError);
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(mockError);
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(mockError);
+      (AppleHealthKit.getDailyStepCountSamples as jest.Mock).mockImplementation(mockError);
+      (AppleHealthKit.getDailyDistanceWalkingRunningSamples as jest.Mock).mockImplementation(mockError);
+      (AppleHealthKit.getDailyFlightsClimbedSamples as jest.Mock).mockImplementation(mockError);
       (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(mockError);
       (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(mockError);
 
@@ -1804,9 +1769,11 @@ describe('HealthKit Service - Comprehensive Data Fetching', () => {
       // Mindfulness
       delete (AppleHealthKit as any).getMindfulSession;
 
+      // Each per-category fetcher degrades to [] on its own, so a total data
+      // failure surfaces as an empty-but-intact structure, not a rejection.
+      // HealthDataContext is responsible for preferring cached data over this.
       const results = await healthKitService.fetchAllHealthData(mockFetchOptions);
 
-      // Verify structure is intact with empty arrays
       expect(results).toEqual({
         vitals: [],
         activity: [],
@@ -1817,35 +1784,45 @@ describe('HealthKit Service - Comprehensive Data Fetching', () => {
       });
     });
 
+    it('should reject when the date range is invalid', async () => {
+      await expect(
+        healthKitService.fetchAllHealthData({
+          startDate: new Date('2024-01-31'),
+          endDate: new Date('2024-01-01'),
+          limit: 100,
+        })
+      ).rejects.toThrow();
+    });
+
     it('should handle errors in individual category fetchers', async () => {
       // Mock fetchAllVitals to throw an error
       const originalFetchAllVitals = healthKitService.fetchAllVitals;
       healthKitService.fetchAllVitals = jest.fn().mockRejectedValue(new Error('Vitals fetch failed'));
 
       // Mock other categories to succeed
-      (AppleHealthKit.getStepCount as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyStepCountSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
+          callback('', [{ value: 10000, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' }]);
         }
       );
-      (AppleHealthKit.getDistanceWalkingRunning as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyDistanceWalkingRunningSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
           callback('', []);
         }
       );
-      (AppleHealthKit.getFlightsClimbed as jest.Mock).mockImplementation(
+      (AppleHealthKit.getDailyFlightsClimbedSamples as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
           callback('', []);
         }
       );
       (AppleHealthKit.getActiveEnergyBurned as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
+          callback('', [{ value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' }]);
         }
       );
       (AppleHealthKit.getAppleExerciseTime as jest.Mock).mockImplementation(
         (options: any, callback: (err: string, results: any) => void) => {
-          callback('', { value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' });
+          callback('', [{ value: 0, startDate: '2024-01-15T00:00:00Z', endDate: '2024-01-15T23:59:59Z' }]);
         }
       );
 
