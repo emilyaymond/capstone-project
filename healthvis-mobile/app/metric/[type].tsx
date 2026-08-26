@@ -39,7 +39,7 @@ import { announceNavigation, announceDataUpdate } from "@/lib/announcer";
 
 import { SimpleLineChart } from "@/components/charts/lineChart";
 import { SimpleBarChart } from "@/components/charts/barChart";
-import { ScatterPlot } from "@/components/charts/scatter";
+import { ScatterPlot, buildRangeBuckets } from "@/components/charts/scatter";
 import { SleepChart } from "@/components/charts/sleepChart";
 import { SleepStageBreakdown } from "@/components/SleepStageBreakdown";
 import { AISummary } from "@/components/ai/aiSummary";
@@ -51,7 +51,7 @@ import {
   classifyRange,
   hasDefinedRange,
 } from "@/types/health-metric";
-import { DataPoint } from "@/types";
+import { DataPoint, DataRange } from "@/types";
 import {
   getMetricConfig,
   getMetricChartKind,
@@ -476,9 +476,52 @@ export default function MetricDetailScreen() {
     return cfg.heroLabel;
   }, [timeRange, isSleep, cfg]);
 
-  // ── Key stats (min / avg / max) ────────────────────────────────────────────
+  const points = useMemo(() => toPoints(data), [data]);
+
+  // ── Values actually plotted on the chart ──────────────────────────────────
+  // The scatter chart re-buckets `data` before drawing: on W it turns hourly
+  // points into one dot per day. Deriving stats from `data` therefore described
+  // a different time resolution than the chart directly below them -- on
+  // Steps/W the header reported steps per active hour (avg 488, min 1, max
+  // 3,888) while the chart plotted daily totals (1,947-14,315). Reuse the
+  // chart's own bucketing so the two agree by construction.
+  const displayedSeries = useMemo<
+    { value: number; timestamp: Date; range: DataRange }[]
+  >(() => {
+    if (chartKind === "scatter" && timeRange !== "H") {
+      return buildRangeBuckets(
+        points,
+        timeRange as Exclude<TimeRange, "H">,
+        settings.contrast,
+        new Date(),
+        cfg.color,
+        agg === "sum" ? "sum" : "avg",
+      ).map((bucket) => ({
+        value: bucket.avg,
+        timestamp: new Date(bucket.endDate),
+        range: bucket.severity,
+      }));
+    }
+    return data
+      .map((d) => ({
+        value: Number(d.value),
+        timestamp: new Date(d.timestamp),
+        range: d.range ?? ("normal" as DataRange),
+      }))
+      .filter((d) => Number.isFinite(d.value));
+  }, [
+    points,
+    data,
+    chartKind,
+    timeRange,
+    agg,
+    cfg.color,
+    settings.contrast,
+  ]);
+
+  // ── Key stats (min / max / outliers) ───────────────────────────────────────
   const keyStats = useMemo(() => {
-    const vals = data.map((d) => Number(d.value)).filter(Number.isFinite);
+    const vals = displayedSeries.map((d) => d.value);
     if (!vals.length) return null;
     const min = Math.min(...vals);
     const max = Math.max(...vals);
@@ -486,12 +529,16 @@ export default function MetricDetailScreen() {
     const stdDev = Math.sqrt(
       vals.reduce((s, v) => s + (v - avg) ** 2, 0) / vals.length,
     );
-    const outlierCount = vals.filter(
-      (v) => Math.abs(v - avg) > 2 * stdDev,
-    ).length;
+    // With very few buckets (a 7-point week) almost nothing sits beyond 2 sigma
+    // in a meaningful sense, so only flag outliers once there is a real
+    // distribution to speak of.
+    const outlierCount =
+      vals.length >= 8 && stdDev > 0
+        ? vals.filter((v) => Math.abs(v - avg) > 2 * stdDev).length
+        : 0;
     const unit = data[0]?.unit ?? cfg.unit;
     return { min, max, avg, outlierCount, unit };
-  }, [data, cfg]);
+  }, [displayedSeries, data, cfg]);
 
   // ── Sleep breakdown ────────────────────────────────────────────────────────
   const sleepBreakdown = useMemo(
@@ -499,8 +546,30 @@ export default function MetricDetailScreen() {
     [isSleep, data],
   );
 
-  const latest = data.length ? data[data.length - 1] : undefined;
-  const points = useMemo(() => toPoints(data), [data]);
+  /** Reshapes the plotted series into HealthMetrics for downstream consumers. */
+  const displayedMetrics = useMemo<HealthMetric[]>(() => {
+    const template = data[0];
+    return displayedSeries.map((point, index) => ({
+      id: `${metricType}-displayed-${index}`,
+      category: template?.category ?? "activity",
+      type: metricType,
+      value: point.value,
+      timestamp: point.timestamp,
+      unit: template?.unit ?? cfg.unit,
+      range: point.range,
+    }));
+  }, [displayedSeries, data, metricType, cfg.unit]);
+
+  const latestPoint = displayedSeries.length
+    ? displayedSeries[displayedSeries.length - 1]
+    : undefined;
+  const latest = latestPoint
+    ? {
+        value: latestPoint.value,
+        timestamp: latestPoint.timestamp,
+        unit: data[0]?.unit ?? cfg.unit,
+      }
+    : undefined;
   const rangeSubtitle = rangeSubtitleText(timeRange);
 
   // ── Range picker options ─────────────────────────────────────────────────
@@ -518,11 +587,23 @@ export default function MetricDetailScreen() {
 
   // ── VoiceOver hero summary ────────────────────────────────────────────────
   const heroA11yLabel = useMemo(() => {
-    const base = `${cfg.label}. ${heroLabel}: ${heroValue} ${isSleep ? "" : (data[0]?.unit ?? cfg.unit)}. ${rangeSubtitle}.`;
-    if (cfg.normalRange) return `${base} Normal range: ${cfg.normalRange}.`;
-    if (keyStats?.outlierCount)
-      return `${base} ${keyStats.outlierCount} outlier${keyStats.outlierCount > 1 ? "s" : ""} detected.`;
-    return base;
+    const parts = [
+      `${cfg.label}. ${heroLabel}: ${heroValue} ${isSleep ? "" : (data[0]?.unit ?? cfg.unit)}. ${rangeSubtitle}.`,
+    ];
+    if (keyStats) {
+      parts.push(
+        `Range ${formatValue(keyStats.min, keyStats.unit)} to ${formatValue(keyStats.max, keyStats.unit)} ${keyStats.unit}.`,
+      );
+    }
+    // Previously an early return on normalRange meant outliers were never
+    // announced for any metric that defines a normal range.
+    if (cfg.normalRange) parts.push(`Normal range: ${cfg.normalRange}.`);
+    if (keyStats?.outlierCount) {
+      parts.push(
+        `${keyStats.outlierCount} outlier${keyStats.outlierCount > 1 ? "s" : ""} detected.`,
+      );
+    }
+    return parts.join(" ");
   }, [cfg, heroLabel, heroValue, data, rangeSubtitle, keyStats, isSleep]);
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
@@ -731,11 +812,11 @@ export default function MetricDetailScreen() {
         {!isSleep && keyStats && (
           <View style={styles.statsContainer}>
             <MainStat
-              label="Average"
-              value={formatValue(keyStats.avg, keyStats.unit)}
+              label={heroLabel}
+              value={heroValue}
               unit={isSleep ? "" : keyStats.unit}
               color={cfg.color}
-              accessibilityLabel={`Average: ${formatValue(keyStats.avg, keyStats.unit)} ${keyStats.unit}`}
+              accessibilityLabel={heroA11yLabel}
             />
             <View style={styles.secondaryStats}>
               <StatPill
@@ -863,7 +944,7 @@ export default function MetricDetailScreen() {
               {isSleep ? "AI Sleep Summary" : "AI Health Summary"}
             </ThemedText>
             <AISummary
-              data={data}
+              data={displayedMetrics}
               metricName={cfg.label}
               timeRange={timeRange}
               min={keyStats?.min}
