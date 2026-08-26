@@ -6,7 +6,6 @@
  * properly integrated.
  */
 
-import { describe, it, expect, jest } from '@jest/globals';
 import { HealthValue } from 'react-native-health';
 
 // Mock react-native-health before importing healthkit-service
@@ -397,9 +396,13 @@ describe('HealthKit Sample Conversion', () => {
     });
 
     // Test range classification integration
+    // NORMAL_RANGES.heart_rate is 40-120 bpm, deliberately wider than the
+    // clinical resting range of 60-100. HealthKit samples include exercise
+    // heart rate, and the app cannot yet tell resting from active, so a
+    // narrower band would fire warning haptics through every workout.
     it('should classify warning range correctly', () => {
       const sample: HealthValue = {
-        value: 55, // Below normal range for heart rate
+        value: 130, // Above normal max (120) but within the 20% danger margin
         startDate: '2024-01-15T10:00:00Z',
         endDate: '2024-01-15T10:00:00Z',
       };
@@ -411,7 +414,7 @@ describe('HealthKit Sample Conversion', () => {
 
     it('should classify danger range correctly', () => {
       const sample: HealthValue = {
-        value: 45, // Significantly below normal range for heart rate
+        value: 160, // More than 20% above the normal max (120 * 1.2 = 144)
         startDate: '2024-01-15T10:00:00Z',
         endDate: '2024-01-15T10:00:00Z',
       };
@@ -419,6 +422,18 @@ describe('HealthKit Sample Conversion', () => {
       const metric = convertHealthKitSample(sample, 'heart_rate');
 
       expect(metric.range).toBe('danger');
+    });
+
+    it('should classify a value inside the normal band as normal', () => {
+      const sample: HealthValue = {
+        value: 55, // Athlete resting heart rate: inside 40-120, not a warning
+        startDate: '2024-01-15T10:00:00Z',
+        endDate: '2024-01-15T10:00:00Z',
+      };
+
+      const metric = convertHealthKitSample(sample, 'heart_rate');
+
+      expect(metric.range).toBe('normal');
     });
 
     // Test metadata preservation
