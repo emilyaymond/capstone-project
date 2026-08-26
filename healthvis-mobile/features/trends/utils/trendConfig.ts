@@ -1,3 +1,5 @@
+import { HealthMetricType } from "@/types/health-metric";
+
 export type TimeRangeKey = "H" | "D" | "W" | "M" | "6M" | "Y";
 
 export const TIME_RANGES: { key: TimeRangeKey; label: string }[] = [
@@ -10,7 +12,7 @@ export const TIME_RANGES: { key: TimeRangeKey; label: string }[] = [
 ];
 
 export type MetricChip = {
-  key: string;
+  key: HealthMetricType;
   label: string;
   unit: string;
   color: string;

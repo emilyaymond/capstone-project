@@ -165,19 +165,21 @@ export function ErrorDisplay({
   showDismiss = true,
   style,
 }: ErrorDisplayProps): React.ReactElement | null {
-  // Don't render if no error
-  if (!error) {
-    return null;
-  }
-
-  // Detect error type if not provided
-  const detectedType = errorType || detectErrorType(error);
+  // Detect error type if not provided. Computed before any early return so the
+  // hooks below always run in the same order (rules of hooks).
+  const detectedType = error ? errorType ?? detectErrorType(error) : 'unknown';
 
   // Get error content
-  const { title, message, recoveryHint } = getErrorContent(detectedType, error);
+  const { title, message, recoveryHint } = getErrorContent(
+    detectedType,
+    error ?? '',
+  );
 
   // Announce error to screen readers when component mounts or error changes
   useEffect(() => {
+    if (!error) {
+      return;
+    }
     // Announce with assertive priority (Requirement 15.2)
     announceError(`${title}. ${message}. ${recoveryHint}`);
   }, [error, title, message, recoveryHint]);
@@ -195,6 +197,11 @@ export function ErrorDisplay({
       onDismiss();
     }
   };
+
+  // Don't render if no error
+  if (!error) {
+    return null;
+  }
 
   return (
     <View style={[styles.container, style]} accessibilityRole="alert">

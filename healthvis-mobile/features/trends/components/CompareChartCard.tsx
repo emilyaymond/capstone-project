@@ -69,6 +69,22 @@ export default function CompareChartCard(props: {
 
   const hasData = normalized.length > 0;
 
+  /** Builds the VoiceOver description of the comparison chart from its series. */
+  const chartAccessibilityLabel = useMemo(() => {
+    if (normalized.length === 0) {
+      return "Comparison chart. No data selected.";
+    }
+    const parts = normalized.map(
+      (s) =>
+        `${s.label}, ranging from ${Math.round(s.originalMin)} to ${Math.round(
+          s.originalMax,
+        )} ${s.unit}, ${s.points.length} ${
+          s.points.length === 1 ? "point" : "points"
+        }`,
+    );
+    return `Comparison chart. ${parts.join(". ")}.`;
+  }, [normalized]);
+
   return (
     <ThemedView style={styles.card} accessible accessibilityLabel="Compare chart">
       <View style={styles.headerRow}>
@@ -95,7 +111,12 @@ export default function CompareChartCard(props: {
             }).join("  •  ")}
           </ThemedText>
 
-          <View style={styles.chartContainer}>
+          <View
+            style={styles.chartContainer}
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={chartAccessibilityLabel}
+          >
             <LineChart
               data={normalized[0]?.points.map((p, idx) => ({
                 value: p.value,
@@ -123,9 +144,6 @@ export default function CompareChartCard(props: {
               backgroundColor="transparent"
               isAnimated
               animationDuration={800}
-              accessible
-              accessibilityLabel="Comparison chart showing multiple metrics over time"
-              accessibilityRole="image"
             />
           </View>
 

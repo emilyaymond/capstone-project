@@ -7,7 +7,7 @@
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Audio } from "expo-av";
 import { useAccessibility } from "../contexts/AccessibilityContext";
 import { AccessibilityMode } from "../types";
@@ -75,6 +75,12 @@ export function useAudio(): UseAudioReturn {
   const soundObjectsRef = useRef<Audio.Sound[]>([]);
   const isInitializedRef = useRef(false);
 
+  // Read settings through a ref so the returned API can stay referentially
+  // stable. Consumers put this object in useCallback/useEffect dependency
+  // arrays; a new object every render made those effects re-run every render.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   // Initialize Audio Mode
 
   useEffect(() => {
@@ -139,7 +145,7 @@ export function useAudio(): UseAudioReturn {
     type: OscillatorType = "sine",
   ): Promise<void> {
     // Check if audio is enabled
-    if (!settings.audioEnabled) {
+    if (!settingsRef.current.audioEnabled) {
       console.log("🔇 Audio is disabled in settings");
       return;
     }
@@ -286,13 +292,19 @@ export function useAudio(): UseAudioReturn {
 
   // Return Hook Interface
 
-  return {
-    playSound,
-    playClickSound,
-    playSuccessSound,
-    playErrorSound,
-    playModeChangeSound,
-    playFocusSound,
-    playHoverSound,
-  };
+  // Memoized with an empty dependency list: every function above reads mutable
+  // state through refs, so the first render's closures stay correct forever.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo<UseAudioReturn>(
+    () => ({
+      playSound,
+      playClickSound,
+      playSuccessSound,
+      playErrorSound,
+      playModeChangeSound,
+      playFocusSound,
+      playHoverSound,
+    }),
+    [],
+  );
 }

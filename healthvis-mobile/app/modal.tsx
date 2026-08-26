@@ -1,4 +1,5 @@
 import { Link } from "expo-router";
+import { useMemo } from "react";
 import { StyleSheet, View, TouchableOpacity, ScrollView } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -10,6 +11,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useSpeech } from "@/hooks/useSpeech";
 import { HealthMetric } from "@/types";
+import { buildMockHealthData } from "@/lib/mock-data";
 import {
   announce,
   announceSuccess,
@@ -25,6 +27,12 @@ export default function ModalScreen() {
   const audio = useAudio();
   const haptics = useHaptics();
   const speech = useSpeech();
+
+  // Sample metrics backing the speech-test buttons on this screen.
+  const mockMetrics = useMemo<HealthMetric[]>(
+    () => Object.values(buildMockHealthData()).flat(),
+    [],
+  );
 
   if (isLoading) {
     return (
