@@ -44,6 +44,7 @@ import {
   FetchOptions,
 } from "../lib/healthkit-service";
 import { buildMockHealthData, MOCK_PERMISSIONS } from "../lib/mock-data";
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from "../lib/storage-keys";
 
 // Set to true to always use mock data (useful for simulator / demo mode)
 const USE_MOCK_DATA = false;
@@ -52,11 +53,6 @@ const USE_MOCK_DATA = false;
 // Storage Keys
 // ============================================================================
 
-const CACHE_KEYS = {
-  HEALTH_METRICS: "health_data_metrics",
-  LAST_ANALYSIS: "health_data_last_analysis",
-  LAST_FETCH: "health_data_last_fetch",
-} as const;
 
 // Cache expiration time (5 minutes)
 const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
@@ -131,7 +127,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   ): Promise<void> {
     try {
       await AsyncStorage.setItem(
-        CACHE_KEYS.HEALTH_METRICS,
+        STORAGE_KEYS.HEALTH_METRICS,
         JSON.stringify({
           data: metrics,
           timestamp: Date.now(),
@@ -147,7 +143,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
    */
   async function loadHealthMetricsFromCache(): Promise<CategorizedHealthData | null> {
     try {
-      const cached = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
+      const cached = await AsyncStorage.getItem(STORAGE_KEYS.HEALTH_METRICS);
       if (!cached) {
         return null;
       }
@@ -193,15 +189,9 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
    */
   async function migrateVitalSignCache(): Promise<void> {
     try {
-      // Check if we have old VitalSign cache to clean up
-      const oldCache = await AsyncStorage.getItem("health_data_vitals");
-      if (oldCache) {
-        console.log("Removing old VitalSign cache...");
-        await AsyncStorage.removeItem("health_data_vitals");
-        console.log("✅ Old VitalSign cache removed");
-      }
+      await AsyncStorage.multiRemove([...LEGACY_STORAGE_KEYS]);
     } catch (error) {
-      console.error("Failed to clean up old VitalSign cache:", error);
+      console.error("Failed to clean up legacy cache keys:", error);
       // Don't throw - cleanup failure shouldn't break the app
     }
   }
@@ -214,7 +204,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   ): Promise<void> {
     try {
       await AsyncStorage.setItem(
-        CACHE_KEYS.LAST_ANALYSIS,
+        STORAGE_KEYS.LAST_ANALYSIS,
         JSON.stringify({
           data: analysis,
           timestamp: Date.now(),
@@ -259,6 +249,10 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
 
       // Initialize HealthKit if not already initialized
       if (!isInitialized) {
+        // Was defined but never called, so keys from the pre-HealthMetric
+        // cache format were left behind on every device that had them.
+        await migrateVitalSignCache();
+
         console.log("Initializing HealthKit...");
         announceHealthKitFetch(); // Announce we're fetching data
 
@@ -317,7 +311,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         console.log("✅ Loaded health metrics from cache");
 
         // Log cache age
-        const cacheInfo = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
+        const cacheInfo = await AsyncStorage.getItem(STORAGE_KEYS.HEALTH_METRICS);
         if (cacheInfo) {
           const { timestamp } = JSON.parse(cacheInfo);
           const ageMinutes = Math.floor((Date.now() - timestamp) / (60 * 1000));
@@ -328,7 +322,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
       // Load data range preference (default to 30 days)
       let daysToFetch = 30;
       try {
-        const rangeStr = await AsyncStorage.getItem("health_data_range");
+        const rangeStr = await AsyncStorage.getItem(STORAGE_KEYS.DATA_RANGE);
         if (rangeStr) {
           daysToFetch = parseInt(rangeStr, 10);
         }
@@ -556,7 +550,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   const refreshData = useCallback(async (): Promise<void> => {
     // Clear cache
     try {
-      await AsyncStorage.removeItem(CACHE_KEYS.HEALTH_METRICS);
+      await AsyncStorage.removeItem(STORAGE_KEYS.HEALTH_METRICS);
       console.log("✅ Cache cleared for refresh");
     } catch (error) {
       console.error("Failed to clear cache:", error);

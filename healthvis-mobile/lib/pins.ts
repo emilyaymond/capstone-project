@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS } from "./storage-keys";
 
 export type PinnedKey =
   | "sleep_score"
@@ -9,10 +10,10 @@ export type PinnedKey =
   | "resting_energy"
   | "active_energy";
 
-const STORAGE_KEY = "summary_pins_v1";
+
 
 export async function loadPinnedKeys(): Promise<PinnedKey[]> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  const raw = await AsyncStorage.getItem(STORAGE_KEYS.SUMMARY_PINS);
   if (!raw) return ["sleep_score", "activity_rings", "heart_rate_latest", "steps_today"];
   try {
     return JSON.parse(raw);
@@ -22,5 +23,5 @@ export async function loadPinnedKeys(): Promise<PinnedKey[]> {
 }
 
 export async function savePinnedKeys(keys: PinnedKey[]) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
+  await AsyncStorage.setItem(STORAGE_KEYS.SUMMARY_PINS, JSON.stringify(keys));
 }
