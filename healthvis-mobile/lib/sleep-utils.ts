@@ -85,6 +85,38 @@ export function aggregateSleepByStage(
  * @param breakdown - Sleep stage breakdown
  * @returns Sleep quality rating
  */
+/**
+ * Returns when a sleep session ended.
+ *
+ * Metrics carry the session start as their timestamp and the length in
+ * metadata, so the end has to be derived.
+ */
+export function getSleepSessionEnd(metric: HealthMetric): Date {
+  const start = new Date(metric.timestamp).getTime();
+  const minutes =
+    metric.metadata?.durationMinutes != null
+      ? Number(metric.metadata.durationMinutes)
+      : Number(metric.value) * 60;
+
+  return new Date(start + (Number.isFinite(minutes) ? minutes : 0) * 60 * 1000);
+}
+
+/**
+ * Selects the sleep sessions belonging to a range.
+ *
+ * A night is attributed to the day it ends, not the day it starts. Filtering on
+ * start time meant going to bed at 22:00 put most of the night in the previous
+ * day, so "today" showed only the hours after midnight and under-reported every
+ * night that began before it.
+ */
+export function filterSleepForRange(
+  metrics: HealthMetric[],
+  rangeStart: Date,
+): HealthMetric[] {
+  const startMs = rangeStart.getTime();
+  return metrics.filter((metric) => getSleepSessionEnd(metric).getTime() >= startMs);
+}
+
 export function calculateSleepQuality(
   breakdown: SleepStageBreakdown,
   nights: number = 1,

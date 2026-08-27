@@ -63,7 +63,11 @@ import {
   hasDefinedRange,
   normalRangeText,
 } from "@/lib/metric-registry";
-import { aggregateSleepByStage, formatSleepDuration } from "@/lib/sleep-utils";
+import {
+  aggregateSleepByStage,
+  filterSleepForRange,
+  formatSleepDuration,
+} from "@/lib/sleep-utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -336,8 +340,10 @@ export default function MetricDetailScreen() {
       (m) => new Date(m.timestamp).getTime() >= start.getTime(),
     );
 
-    // Sleep: return raw (SleepChart handles its own layout)
-    if (isSleep) return filtered;
+    // Sleep: a night belongs to the day it ends, so select by session end
+    // rather than start. Filtering on start dropped the pre-midnight hours of
+    // every night that began before 12am.
+    if (isSleep) return filterSleepForRange(allRaw, start);
 
     // No aggregation for hourly
     if (timeRange === "H") return filtered;
@@ -359,13 +365,10 @@ export default function MetricDetailScreen() {
 
     if (isSleep) {
       // Filter out Awake / In Bed for actual sleep hours
-      const sleepData = allRaw
-        .filter(
-          (m) =>
-            new Date(m.timestamp).getTime() >=
-            getStartDate(timeRange).getTime(),
-        )
-        .filter(isActualSleepStage);
+      const sleepData = filterSleepForRange(
+        allRaw,
+        getStartDate(timeRange),
+      ).filter(isActualSleepStage);
 
       const totalHours = sleepData.reduce((s, m) => s + Number(m.value), 0);
 
@@ -477,6 +480,18 @@ export default function MetricDetailScreen() {
     () => (isSleep && data.length ? aggregateSleepByStage(data) : null),
     [isSleep, data],
   );
+
+  /**
+   * Time in bed averaged per night.
+   *
+   * The raw total is the sum across the range, so a month read "194h 27m" --
+   * technically true and useless. Nights are what the user thinks in.
+   */
+  const inBedPerNight = useMemo(() => {
+    if (!sleepBreakdown) return 0;
+    const total = sleepBreakdown.totalInBed || sleepBreakdown.totalSleep;
+    return total / Math.max(1, getDaysInRange(timeRange));
+  }, [sleepBreakdown, timeRange]);
 
   /** Reshapes the plotted series into HealthMetrics for downstream consumers. */
   const displayedMetrics = useMemo<HealthMetric[]>(() => {
@@ -635,14 +650,11 @@ export default function MetricDetailScreen() {
               <View style={styles.sleepHeroRow}>
                 <View style={styles.sleepHeroItem}>
                   <ThemedText style={styles.sleepHeroItemLabel}>
-                    In Bed
+                    {isLongRange(timeRange) ? "Avg In Bed / night" : "In Bed"}
                   </ThemedText>
                   <ThemedText style={styles.sleepHeroItemValue}>
                     {sleepBreakdown
-                      ? formatSleepDuration(
-                          sleepBreakdown.totalInBed ??
-                            sleepBreakdown.totalSleep,
-                        )
+                      ? formatSleepDuration(inBedPerNight)
                       : "—"}
                   </ThemedText>
                 </View>

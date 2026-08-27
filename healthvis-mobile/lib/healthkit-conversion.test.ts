@@ -624,3 +624,50 @@ describe('Sleep quality across ranges', () => {
     expect(calculateSleepQuality(breakdownFor(1), 0)).toBe('fair');
   });
 });
+
+describe('Sleep night boundary', () => {
+  const { filterSleepForRange, getSleepSessionEnd } = require('./sleep-utils');
+
+  /** A sleep session starting at a given hour, lasting `hours`. */
+  function session(startHour: number, hours: number, dayOffset = 0) {
+    const start = new Date(2026, 7, 27 + dayOffset, startHour, 0, 0);
+    return {
+      id: `sleep-${dayOffset}-${startHour}`,
+      category: 'sleep' as const,
+      type: 'sleep' as const,
+      value: hours,
+      timestamp: start,
+      unit: 'hr',
+      metadata: { durationMinutes: hours * 60, sleepStage: 'Light Sleep' },
+    };
+  }
+
+  it('derives the session end from start plus duration', () => {
+    const end = getSleepSessionEnd(session(22, 8));
+    expect(end.getDate()).toBe(28);
+    expect(end.getHours()).toBe(6);
+  });
+
+  it('includes a night that began before midnight', () => {
+    // The reason this exists: going to bed at 22:00 previously put most of the
+    // night in the previous day, so "today" showed only the hours after 12am.
+    const midnightToday = new Date(2026, 7, 28, 0, 0, 0);
+    const lastNight = session(22, 8); // 22:00 the 27th -> 06:00 the 28th
+
+    expect(filterSleepForRange([lastNight], midnightToday)).toHaveLength(1);
+  });
+
+  it('excludes a night that ended before the range started', () => {
+    const midnightToday = new Date(2026, 7, 28, 0, 0, 0);
+    const twoNightsAgo = session(22, 8, -2); // ends 06:00 on the 26th
+
+    expect(filterSleepForRange([twoNightsAgo], midnightToday)).toHaveLength(0);
+  });
+
+  it('keeps an afternoon nap on the day it happened', () => {
+    const midnightToday = new Date(2026, 7, 27, 0, 0, 0);
+    const nap = session(15, 1);
+
+    expect(filterSleepForRange([nap], midnightToday)).toHaveLength(1);
+  });
+});
