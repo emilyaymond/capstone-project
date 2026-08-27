@@ -3,8 +3,8 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { AccessibleButton } from "@/components/AccessibleButton";
 import { HealthMetric } from "@/types/health-metric";
+import { generateSummary as requestSummary } from "@/lib/api-client";
 
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
 type SummaryCardInput = {
   type: string;
@@ -66,18 +66,11 @@ export function SummaryAISummary({
     setError("");
 
     try {
-      if (!OPENAI_API_KEY) {
-        setSummary(fallback);
-        setLoading(false);
-        return;
-      }
-
-      const metricLines = cards
-        .map(
-          (card) =>
-            `- ${card.title}: ${card.valueText}. Status: ${card.subtitle}.`,
-        )
-        .join("\n");
+      const metricCards = cards.map((card) => ({
+        title: card.title,
+        value_text: card.valueText,
+        subtitle: card.subtitle,
+      }));
 
       const dangerCount = allMetrics.filter((m) => m.range === "danger").length;
       const warningCount = allMetrics.filter(
@@ -85,53 +78,19 @@ export function SummaryAISummary({
       ).length;
       const normalCount = allMetrics.filter((m) => m.range === "normal").length;
 
-      const prompt = `You are writing a spoken and readable health summary for a blind or low-vision user.
-
-Write:
-1. A short 2-3 sentence summary for the main dashboard
-2. It must be very clear when read aloud
-3. It must be supportive and non-diagnostic
-4. Do not use medical jargon
-5. Mention only the most useful takeaways
-6. Avoid saying "consult a doctor" unless the data strongly suggests concern
-7. Keep it concise
-
-Dashboard metrics:
-${metricLines}
-
-Counts across loaded metrics:
-- Normal readings: ${normalCount}
-- Elevated readings: ${warningCount}
-- High readings: ${dangerCount}
-
-Return only the summary text.`;
-
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 140,
-            temperature: 0.5,
-          }),
+      const response = await requestSummary({
+        kind: "dashboard",
+        dashboard: {
+          cards: metricCards,
+          normal_count: normalCount,
+          warning_count: warningCount,
+          danger_count: dangerCount,
         },
+      });
+
+      setSummary(
+        response.configured && response.summary ? response.summary : fallback,
       );
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      const content =
-        result?.choices?.[0]?.message?.content?.trim() || fallback;
-
-      setSummary(content);
     } catch (err) {
       console.error("Summary AI error:", err);
       // Use fallback silently - don't show error to user since fallback works fine

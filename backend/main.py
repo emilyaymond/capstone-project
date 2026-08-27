@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
-from api import chat
+from api import chat, summary
 
 def init_db():
     """Initialize database if needed - placeholder for now"""
@@ -38,6 +38,7 @@ def _configure_middleware(app: FastAPI) -> None:
 def _configure_routes(app: FastAPI) -> None:
     """Configure all API routes"""
     app.include_router(chat.router, prefix="/api", tags=["Chat"])
+    app.include_router(summary.router, prefix="/api", tags=["Summary"])
 
 app = create_app()
 
@@ -63,7 +64,9 @@ async def health_check():
 def _get_api_endpoints() -> dict:
     """Get available API endpoints"""
     return {
-        "chat": "/api/chat"
+        "chat": "/api/chat",
+        "analyze": "/api/analyze",
+        "summary": "/api/summary"
     }
 
 if __name__ == "__main__":

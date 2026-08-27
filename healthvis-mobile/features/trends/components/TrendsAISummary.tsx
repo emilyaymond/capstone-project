@@ -1,10 +1,11 @@
 /**
  * TrendsAISummary
  *
- * Calls OpenAI to generate a comparative, spoken-friendly analysis across
- * all currently selected health metrics and the chosen time range.
+ * Asks the HealthVis backend for a comparative, spoken-friendly analysis
+ * across the selected health metrics and the chosen time range.
  *
- * - Falls back to a deterministic summary when no API key is configured.
+ * - The model call happens server-side; the app holds no API key.
+ * - Falls back to a deterministic summary when the backend is unreachable.
  * - Provides "Hear Summary" TTS button so blind/low-vision users can listen.
  * - VoiceOver: the card itself is marked as a `summary` role so it is
  *   reachable as a single focusable node.
@@ -18,8 +19,8 @@ import { AccessibleButton } from "@/components/AccessibleButton";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { FONT_SIZES } from "@/constants/accessibility";
 import { rangeLabel, TimeRangeKey } from "../utils/trendConfig";
+import { generateSummary as requestSummary } from "@/lib/api-client";
 
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
 export type SeriesSummary = {
   key: string;
@@ -96,61 +97,25 @@ export default function TrendsAISummary({ timeRange, series }: Props) {
     setError("");
 
     try {
-      if (!OPENAI_API_KEY) {
-        setSummary(fallback);
-        setLoading(false);
-        return;
-      }
-
-      const period = rangeLabel(timeRange);
-      const metricLines = series
-        .map(
-          (s) =>
-            `- ${s.label}: range ${Math.round(s.min)}–${Math.round(s.max)} ${s.unit}, avg ${s.avg.toFixed(1)} ${s.unit}, ${s.count} readings, ${s.outlierCount} outlier(s)`,
-        )
-        .join("\n");
-
-      const prompt = `You are writing a health trend comparison for a blind or low-vision user. 
-This will be read aloud by a screen reader and also displayed as text.
-
-Time period: ${period}
-Selected metrics:
-${metricLines}
-
-Write:
-1. A 3–4 sentence spoken-friendly comparison across these metrics
-2. Highlight any notable patterns, correlations, or concerns
-3. Be supportive and non-diagnostic
-4. No medical jargon
-5. No bullet points — write in flowing sentences
-6. If you notice a correlation (e.g., high activity days also show elevated heart rate), mention it
-7. End with one brief, actionable observation
-
-Return only the summary text. No headers.`;
-
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 200,
-            temperature: 0.5,
-          }),
+      const response = await requestSummary({
+        kind: "trends",
+        time_range_text: rangeLabel(timeRange),
+        trends: {
+          series: series.map((entry) => ({
+            label: entry.label,
+            unit: entry.unit,
+            min: entry.min,
+            max: entry.max,
+            avg: entry.avg,
+            count: entry.count,
+            outlier_count: entry.outlierCount,
+          })),
         },
+      });
+
+      setSummary(
+        response.configured && response.summary ? response.summary : fallback,
       );
-
-      if (!response.ok) throw new Error(`OpenAI error: ${response.status}`);
-
-      const result = await response.json();
-      const content =
-        result?.choices?.[0]?.message?.content?.trim() || fallback;
-      setSummary(content);
     } catch (err) {
       console.error("TrendsAISummary error:", err);
       // Use fallback silently - don't show error to user since fallback works fine
