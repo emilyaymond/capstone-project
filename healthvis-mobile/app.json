@@ -61,7 +61,8 @@
           "androidPermissions": [],
           "disableFFmpeg": true
         }
-      ]
+      ],
+      "./plugins/withScriptSandboxDisabled"
     ],
     "experiments": {
       "typedRoutes": true
