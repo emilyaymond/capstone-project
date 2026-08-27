@@ -44,12 +44,6 @@ import {
   FetchOptions,
 } from "../lib/healthkit-service";
 import { buildMockHealthData, MOCK_PERMISSIONS } from "../lib/mock-data";
-import {
-  getMetricAggregation,
-  getMetricChartKind,
-  MetricChartKind,
-  MetricAggregation,
-} from "@/lib/metric-registry";
 
 // Set to true to always use mock data (useful for simulator / demo mode)
 const USE_MOCK_DATA = false;
@@ -85,14 +79,6 @@ export interface HealthDataContextValue {
   getMetricsByCategory: (category: HealthCategory) => HealthMetric[];
   getMetricsByType: (type: HealthMetricType) => HealthMetric[];
   getMetricsByDateRange: (startDate: Date, endDate: Date) => HealthMetric[];
-  getMetricSeries: (
-    type: HealthMetricType,
-    range: "day" | "week" | "month",
-  ) => {
-    points: HealthMetric[];
-    chart: MetricChartKind;
-    aggregation: MetricAggregation;
-  };
 }
 
 // ============================================================================
@@ -109,78 +95,6 @@ const HealthDataContext = createContext<HealthDataContextValue | undefined>(
 
 interface HealthDataProviderProps {
   children: ReactNode;
-}
-
-type TimeRangeKey = "day" | "week" | "month";
-
-function getRangeCutoff(range: TimeRangeKey) {
-  const now = new Date();
-  const cutoff = new Date(now);
-  if (range === "day") cutoff.setDate(now.getDate() - 1);
-  if (range === "week") cutoff.setDate(now.getDate() - 7);
-  if (range === "month") cutoff.setMonth(now.getMonth() - 1);
-  return cutoff;
-}
-
-function getBucketSizeMs(range: TimeRangeKey) {
-  if (range === "day") return 60 * 60 * 1000; // hourly
-  return 24 * 60 * 60 * 1000; // daily for week/month
-}
-
-function aggregateBucket(
-  metrics: HealthMetric[],
-  aggregation: "avg" | "sum" | "latest",
-): number {
-  const values = metrics.map((m) => Number(m.value)).filter(Number.isFinite);
-  if (!values.length) return 0;
-
-  if (aggregation === "sum")
-    return Math.round(values.reduce((a, b) => a + b, 0));
-  if (aggregation === "latest")
-    return Math.round(Number(metrics[metrics.length - 1]?.value ?? 0));
-  return Math.round(values.reduce((a, b) => a + b, 0) / values.length); // avg
-}
-
-function bucketize(
-  data: HealthMetric[],
-  bucketSize: number,
-  aggregation: "avg" | "sum" | "latest",
-): HealthMetric[] {
-  const buckets = new Map<number, HealthMetric[]>();
-
-  for (const m of data) {
-    const t =
-      m.timestamp instanceof Date
-        ? m.timestamp.getTime()
-        : new Date(m.timestamp as any).getTime();
-    const key = Math.floor(t / bucketSize) * bucketSize;
-    const arr = buckets.get(key) ?? [];
-    arr.push(m);
-    buckets.set(key, arr);
-  }
-
-  const out: HealthMetric[] = [];
-  for (const [key, arr] of buckets.entries()) {
-    // keep deterministic ordering within bucket
-    arr.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-    const value = aggregateBucket(arr, aggregation);
-    const range = arr.some((x) => x.range === "danger")
-      ? "danger"
-      : arr.some((x) => x.range === "warning")
-        ? "warning"
-        : "normal";
-
-    out.push({
-      ...arr[0],
-      value: Math.round(value),
-      timestamp: new Date(key),
-      range,
-    });
-  }
-
-  out.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-  return out;
 }
 
 // ============================================================================
@@ -732,29 +646,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     [healthMetrics],
   );
 
-  const getMetricSeries = useCallback(
-    (type: HealthMetricType, range: "day" | "week" | "month") => {
-      const chart = getMetricChartKind(type);
-      const aggregation = getMetricAggregation(type);
-
-      const cutoff = getRangeCutoff(range);
-      const bucketSize = getBucketSizeMs(range);
-
-      // Use your existing query method instead of a nonexistent `healthData`
-      const allOfType = getMetricsByType(type);
-
-      // getMetricsByType sorts newest-first; bucketize expects oldest-first
-      const filtered = allOfType
-        .filter((m) => m.timestamp >= cutoff)
-        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-      const points = bucketize(filtered, bucketSize, aggregation);
-
-      return { points, chart, aggregation };
-    },
-    [getMetricsByType],
-  );
-
   /**
    * Get all metrics within a specific date range
    *
@@ -807,7 +698,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     getMetricsByCategory,
     getMetricsByType,
     getMetricsByDateRange,
-    getMetricSeries,
   };
 
   return (

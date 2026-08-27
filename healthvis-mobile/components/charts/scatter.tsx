@@ -18,6 +18,7 @@ import { useHaptics } from "../../hooks/useHaptics";
 import { CartesianChart, Scatter, useChartPressState } from "victory-native";
 import { Circle, Line as SkiaLine } from "@shopify/react-native-skia";
 import { useAnimatedReaction, runOnJS } from "react-native-reanimated";
+import type { TimeRangeKey } from "@/lib/time-range";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +37,6 @@ export interface ScatterPlotProps {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TimeRangeKey = "H" | "D" | "W" | "M" | "6M" | "Y";
 
 type TickConfig = {
   ticks: number[];

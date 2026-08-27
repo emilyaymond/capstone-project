@@ -48,6 +48,14 @@ import { TimeSliceRow } from "@/components/TimeSliceRow";
 import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint, DataRange } from "@/types";
 import {
+  getBucketMs,
+  getDaysInRange,
+  getStartDate,
+  isLongRange,
+  rangeLabel,
+  type TimeRangeKey,
+} from "@/lib/time-range";
+import {
   getMetric as getMetricConfig,
   getMetricChartKind,
   getMetricAggregation,
@@ -59,7 +67,7 @@ import { aggregateSleepByStage, formatSleepDuration } from "@/lib/sleep-utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TimeRange = "H" | "D" | "W" | "M" | "6M" | "Y";
+type TimeRange = TimeRangeKey;
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -95,66 +103,9 @@ function isActualSleepStage(m: HealthMetric): boolean {
   return !stage.includes("Awake") && !stage.includes("In Bed");
 }
 
-function rangeSubtitleText(range: TimeRange): string {
-  switch (range) {
-    case "H":
-      return "Last Hour";
-    case "D":
-      return "Today";
-    case "W":
-      return "This Week";
-    case "M":
-      return "This Month";
-    case "6M":
-      return "Last 6 Months";
-    case "Y":
-      return "This Year";
-  }
-}
 
 /** Number of calendar days in a time range (used for avg/day calculations) */
-function daysInRange(range: TimeRange): number {
-  switch (range) {
-    case "H":
-      return 1;
-    case "D":
-      return 1;
-    case "W":
-      return 7;
-    case "M":
-      return 30;
-    case "6M":
-      return 180;
-    case "Y":
-      return 365;
-  }
-}
 
-/** Returns start Date for the selected range */
-function getStartDate(range: TimeRange): Date {
-  const now = new Date();
-  switch (range) {
-    case "H":
-      return new Date(now.getTime() - 60 * 60 * 1000);
-    case "D":
-      return new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        0,
-        0,
-        0,
-      );
-    case "W":
-      return new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-    case "M":
-      return new Date(now.getFullYear(), now.getMonth(), 1);
-    case "6M":
-      return new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
-    case "Y":
-      return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-  }
-}
 
 /** Aggregate raw metrics into time-bucketed array */
 function aggregateData(
@@ -346,8 +297,7 @@ export default function MetricDetailScreen() {
       : TOUCH_TARGET_SIZES.minimum;
 
   const isSleep = metricType === "sleep";
-  const isLongRange = (r: TimeRange) => r !== "H" && r !== "D";
-
+  
   const [timeRange, setTimeRange] = React.useState<TimeRange>("D");
 
   // ── Announce navigation on mount ──────────────────────────────────────────
@@ -395,27 +345,9 @@ export default function MetricDetailScreen() {
     // Scatter charts handle their own bucketing for daily view
     if (chartKind === "scatter" && timeRange === "D") return filtered;
 
-    let bucketSize: number;
-    switch (timeRange) {
-      case "D":
-        bucketSize = 5 * 60 * 1000;
-        break; // 5-min
-      case "W":
-        bucketSize = 60 * 60 * 1000;
-        break; // 1-hour
-      case "M":
-        bucketSize = 6 * 60 * 60 * 1000;
-        break; // 6-hour
-      case "6M":
-        bucketSize = 24 * 60 * 60 * 1000;
-        break; // daily
-      case "Y":
-        bucketSize = 7 * 24 * 60 * 60 * 1000;
-        break; // weekly
-      default:
-        bucketSize = 5 * 60 * 1000;
-    }
-    return aggregateData(filtered, bucketSize, agg);
+    // Width is chart-aware: scatter re-buckets its input, so it takes a finer
+    // sampling resolution than the line and bar charts, which plot buckets 1:1.
+    return aggregateData(filtered, getBucketMs(timeRange, chartKind), agg);
   }, [allRaw, timeRange, isSleep, agg, chartKind]);
 
   // ── Hero stat computation ─────────────────────────────────────────────────
@@ -439,7 +371,7 @@ export default function MetricDetailScreen() {
 
       if (isLongRange(timeRange)) {
         // avg per night
-        const nights = daysInRange(timeRange);
+        const nights = getDaysInRange(timeRange);
         return formatValue(totalHours / nights, "hr");
       }
       return formatValue(totalHours, "hr");
@@ -448,7 +380,7 @@ export default function MetricDetailScreen() {
     if (cfg.longRangeHeroMode === "avg_per_day" && isLongRange(timeRange)) {
       // For sum metrics (steps, calories, etc.) in W/M/6M/Y — sum all, divide by days
       const total = vals.reduce((a, b) => a + b, 0);
-      const days = daysInRange(timeRange);
+      const days = getDaysInRange(timeRange);
       return formatValue(total / days, unit);
     }
 
@@ -570,7 +502,7 @@ export default function MetricDetailScreen() {
         unit: data[0]?.unit ?? cfg.unit,
       }
     : undefined;
-  const rangeSubtitle = rangeSubtitleText(timeRange);
+  const rangeSubtitle = rangeLabel(timeRange, "title");
 
   // ── Range picker options ─────────────────────────────────────────────────
   const rangeOptions: TimeRange[] = isSleep
@@ -581,7 +513,7 @@ export default function MetricDetailScreen() {
   const handleRangeChange = (range: TimeRange) => {
     setTimeRange(range);
     announceDataUpdate(
-      `Showing ${rangeSubtitleText(range).toLowerCase()} data`,
+      `Showing ${rangeLabel(range, "title").toLowerCase()} data`,
     );
   };
 
@@ -661,7 +593,7 @@ export default function MetricDetailScreen() {
                 timeRange === range && styles.rangeBtnActive,
               ]}
               accessibilityRole="tab"
-              accessibilityLabel={rangeSubtitleText(range)}
+              accessibilityLabel={rangeLabel(range, "title")}
               accessibilityState={{ selected: timeRange === range }}
             >
               <ThemedText
