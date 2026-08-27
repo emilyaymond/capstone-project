@@ -1,23 +1,16 @@
-import React, {
-  useMemo,
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   View,
   StyleSheet,
   Text,
   ActivityIndicator,
-  AccessibilityInfo,
 } from "react-native";
-import { DataPoint } from "../../types";
+import { DataPoint, DataRange } from "../../types";
 import { useAccessibility } from "../../contexts/AccessibilityContext";
 import { useHaptics } from "../../hooks/useHaptics";
 import { CartesianChart, Scatter, useChartPressState } from "victory-native";
 import { Circle, Line as SkiaLine } from "@shopify/react-native-skia";
-import { useAnimatedReaction, runOnJS } from "react-native-reanimated";
+import { useChartScrubbing } from "./useChartScrubbing";
 import type { TimeRangeKey } from "@/lib/time-range";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -619,29 +612,18 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
   unit,
   title,
 }) => {
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const [isPressed, setIsPressed] = useState(false);
-  const lastHapticIndexRef = useRef<number | null>(null);
-  const haptics = useHaptics();
+  const press = useChartPressState({ x: 0, y: { value: 0 } });
 
-  const [voiceOverOn, setVoiceOverOn] = useState(false);
+  const severityForIndex = useCallback(
+    (index: number): DataRange => data[index]?.originalPoint.range ?? "normal",
+    [data],
+  );
 
-  useEffect(() => {
-    AccessibilityInfo.isScreenReaderEnabled().then(setVoiceOverOn);
-    const sub = AccessibilityInfo.addEventListener(
-      "screenReaderChanged",
-      setVoiceOverOn,
-    );
-    return () => sub.remove();
-  }, []);
+  const { activeIndex, isPressed, voiceOverOn, selectIndex } =
+    useChartScrubbing(press, data.length, severityForIndex);
 
   const activePoint =
     activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
-
-  const { state: chartPressedState, isActive } = useChartPressState({
-    x: 0,
-    y: { value: 0 },
-  });
 
   const rightPad = 18;
   const topPad = 16;
@@ -650,75 +632,6 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
   const yBounds = getChartValueBounds(data.map((d) => d.value));
   const yTicks = getYTickValues(yBounds.min, yBounds.max, 4);
   const leftPad = getAxisLeftPad(yTicks, fontSize);
-
-  // Zone-aware haptic — fires pattern based on clinical significance of point.
-  // Fires once per newly selected point while dragging.
-  const triggerPointHaptic = useCallback(
-    (index: number) => {
-      if (index < 0 || index >= data.length) return;
-
-      // Fire once per newly selected point while dragging
-      if (lastHapticIndexRef.current === index) return;
-      lastHapticIndexRef.current = index;
-
-      const point = data[index].originalPoint;
-
-      // Use the haptics hook which respects the hapticsEnabled setting
-      if (point.range === "danger") {
-        console.log(
-          `[Haptic] Hourly point ${index}: DANGER (heavy) - value: ${point.value}`,
-        );
-        haptics.triggerHeavy();
-      } else if (point.range === "warning") {
-        console.log(
-          `[Haptic] Hourly point ${index}: WARNING (medium) - value: ${point.value}`,
-        );
-        haptics.triggerMedium();
-      } else {
-        console.log(
-          `[Haptic] Hourly point ${index}: NORMAL (light) - value: ${point.value}`,
-        );
-        haptics.triggerSoft();
-      }
-    },
-    [data, haptics],
-  );
-
-  const updateActiveIndex = useCallback(
-    (index: number) => {
-      setActiveIndex(index);
-    },
-    [data],
-  );
-
-  const updatePressed = useCallback((pressed: boolean) => {
-    setIsPressed(pressed);
-    if (!pressed) {
-      setActiveIndex(-1);
-      lastHapticIndexRef.current = null;
-    }
-  }, []);
-
-  useAnimatedReaction(
-    () => ({
-      index: chartPressedState.matchedIndex.value,
-      active: isActive,
-    }),
-    (current, previous) => {
-      if (!current.active) return;
-      const currentIndex = current.index;
-      const previousIndex = previous?.index ?? -1;
-
-      if (currentIndex >= 0 && currentIndex !== previousIndex) {
-        runOnJS(updateActiveIndex)(currentIndex);
-        runOnJS(triggerPointHaptic)(currentIndex);
-      }
-    },
-  );
-
-  useEffect(() => {
-    updatePressed(isActive);
-  }, [isActive, updatePressed]);
 
   return (
     <View
@@ -743,31 +656,9 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
         voiceOverOn
           ? (event) => {
               if (event.nativeEvent.actionName === "increment") {
-                const next = Math.min(activeIndex + 1, data.length - 1);
-                updateActiveIndex(next);
-                const point = data[next]?.originalPoint;
-                if (point) {
-                  if (point.range === "danger") {
-                    haptics.triggerHeavy();
-                  } else if (point.range === "warning") {
-                    haptics.triggerMedium();
-                  } else {
-                    haptics.triggerLight();
-                  }
-                }
+                selectIndex(Math.min(activeIndex + 1, data.length - 1));
               } else if (event.nativeEvent.actionName === "decrement") {
-                const prev = Math.max(activeIndex - 1, 0);
-                updateActiveIndex(prev);
-                const point = data[prev]?.originalPoint;
-                if (point) {
-                  if (point.range === "danger") {
-                    haptics.triggerHeavy();
-                  } else if (point.range === "warning") {
-                    haptics.triggerMedium();
-                  } else {
-                    haptics.triggerLight();
-                  }
-                }
+                selectIndex(Math.max(activeIndex - 1, 0));
               }
             }
           : undefined
@@ -785,7 +676,7 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
           data={data}
           xKey="date"
           yKeys={["value"]}
-          chartPressState={chartPressedState}
+          chartPressState={press.state}
           padding={{
             top: topPad,
             bottom: bottomPad,
@@ -897,99 +788,18 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
   unit,
   title,
 }) => {
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const [isPressed, setIsPressed] = useState(false);
-  const lastHapticIndexRef = useRef<number | null>(null);
-  const haptics = useHaptics();
+  const press = useChartPressState({ x: 0, y: { low: 0, high: 0, avg: 0 } });
 
-  const [voiceOverOn, setVoiceOverOn] = useState(false);
-
-  useEffect(() => {
-    AccessibilityInfo.isScreenReaderEnabled().then(setVoiceOverOn);
-    const sub = AccessibilityInfo.addEventListener(
-      "screenReaderChanged",
-      setVoiceOverOn,
-    );
-    return () => sub.remove();
-  }, []);
-
-  const activeBucket =
-    activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
-
-  const { state: chartPressedState, isActive } = useChartPressState({
-    x: 0,
-    y: { low: 0, high: 0, avg: 0 },
-  });
-
-  // Zone-aware haptic — fires a distinct pattern per clinical zone.
-  // Fires once per newly selected bucket while dragging.
-  const triggerBucketHaptic = useCallback(
-    (index: number) => {
-      if (index < 0 || index >= data.length) return;
-
-      // Fire once per newly selected bucket while dragging
-      if (lastHapticIndexRef.current === index) return;
-      lastHapticIndexRef.current = index;
-
-      const bucket = data[index];
-      const zone = getBucketHapticZone(bucket);
-
-      // Use the haptics hook which respects the hapticsEnabled setting
-      if (zone === "high") {
-        console.log(
-          `[Haptic] Bucket ${index}: HIGH/DANGER (heavy) - range: ${bucket.low.toFixed(1)}-${bucket.high.toFixed(1)}, severity: ${bucket.severity}, fill: ${bucket.fill}`,
-        );
-        haptics.triggerHeavy();
-      } else if (zone === "elevated") {
-        console.log(
-          `[Haptic] Bucket ${index}: ELEVATED/WARNING (light) - range: ${bucket.low.toFixed(1)}-${bucket.high.toFixed(1)}, severity: ${bucket.severity}, fill: ${bucket.fill}`,
-        );
-        haptics.triggerLight();
-      } else {
-        console.log(
-          `[Haptic] Bucket ${index}: NORMAL (soft) - range: ${bucket.low.toFixed(1)}-${bucket.high.toFixed(1)}, severity: ${bucket.severity}, fill: ${bucket.fill}`,
-        );
-        haptics.triggerSoft();
-      }
-    },
-    [data, haptics],
-  );
-
-  const updateActiveIndex = useCallback(
-    (index: number) => {
-      setActiveIndex(index);
-    },
+  const severityForIndex = useCallback(
+    (index: number): DataRange => data[index]?.severity ?? "normal",
     [data],
   );
 
-  const updatePressed = useCallback((pressed: boolean) => {
-    setIsPressed(pressed);
-    if (!pressed) {
-      setActiveIndex(-1);
-      lastHapticIndexRef.current = null;
-    }
-  }, []);
+  const { activeIndex, isPressed, voiceOverOn, selectIndex } =
+    useChartScrubbing(press, data.length, severityForIndex);
 
-  useAnimatedReaction(
-    () => ({
-      index: chartPressedState.matchedIndex.value,
-      active: isActive,
-    }),
-    (current, previous) => {
-      if (!current.active) return;
-      const currentIndex = current.index;
-      const previousIndex = previous?.index ?? -1;
-
-      if (currentIndex >= 0 && currentIndex !== previousIndex) {
-        runOnJS(updateActiveIndex)(currentIndex);
-        runOnJS(triggerBucketHaptic)(currentIndex);
-      }
-    },
-  );
-
-  useEffect(() => {
-    updatePressed(isActive);
-  }, [isActive, updatePressed]);
+  const activeBucket =
+    activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
 
   const strokeWidth = timeRange === "D" ? 10 : 8;
 
@@ -1025,33 +835,9 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
         voiceOverOn
           ? (event) => {
               if (event.nativeEvent.actionName === "increment") {
-                const next = Math.min(activeIndex + 1, data.length - 1);
-                updateActiveIndex(next);
-                const bucket = data[next];
-                if (bucket) {
-                  const zone = getBucketHapticZone(bucket);
-                  if (zone === "high") {
-                    haptics.triggerHeavy();
-                  } else if (zone === "elevated") {
-                    haptics.triggerMedium();
-                  } else {
-                    haptics.triggerLight();
-                  }
-                }
+                selectIndex(Math.min(activeIndex + 1, data.length - 1));
               } else if (event.nativeEvent.actionName === "decrement") {
-                const prev = Math.max(activeIndex - 1, 0);
-                updateActiveIndex(prev);
-                const bucket = data[prev];
-                if (bucket) {
-                  const zone = getBucketHapticZone(bucket);
-                  if (zone === "high") {
-                    haptics.triggerHeavy();
-                  } else if (zone === "elevated") {
-                    haptics.triggerMedium();
-                  } else {
-                    haptics.triggerLight();
-                  }
-                }
+                selectIndex(Math.max(activeIndex - 1, 0));
               }
             }
           : undefined
@@ -1069,7 +855,7 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
           data={data}
           xKey="x"
           yKeys={["low", "high", "avg"]}
-          chartPressState={chartPressedState}
+          chartPressState={press.state}
           padding={{
             top: topPad,
             bottom: bottomPad,
