@@ -15,11 +15,17 @@ import { FONT_SIZES } from "@/constants/accessibility";
 type Props = {
   onPressSonification: () => void;
   onPressHaptics: () => void;
+  /** True while a series is playing, so the buttons can say so. */
+  isBusy?: boolean;
+  /** Name of the metric that will be played, announced before starting. */
+  subject?: string;
 };
 
 export default function ExploreModesCard({
   onPressSonification,
   onPressHaptics,
+  isBusy = false,
+  subject,
 }: Props) {
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
@@ -60,10 +66,20 @@ export default function ExploreModesCard({
       <View style={styles.featureList}>
         <FeatureRow
           iconLabel="SFX"
-          title="Sonification"
-          description="Listen to metric patterns as musical tones"
+          title={isBusy ? "Stop playback" : "Sonification"}
+          description={
+            subject
+              ? `Hear ${subject} as pitch: higher tone, higher value`
+              : "Select a metric above to hear it as sound"
+          }
           onPress={onPressSonification}
-          accessibilityHint="Play health data as audio"
+          accessibilityHint={
+            isBusy
+              ? "Stops the audio currently playing"
+              : subject
+                ? `Plays ${subject} as a sequence of tones`
+                : "No metric selected yet"
+          }
           fontSize={fontSize}
         />
 
@@ -72,9 +88,17 @@ export default function ExploreModesCard({
         <FeatureRow
           iconLabel="VBR"
           title="Haptic Pulse"
-          description="Feel data rhythms through vibration patterns"
+          description={
+            subject
+              ? `Feel ${subject} as pulses: stronger means out of range`
+              : "Select a metric above to feel it as vibration"
+          }
           onPress={onPressHaptics}
-          accessibilityHint="Explore health data through haptic feedback"
+          accessibilityHint={
+            subject
+              ? `Pulses once per ${subject} reading`
+              : "No metric selected yet"
+          }
           fontSize={fontSize}
         />
       </View>

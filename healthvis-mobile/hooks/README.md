@@ -22,7 +22,7 @@ Provides persistent storage functionality using AsyncStorage.
 ### useAudio
 **File:** `useAudio.ts`
 
-Provides audio feedback functionality using expo-av.
+Provides audio feedback by synthesising tones with react-native-audio-api.
 
 **Features:**
 - Play sounds with specified frequency, duration, and waveform

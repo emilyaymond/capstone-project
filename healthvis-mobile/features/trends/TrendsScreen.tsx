@@ -26,7 +26,7 @@ import { ThemedText } from "@/components/themed-text";
 import { useHealthData } from "@/contexts/HealthDataContext";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { FONT_SIZES } from "@/constants/accessibility";
-import { announceNavigation } from "@/lib/announcer";
+import { announce, announceNavigation } from "@/lib/announcer";
 
 import FacetedMetricChart, {
   FacetedPoint,
@@ -35,7 +35,14 @@ import TrendsAISummary, {
   SeriesSummary,
 } from "@/features/trends/components/TrendsAISummary";
 import ExploreModesCard from "@/features/trends/components/ExploreModesCard";
-import * as Haptics from "expo-haptics";
+import { useHaptics } from "@/hooks/useHaptics";
+import {
+  isSonificationPlaying,
+  playDataSeries,
+  stop as stopSonification,
+} from "@/lib/sonification";
+import { classifyRange } from "@/lib/metric-registry";
+import type { DataPoint, DataRange } from "@/types";
 
 import type { HealthMetricType } from "@/types/health-metric";
 import {
@@ -110,6 +117,7 @@ export default function TrendsScreen() {
   const { healthMetrics, fetchData } = useHealthData();
   const { settings } = useAccessibility();
   const fontSize = FONT_SIZES[settings.fontSize];
+  const haptics = useHaptics();
 
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("W");
   const [selectedKeys, setSelectedKeys] = useState<HealthMetricType[]>(
@@ -151,8 +159,8 @@ export default function TrendsScreen() {
         return next;
       }
     });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-  }, []);
+    haptics.triggerLight();
+  }, [haptics]);
 
   // ── data aggregation ──────────────────────────────────────────────────────────
 
@@ -226,6 +234,84 @@ export default function TrendsScreen() {
   );
 
   // ── render ───────────────────────────────────────────────────────────────────
+
+  // ── Eyes-free exploration ─────────────────────────────────────────────────
+
+  const [isExploring, setIsExploring] = useState(false);
+
+  /** Converts the first selected series into points carrying clinical severity. */
+  const exploreSeries = useMemo(() => {
+    const first = facetedSeries.find((series) => series.points.length > 0);
+    if (!first) return null;
+
+    const points: DataPoint[] = first.points.map((point) => ({
+      value: point.value,
+      timestamp: point.timestamp,
+      range: classifyRange(first.chip.key, point.value) as DataRange,
+    }));
+
+    return { label: first.chip.label, unit: first.chip.unit, points };
+  }, [facetedSeries]);
+
+  /** Plays the selected metric as a sequence of tones, or stops if playing. */
+  const handleSonification = useCallback(async () => {
+    if (isSonificationPlaying()) {
+      stopSonification();
+      setIsExploring(false);
+      announce("Sonification stopped");
+      return;
+    }
+
+    if (!exploreSeries) {
+      announce("No data available to play");
+      return;
+    }
+
+    const { label, points } = exploreSeries;
+    setIsExploring(true);
+    announce(
+      `Playing ${label} as sound. ${points.length} ${
+        points.length === 1 ? "reading" : "readings"
+      }, ${rangeLabel(timeRange)}. Pitch rises with the value.`,
+    );
+
+    await playDataSeries(points, {
+      onComplete: () => setIsExploring(false),
+      onError: () => {
+        setIsExploring(false);
+        announce("Could not play audio");
+      },
+    });
+  }, [exploreSeries, timeRange]);
+
+  /** Pulses through the selected metric, one haptic per reading. */
+  const handleHapticPulse = useCallback(async () => {
+    if (!exploreSeries) {
+      announce("No data available to feel");
+      return;
+    }
+
+    const { label, points } = exploreSeries;
+    setIsExploring(true);
+    announce(
+      `Pulsing ${label}. Stronger vibration means a reading outside its normal range.`,
+    );
+
+    // Same severity vocabulary the charts use, so a pulse means the same thing
+    // here as it does under your finger on a chart.
+    for (const point of points) {
+      if (point.range === "danger") haptics.triggerHeavy();
+      else if (point.range === "warning") haptics.triggerMedium();
+      else haptics.triggerSoft();
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    }
+
+    setIsExploring(false);
+    announce(`Finished pulsing ${label}`);
+  }, [exploreSeries, haptics]);
+
+  // Stop any audio when leaving the screen.
+  useEffect(() => stopSonification, []);
 
   return (
     <ScrollView
@@ -331,8 +417,10 @@ export default function TrendsScreen() {
 
       {/* ── Explore modes card ───────────────────────────────────────────── */}
       <ExploreModesCard
-        onPressSonification={() => {}}
-        onPressHaptics={() => {}}
+        onPressSonification={handleSonification}
+        onPressHaptics={handleHapticPulse}
+        isBusy={isExploring}
+        subject={exploreSeries?.label}
       />
 
       {/* Bottom spacer */}

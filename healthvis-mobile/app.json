@@ -52,7 +52,16 @@
           "healthUpdatePermission": "HealthVis does not write health data."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": false,
+          "androidForegroundService": false,
+          "androidPermissions": [],
+          "disableFFmpeg": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

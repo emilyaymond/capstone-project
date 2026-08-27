@@ -70,7 +70,7 @@ function AppLifecycleHandler({ children }: { children: React.ReactNode }) {
   /**
    * Handles backgrounding logic
    * - Stops TTS playback
-   * - Pauses audio (handled by expo-av automatically)
+   * - Pauses audio (the audio session suspends automatically)
    * - Saves state (handled by AccessibilityContext automatically via debounced saves)
    */
   const handleBackgrounding = useCallback(async () => {
@@ -79,7 +79,7 @@ function AppLifecycleHandler({ children }: { children: React.ReactNode }) {
       const Speech = await import("expo-speech");
       Speech.stop();
 
-      // Note: Audio pause is handled automatically by expo-av when app backgrounds
+      // Note: the audio session suspends automatically when the app backgrounds
       // Note: State save is handled automatically by AccessibilityContext's debounced save
 
       console.log("App backgrounded: TTS stopped, audio paused, state saved");
