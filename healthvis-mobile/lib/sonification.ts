@@ -130,6 +130,7 @@ function scheduleNote(
   startTime: number,
   durationSeconds: number,
   pan: number,
+  peakGain: number = NOTE_GAIN,
 ): void {
   const oscillator = context.createOscillator();
   oscillator.type = WAVEFORM_FOR_RANGE[range] ?? "sine";
@@ -139,8 +140,8 @@ function scheduleNote(
   // Fade in and out so notes do not click at their boundaries.
   const fade = Math.min(FADE_SECONDS, durationSeconds / 3);
   gain.gain.setValueAtTime(0, startTime);
-  gain.gain.linearRampToValueAtTime(NOTE_GAIN, startTime + fade);
-  gain.gain.setValueAtTime(NOTE_GAIN, startTime + durationSeconds - fade);
+  gain.gain.linearRampToValueAtTime(peakGain, startTime + fade);
+  gain.gain.setValueAtTime(peakGain, startTime + durationSeconds - fade);
   gain.gain.linearRampToValueAtTime(0, startTime + durationSeconds);
 
   const panner = context.createStereoPanner();
@@ -152,6 +153,47 @@ function scheduleNote(
 
   oscillator.start(startTime);
   oscillator.stop(startTime + durationSeconds);
+}
+
+/** How long a single scrub tone sounds. Short enough to track a moving finger. */
+const SCRUB_NOTE_MS = 130;
+
+/** Scrub tones sit under the series notes so a fast drag does not become harsh. */
+const SCRUB_GAIN_SCALE = 0.75;
+
+/**
+ * Plays one tone for the reading under the user's finger.
+ *
+ * Used while scrubbing a chart, where the finger already conveys position, so
+ * this carries magnitude as pitch and severity as timbre. Fire-and-forget: a
+ * drag produces these in rapid succession and must not await anything.
+ */
+export function playScrubTone(
+  value: number,
+  min: number,
+  max: number,
+  range: DataRange = "normal",
+): void {
+  void ensureAudioSession()
+    .then(() => {
+      const context = getContext();
+      const startTime = context.currentTime;
+      const durationSeconds = SCRUB_NOTE_MS / 1000;
+
+      scheduleNote(
+        context,
+        valueToFrequency(value, min, max),
+        range,
+        startTime,
+        durationSeconds,
+        // No panning: the finger is already the position indicator.
+        0,
+        NOTE_GAIN * SCRUB_GAIN_SCALE,
+      );
+    })
+    .catch((error) => {
+      console.error("Failed to play scrub tone:", error);
+    });
 }
 
 /**

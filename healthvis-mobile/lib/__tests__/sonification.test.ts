@@ -12,6 +12,7 @@ import {
   getFrequencyForRange,
   isSonificationPlaying,
   playDataSeries,
+  playScrubTone,
   stop,
   valueToFrequency,
 } from '../sonification';
@@ -126,6 +127,23 @@ describe('sonification', () => {
     it('is not playing once the series finishes', async () => {
       await playDataSeries(series([1, 2]), { noteDurationMs: 1, gapMs: 0 });
       expect(isSonificationPlaying()).toBe(false);
+    });
+  });
+
+  describe('playScrubTone', () => {
+    it('schedules a single tone for the point under the finger', async () => {
+      playScrubTone(70, 60, 100, 'normal');
+      // Fire-and-forget: it configures the session before scheduling.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const context = (AudioContext as unknown as jest.Mock).mock.results[0]
+        .value;
+      expect(context.createOscillator).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw for a flat series', async () => {
+      expect(() => playScrubTone(70, 70, 70, 'normal')).not.toThrow();
+      await new Promise((resolve) => setImmediate(resolve));
     });
   });
 

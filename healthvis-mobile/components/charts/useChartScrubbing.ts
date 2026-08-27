@@ -14,8 +14,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { runOnJS, useAnimatedReaction } from "react-native-reanimated";
 
+import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useScreenReaderEnabled } from "@/hooks/useScreenReaderEnabled";
+import { playScrubTone } from "@/lib/sonification";
 import type { DataRange } from "@/types";
 
 /** Minimal shape of the press state victory-native's useChartPressState returns. */
@@ -41,28 +43,46 @@ export interface ChartScrubbing {
   selectIndex: (index: number) => void;
 }
 
+export interface ChartScrubbingOptions {
+  /** Number of plotted items, used to bound the index. */
+  itemCount: number;
+  /** Clinical severity of the item at an index, driving the haptic. */
+  severityForIndex: (index: number) => DataRange;
+  /**
+   * Plotted value at an index. Supplying this and valueBounds makes the chart
+   * sound as well as vibrate: pitch carries magnitude while the haptic carries
+   * severity, so one gesture conveys both.
+   */
+  valueForIndex?: (index: number) => number;
+  /** Min and max of the series, for mapping value to pitch. */
+  valueBounds?: { min: number; max: number };
+}
+
 /**
- * Wires a chart's press state to selection state and severity haptics.
+ * Wires a chart's press state to selection state, haptics and scrub tones.
  *
- * @param press - Result of useChartPressState from the chart component
- * @param itemCount - Number of plotted items, used to bound the index
- * @param severityForIndex - Clinical severity of the item at an index
+ * Both dragging and the VoiceOver increment/decrement actions run through here,
+ * so feedback stays identical however the user moves between points.
  */
 export function useChartScrubbing(
   press: ChartPressState,
-  itemCount: number,
-  severityForIndex: (index: number) => DataRange,
+  options: ChartScrubbingOptions,
 ): ChartScrubbing {
+  const { itemCount, severityForIndex, valueForIndex, valueBounds } = options;
+  const { settings } = useAccessibility();
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isPressed, setIsPressed] = useState(false);
   const lastHapticIndexRef = useRef<number | null>(null);
   const haptics = useHaptics();
   const voiceOverOn = useScreenReaderEnabled();
 
-  // One haptic per newly selected item, so holding still stays quiet.
-  const playSeverityHaptic = useCallback(
+  // One haptic, and one tone, per newly selected item -- holding still stays
+  // quiet rather than repeating.
+  const playFeedback = useCallback(
     (index: number) => {
-      switch (severityForIndex(index)) {
+      const severity = severityForIndex(index);
+
+      switch (severity) {
         case "danger":
           haptics.triggerHeavy();
           break;
@@ -72,8 +92,25 @@ export function useChartScrubbing(
         default:
           haptics.triggerSoft();
       }
+
+      // Gated on the same setting as the rest of the app's audio, so a sighted
+      // user who has turned sound off does not get an unexpected beep.
+      if (settings.audioEnabled && valueForIndex && valueBounds) {
+        playScrubTone(
+          valueForIndex(index),
+          valueBounds.min,
+          valueBounds.max,
+          severity,
+        );
+      }
     },
-    [severityForIndex, haptics],
+    [
+      severityForIndex,
+      haptics,
+      settings.audioEnabled,
+      valueForIndex,
+      valueBounds,
+    ],
   );
 
   const triggerHaptic = useCallback(
@@ -81,9 +118,9 @@ export function useChartScrubbing(
       if (index < 0 || index >= itemCount) return;
       if (lastHapticIndexRef.current === index) return;
       lastHapticIndexRef.current = index;
-      playSeverityHaptic(index);
+      playFeedback(index);
     },
-    [itemCount, playSeverityHaptic],
+    [itemCount, playFeedback],
   );
 
   const selectIndex = useCallback(
@@ -91,9 +128,9 @@ export function useChartScrubbing(
       if (index < 0 || index >= itemCount) return;
       setActiveIndex(index);
       lastHapticIndexRef.current = index;
-      playSeverityHaptic(index);
+      playFeedback(index);
     },
-    [itemCount, playSeverityHaptic],
+    [itemCount, playFeedback],
   );
 
   const updateActiveIndex = useCallback((index: number) => {

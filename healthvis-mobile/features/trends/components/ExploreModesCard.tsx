@@ -58,18 +58,19 @@ export default function ExploreModesCard({
           { fontSize: fontSize.body, lineHeight: fontSize.body * 1.55 },
         ]}
       >
-        Experience your health data through sound and vibration — designed for
-        eyes-free exploration.
+        Play a whole series at once to hear its shape. To hear individual
+        readings, drag a finger across any chart — pitch follows the value and
+        vibration follows the range.
       </ThemedText>
 
       {/* Feature buttons */}
       <View style={styles.featureList}>
         <FeatureRow
           iconLabel="SFX"
-          title={isBusy ? "Stop playback" : "Sonification"}
+          title={isBusy ? "Stop playback" : "Play whole series"}
           description={
             subject
-              ? `Hear ${subject} as pitch: higher tone, higher value`
+              ? `Hear all of ${subject} as a sequence of tones`
               : "Select a metric above to hear it as sound"
           }
           onPress={onPressSonification}
@@ -87,10 +88,10 @@ export default function ExploreModesCard({
 
         <FeatureRow
           iconLabel="VBR"
-          title="Haptic Pulse"
+          title="Pulse whole series"
           description={
             subject
-              ? `Feel ${subject} as pulses: stronger means out of range`
+              ? `Feel all of ${subject} as pulses: stronger means out of range`
               : "Select a metric above to feel it as vibration"
           }
           onPress={onPressHaptics}

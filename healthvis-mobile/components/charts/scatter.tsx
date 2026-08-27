@@ -612,19 +612,6 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
   unit,
   title,
 }) => {
-  const press = useChartPressState({ x: 0, y: { value: 0 } });
-
-  const severityForIndex = useCallback(
-    (index: number): DataRange => data[index]?.originalPoint.range ?? "normal",
-    [data],
-  );
-
-  const { activeIndex, isPressed, voiceOverOn, selectIndex } =
-    useChartScrubbing(press, data.length, severityForIndex);
-
-  const activePoint =
-    activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
-
   const rightPad = 18;
   const topPad = 16;
   const bottomPad = 34;
@@ -632,6 +619,30 @@ const HourlyScatterChart: React.FC<HourlyChartProps> = ({
   const yBounds = getChartValueBounds(data.map((d) => d.value));
   const yTicks = getYTickValues(yBounds.min, yBounds.max, 4);
   const leftPad = getAxisLeftPad(yTicks, fontSize);
+
+  const press = useChartPressState({ x: 0, y: { value: 0 } });
+
+  const severityForIndex = useCallback(
+    (index: number): DataRange => data[index]?.originalPoint.range ?? "normal",
+    [data],
+  );
+
+  const valueForIndex = useCallback(
+    (index: number): number => data[index]?.value ?? 0,
+    [data],
+  );
+
+  const { activeIndex, isPressed, voiceOverOn, selectIndex } =
+    useChartScrubbing(press, {
+      itemCount: data.length,
+      severityForIndex,
+      valueForIndex,
+      valueBounds: yBounds,
+    });
+
+  const activePoint =
+    activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
+
 
   return (
     <View
@@ -788,21 +799,6 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
   unit,
   title,
 }) => {
-  const press = useChartPressState({ x: 0, y: { low: 0, high: 0, avg: 0 } });
-
-  const severityForIndex = useCallback(
-    (index: number): DataRange => data[index]?.severity ?? "normal",
-    [data],
-  );
-
-  const { activeIndex, isPressed, voiceOverOn, selectIndex } =
-    useChartScrubbing(press, data.length, severityForIndex);
-
-  const activeBucket =
-    activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
-
-  const strokeWidth = timeRange === "D" ? 10 : 8;
-
   const rightPad = 20;
   const topPad = 16;
   const bottomPad = 34;
@@ -811,6 +807,32 @@ const BucketedRangeChart: React.FC<RangeChartProps> = ({
   const yBounds = getChartValueBounds(bucketValues);
   const yTicks = getYTickValues(yBounds.min, yBounds.max, 4);
   const leftPad = getAxisLeftPad(yTicks, fontSize);
+
+  const press = useChartPressState({ x: 0, y: { low: 0, high: 0, avg: 0 } });
+
+  const severityForIndex = useCallback(
+    (index: number): DataRange => data[index]?.severity ?? "normal",
+    [data],
+  );
+
+  const valueForIndex = useCallback(
+    (index: number): number => data[index]?.avg ?? 0,
+    [data],
+  );
+
+  const { activeIndex, isPressed, voiceOverOn, selectIndex } =
+    useChartScrubbing(press, {
+      itemCount: data.length,
+      severityForIndex,
+      valueForIndex,
+      valueBounds: yBounds,
+    });
+
+  const activeBucket =
+    activeIndex >= 0 && activeIndex < data.length ? data[activeIndex] : null;
+
+  const strokeWidth = timeRange === "D" ? 10 : 8;
+
 
   return (
     <View
