@@ -19,6 +19,7 @@ import {
   countSleepNights,
   formatSleepDuration,
 } from "@/lib/sleep-utils";
+import { rangeLabel, type TimeRangeKey } from "@/lib/time-range";
 import { generateSummary as requestSummary } from "@/lib/api-client";
 
 
@@ -29,6 +30,56 @@ interface AISummaryProps {
   timeRange: string;
   min?: number;
   max?: number;
+}
+
+/** Phrases a time range for prose, from the shared range vocabulary. */
+function rangeText(timeRange: string, sleep = false): string {
+  if (timeRange === "D") return sleep ? "last night" : "today";
+  return rangeLabel(timeRange as TimeRangeKey);
+}
+
+/** Builds a readable summary from precomputed stats, with no model involved. */
+function buildMetricFallback(
+  metricName: string,
+  timeRangeText: string,
+  unit: string,
+  stats: {
+    min: number;
+    max: number;
+    avg: number;
+    outlierCount: number;
+    warningCount: number;
+    dangerCount: number;
+    totalReadings: number;
+  },
+): string {
+  const unitText = unit ? ` ${unit}` : "";
+  const parts = [
+    `${metricName} ${timeRangeText}: ${stats.totalReadings} reading${
+      stats.totalReadings === 1 ? "" : "s"
+    }, averaging ${Math.round(stats.avg)}${unitText}, ranging from ${Math.round(
+      stats.min,
+    )} to ${Math.round(stats.max)}${unitText}.`,
+  ];
+
+  const flagged = stats.warningCount + stats.dangerCount;
+  parts.push(
+    flagged === 0
+      ? "All readings were within the normal range."
+      : `${flagged} reading${flagged === 1 ? "" : "s"} fell outside the normal range.`,
+  );
+
+  return parts.join(" ");
+}
+
+/** Builds a readable sleep summary with no model involved. */
+function buildSleepFallback(
+  timeRangeText: string,
+  totalSleep: string,
+  efficiency: number,
+  quality: string,
+): string {
+  return `Sleep ${timeRangeText}: ${totalSleep} asleep, ${efficiency}% efficiency. Overall quality ${quality}.`;
 }
 
 /** Returns a stage's share of total sleep as a whole percentage. */
@@ -45,7 +96,6 @@ export function AISummary({
 }: AISummaryProps) {
   const [summary, setSummary] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (data.length > 0) {
@@ -90,9 +140,33 @@ export function AISummary({
     };
   };
 
+  /** Summary built entirely on-device, for when the backend is unreachable. */
+  const buildLocalFallback = (): string => {
+    if (data[0]?.type === "sleep") {
+      const breakdown = aggregateSleepByStage(data);
+      return buildSleepFallback(
+        rangeText(timeRange, true),
+        formatSleepDuration(breakdown.totalSleep),
+        calculateSleepEfficiency(breakdown),
+        String(
+          calculateSleepQuality(breakdown, Math.max(1, countSleepNights(data))),
+        ),
+      );
+    }
+
+    const stats = calculateStats();
+    if (!stats) return "Not enough data to generate a summary.";
+
+    return buildMetricFallback(
+      metricName,
+      rangeText(timeRange),
+      data[0]?.unit || "",
+      stats,
+    );
+  };
+
   const generateSummary = async () => {
     setLoading(true);
-    setError("");
 
     try {
       const isSleep = data[0]?.type === "sleep";
@@ -107,16 +181,7 @@ export function AISummary({
         );
         const sleepEfficiency = calculateSleepEfficiency(sleepBreakdown);
 
-        const timeRangeText =
-          timeRange === "D"
-            ? "last night"
-            : timeRange === "W"
-              ? "this week"
-              : timeRange === "M"
-                ? "this month"
-                : timeRange === "6M"
-                  ? "last 6 months"
-                  : "this year";
+        const timeRangeText = rangeText(timeRange, true);
 
         const response = await requestSummary({
           kind: "sleep",
@@ -140,7 +205,12 @@ export function AISummary({
         setSummary(
           response.configured && response.summary
             ? response.summary
-            : "AI summary is unavailable right now.",
+            : buildSleepFallback(
+                timeRangeText,
+                formatSleepDuration(sleepBreakdown.totalSleep),
+                sleepEfficiency,
+                String(sleepQuality),
+              ),
         );
       } else {
         // Regular metric summary generation
@@ -153,18 +223,7 @@ export function AISummary({
         }
 
         const unit = data[0]?.unit || "";
-        const timeRangeText =
-          timeRange === "H"
-            ? "last hour"
-            : timeRange === "D"
-              ? "today"
-              : timeRange === "W"
-                ? "this week"
-                : timeRange === "M"
-                  ? "this month"
-                  : timeRange === "6M"
-                    ? "last 6 months"
-                    : "this year";
+        const timeRangeText = rangeText(timeRange);
 
         const response = await requestSummary({
           kind: "metric",
@@ -188,12 +247,14 @@ export function AISummary({
         setSummary(
           response.configured && response.summary
             ? response.summary
-            : "AI summary is unavailable right now.",
+            : buildMetricFallback(metricName, timeRangeText, unit, stats),
         );
       }
     } catch (err) {
-      console.error("AI Summary error:", err);
-      setError("Unable to generate AI summary at this time.");
+      // The backend may simply be unreachable. A locally computed summary is
+      // more use than a red error, and the other AI cards already do this.
+      console.warn("AI summary unavailable, using local summary:", err);
+      setSummary(buildLocalFallback());
     } finally {
       setLoading(false);
     }
@@ -206,14 +267,6 @@ export function AISummary({
         <ThemedText style={styles.loadingText}>
           Generating AI summary...
         </ThemedText>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
       </View>
     );
   }
