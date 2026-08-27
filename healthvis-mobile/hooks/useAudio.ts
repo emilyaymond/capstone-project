@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { AudioContext } from "react-native-audio-api";
 import { useAccessibility } from "../contexts/AccessibilityContext";
+import { ensureAudioSession } from "../lib/audio-session";
 import { AccessibilityMode } from "../types";
 
 // ============================================================================
@@ -107,6 +108,8 @@ export function useAudio(): UseAudioReturn {
     if (!settingsRef.current.audioEnabled) return;
 
     try {
+      await ensureAudioSession();
+
       const context = getContext();
       const now = context.currentTime;
       const seconds = duration / 1000;

@@ -19,6 +19,7 @@
 import { AudioContext } from "react-native-audio-api";
 
 import type { DataPoint, DataRange } from "../types";
+import { ensureAudioSession } from "./audio-session";
 
 // ── Tuning ───────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,9 @@ export async function playDataSeries(
   playing = true;
 
   try {
+    // Without this the ringer switch silences playback entirely.
+    await ensureAudioSession();
+
     const context = getContext();
 
     const values = data

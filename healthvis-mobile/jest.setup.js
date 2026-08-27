@@ -44,6 +44,10 @@ jest.mock('react-native-audio-api', () => {
   });
 
   return {
+    AudioManager: {
+      setAudioSessionOptions: jest.fn(),
+      setAudioSessionActivity: jest.fn().mockResolvedValue(true),
+    },
     AudioContext: jest.fn().mockImplementation(() => ({
       currentTime: 0,
       sampleRate: 44100,
