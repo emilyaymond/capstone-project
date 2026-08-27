@@ -18,6 +18,7 @@ import {
   calculateSleepQuality,
   formatSleepDuration,
 } from "@/lib/sleep-utils";
+import { getDaysInRange, type TimeRangeKey } from "@/lib/time-range";
 import { generateSummary as requestSummary } from "@/lib/api-client";
 
 
@@ -28,6 +29,11 @@ interface AISummaryProps {
   timeRange: string;
   min?: number;
   max?: number;
+}
+
+/** Nights covered by a time range, for per-night sleep averages. */
+function nightsInRange(timeRange: string): number {
+  return getDaysInRange(timeRange as TimeRangeKey) || 1;
 }
 
 /** Returns a stage's share of total sleep as a whole percentage. */
@@ -99,7 +105,10 @@ export function AISummary({
       if (isSleep) {
         // Sleep-specific summary generation
         const sleepBreakdown = aggregateSleepByStage(data);
-        const sleepQuality = calculateSleepQuality(sleepBreakdown);
+        const sleepQuality = calculateSleepQuality(
+          sleepBreakdown,
+          nightsInRange(timeRange),
+        );
         const sleepEfficiency = calculateSleepEfficiency(sleepBreakdown);
 
         const timeRangeText =

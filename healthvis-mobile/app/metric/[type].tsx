@@ -673,7 +673,10 @@ export default function MetricDetailScreen() {
                 Stage Breakdown
               </ThemedText>
               {data.length > 0 ? (
-                <SleepStageBreakdown sleepMetrics={data} />
+                <SleepStageBreakdown
+                  sleepMetrics={data}
+                  nights={getDaysInRange(timeRange)}
+                />
               ) : (
                 <ThemedText style={styles.emptyChart}>
                   No stage data available.

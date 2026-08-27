@@ -569,3 +569,58 @@ describe('Sleep stage mapping', () => {
     expect(getSleepStageColor('INBED')).toBe('#8E8E93');
   });
 });
+
+describe('Sleep quality across ranges', () => {
+  const { calculateSleepQuality } = require('./sleep-utils');
+
+  /** One night's worth of stages, scaled across `nights`. */
+  function breakdownFor(nights: number) {
+    return {
+      lightSleep: 3.94 * nights,
+      deepSleep: 0.6 * nights,
+      remSleep: 1.72 * nights,
+      awake: 0.22 * nights,
+      inBed: 0,
+      totalSleep: 6.26 * nights,
+      totalInBed: 6.48 * nights,
+    };
+  }
+
+  it('judges a single night on its own hours', () => {
+    expect(calculateSleepQuality(breakdownFor(1), 1)).toBe('fair');
+  });
+
+  it('gives the same verdict for a month of identical nights', () => {
+    // Duration thresholds describe one night. Passing a month's total without
+    // the night count failed every band and fell through to "poor".
+    expect(calculateSleepQuality(breakdownFor(30), 30)).toBe('fair');
+  });
+
+  it('is consistent across every range length', () => {
+    const verdicts = [1, 7, 30, 180, 365].map((n) =>
+      calculateSleepQuality(breakdownFor(n), n),
+    );
+    expect(new Set(verdicts).size).toBe(1);
+  });
+
+  it('still reports poor for genuinely poor sleep', () => {
+    const poor = {
+      lightSleep: 2,
+      deepSleep: 0,
+      remSleep: 0,
+      awake: 3,
+      inBed: 0,
+      totalSleep: 2,
+      totalInBed: 5,
+    };
+    expect(calculateSleepQuality(poor, 1)).toBe('poor');
+  });
+
+  it('defaults to a single night when no count is given', () => {
+    expect(calculateSleepQuality(breakdownFor(1))).toBe('fair');
+  });
+
+  it('treats a zero night count as one rather than dividing by zero', () => {
+    expect(calculateSleepQuality(breakdownFor(1), 0)).toBe('fair');
+  });
+});

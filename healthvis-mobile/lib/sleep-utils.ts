@@ -87,18 +87,27 @@ export function aggregateSleepByStage(
  */
 export function calculateSleepQuality(
   breakdown: SleepStageBreakdown,
+  nights: number = 1,
 ): "excellent" | "good" | "fair" | "poor" {
   const { totalSleep, deepSleep, remSleep, awake } = breakdown;
 
-  // Ideal sleep: 7-9 hours, with good deep and REM percentages
+  // The duration thresholds below describe a single night, but a breakdown can
+  // cover any range: on a month view totalSleep is ~190 hours, which failed
+  // every band and fell through to "poor" regardless of how well the user
+  // actually slept. Average across the period before comparing.
+  const nightsInRange = nights > 0 ? nights : 1;
+  const sleepPerNight = totalSleep / nightsInRange;
+
+  // Stage percentages are ratios, so they hold at any range and need no
+  // adjustment.
   const deepPercentage = totalSleep > 0 ? (deepSleep / totalSleep) * 100 : 0;
   const remPercentage = totalSleep > 0 ? (remSleep / totalSleep) * 100 : 0;
   const awakePercentage = totalSleep > 0 ? (awake / totalSleep) * 100 : 0;
 
   // Excellent: 7-9 hours, 15-25% deep, 20-25% REM, <5% awake
   if (
-    totalSleep >= 7 &&
-    totalSleep <= 9 &&
+    sleepPerNight >= 7 &&
+    sleepPerNight <= 9 &&
     deepPercentage >= 15 &&
     deepPercentage <= 25 &&
     remPercentage >= 20 &&
@@ -110,8 +119,8 @@ export function calculateSleepQuality(
 
   // Good: 6-10 hours, 10-30% deep, 15-30% REM, <10% awake
   if (
-    totalSleep >= 6 &&
-    totalSleep <= 10 &&
+    sleepPerNight >= 6 &&
+    sleepPerNight <= 10 &&
     deepPercentage >= 10 &&
     deepPercentage <= 30 &&
     remPercentage >= 15 &&
@@ -123,8 +132,8 @@ export function calculateSleepQuality(
 
   // Fair: 5-11 hours, some deep/REM sleep
   if (
-    totalSleep >= 5 &&
-    totalSleep <= 11 &&
+    sleepPerNight >= 5 &&
+    sleepPerNight <= 11 &&
     (deepPercentage > 5 || remPercentage > 10)
   ) {
     return "fair";

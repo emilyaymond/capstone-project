@@ -19,14 +19,20 @@ import {
 
 interface SleepStageBreakdownProps {
   sleepMetrics: HealthMetric[];
+  /**
+   * Nights covered by these metrics. Quality thresholds describe one night, so
+   * a multi-night range has to be averaged before it can be judged.
+   */
+  nights?: number;
 }
 
 export function SleepStageBreakdown({
   sleepMetrics,
+  nights = 1,
 }: SleepStageBreakdownProps) {
   const breakdown = aggregateSleepByStage(sleepMetrics);
   const efficiency = calculateSleepEfficiency(breakdown);
-  const quality = calculateSleepQuality(breakdown);
+  const quality = calculateSleepQuality(breakdown, nights);
 
   const stages = [
     {
