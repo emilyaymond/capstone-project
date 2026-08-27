@@ -125,6 +125,31 @@ export function filterSleepForRange(
   return metrics.filter((metric) => getSleepSessionEnd(metric).getTime() >= startMs);
 }
 
+/**
+ * Counts the nights that actually have recorded sleep.
+ *
+ * Averages must divide by nights with data, not calendar nights. Dividing a
+ * month's sleep by 30 when the watch was worn for 20 understates every nightly
+ * average by a third, and penalises the user for nights they simply did not
+ * record.
+ *
+ * Nights are keyed by the local date a session ended, matching the rule that a
+ * night belongs to the day it ends on.
+ */
+export function countSleepNights(metrics: HealthMetric[]): number {
+  const nights = new Set<string>();
+
+  for (const metric of metrics) {
+    const end = getSleepSessionEnd(metric);
+    if (Number.isNaN(end.getTime())) continue;
+    nights.add(
+      `${end.getFullYear()}-${end.getMonth()}-${end.getDate()}`,
+    );
+  }
+
+  return nights.size;
+}
+
 export function calculateSleepQuality(
   breakdown: SleepStageBreakdown,
   nights: number = 1,

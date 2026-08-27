@@ -65,6 +65,7 @@ import {
 } from "@/lib/metric-registry";
 import {
   aggregateSleepByStage,
+  countSleepNights,
   filterSleepForRange,
   formatSleepDuration,
 } from "@/lib/sleep-utils";
@@ -373,8 +374,8 @@ export default function MetricDetailScreen() {
       const totalHours = sleepData.reduce((s, m) => s + Number(m.value), 0);
 
       if (isLongRange(timeRange)) {
-        // avg per night
-        const nights = getDaysInRange(timeRange);
+        // Divide by nights that recorded sleep, not calendar nights.
+        const nights = Math.max(1, countSleepNights(sleepData));
         return formatValue(totalHours / nights, "hr");
       }
       return formatValue(totalHours, "hr");
@@ -482,6 +483,17 @@ export default function MetricDetailScreen() {
   );
 
   /**
+   * Nights in this range that actually recorded sleep.
+   *
+   * Calendar nights would divide by 30 for a month even if the watch was only
+   * worn for 20, understating every nightly average.
+   */
+  const recordedNights = useMemo(
+    () => (isSleep ? Math.max(1, countSleepNights(data)) : 1),
+    [isSleep, data],
+  );
+
+  /**
    * Time in bed averaged per night.
    *
    * The raw total is the sum across the range, so a month read "194h 27m" --
@@ -490,8 +502,8 @@ export default function MetricDetailScreen() {
   const inBedPerNight = useMemo(() => {
     if (!sleepBreakdown) return 0;
     const total = sleepBreakdown.totalInBed || sleepBreakdown.totalSleep;
-    return total / Math.max(1, getDaysInRange(timeRange));
-  }, [sleepBreakdown, timeRange]);
+    return total / recordedNights;
+  }, [sleepBreakdown, recordedNights]);
 
   /** Reshapes the plotted series into HealthMetrics for downstream consumers. */
   const displayedMetrics = useMemo<HealthMetric[]>(() => {
@@ -687,7 +699,7 @@ export default function MetricDetailScreen() {
               {data.length > 0 ? (
                 <SleepStageBreakdown
                   sleepMetrics={data}
-                  nights={getDaysInRange(timeRange)}
+                  nights={recordedNights}
                 />
               ) : (
                 <ThemedText style={styles.emptyChart}>

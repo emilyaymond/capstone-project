@@ -700,3 +700,43 @@ describe('Sleep quality with no data', () => {
     expect(calculateSleepQuality(barely, 1)).toBe('poor');
   });
 });
+
+describe('Counting nights with sleep data', () => {
+  const { countSleepNights } = require('./sleep-utils');
+
+  /** A session on a given day, ending the following morning. */
+  function night(day: number) {
+    return {
+      id: `night-${day}`,
+      category: 'sleep' as const,
+      type: 'sleep' as const,
+      value: 8,
+      timestamp: new Date(2026, 7, day, 22, 0, 0),
+      unit: 'hr',
+      metadata: { durationMinutes: 480, sleepStage: 'Light Sleep' },
+    };
+  }
+
+  it('counts nothing when there is no data', () => {
+    expect(countSleepNights([])).toBe(0);
+  });
+
+  it('counts each night once however many stage records it has', () => {
+    // A single night arrives as many stage samples; it is still one night.
+    const oneNight = [night(1), night(1), night(1)];
+    expect(countSleepNights(oneNight)).toBe(1);
+  });
+
+  it('counts only nights that were recorded, not calendar nights', () => {
+    // Three nights recorded inside a month-long range. Averages must divide by
+    // three, not thirty, or every per-night figure is understated.
+    const recorded = [night(1), night(5), night(20)];
+    expect(countSleepNights(recorded)).toBe(3);
+  });
+
+  it('groups a session by the day it ends on', () => {
+    // 22:00 on the 1st ends on the 2nd, so it is the 2nd's night -- the same
+    // rule the range filter uses.
+    expect(countSleepNights([night(1), night(2)])).toBe(2);
+  });
+});
