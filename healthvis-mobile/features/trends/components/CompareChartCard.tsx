@@ -4,18 +4,13 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { AccessibleButton } from "@/components/AccessibleButton";
 import { METRIC_CHIPS, TimeRangeKey } from "../utils/trendConfig";
+import { getColorForType } from "@/lib/metric-registry";
+import type { HealthMetricType } from "@/types/health-metric";
 import { LineChart } from "react-native-gifted-charts";
 
-// Color palette for different metrics
-const METRIC_COLORS: Record<string, string> = {
-  heart_rate: "#FF3B30", // Red for heart rate
-  sleep: "#5856D6", // Purple for sleep
-  steps: "#34C759", // Green for steps
-  glucose: "#FF9500", // Orange for glucose
-};
 
 type Series = {
-  key: string;
+  key: HealthMetricType;
   label: string;
   unit?: string;
   points: { value: number; timestamp: Date }[];
@@ -25,8 +20,8 @@ export default function CompareChartCard(props: {
   timeRange: TimeRangeKey;
   onChangeTimeRange: (v: TimeRangeKey) => void;
 
-  selectedMetricKeys: string[];
-  onChangeSelectedMetricKeys: (keys: string[]) => void;
+  selectedMetricKeys: HealthMetricType[];
+  onChangeSelectedMetricKeys: (keys: HealthMetricType[]) => void;
 
   series: Series[];
 }) {
@@ -34,7 +29,7 @@ export default function CompareChartCard(props: {
 
   const [showPicker, setShowPicker] = useState(false);
 
-  const toggleMetric = (key: string) => {
+  const toggleMetric = (key: HealthMetricType) => {
     const next =
       selectedMetricKeys.includes(key)
         ? selectedMetricKeys.filter((k) => k !== key)
@@ -128,15 +123,15 @@ export default function CompareChartCard(props: {
               }))}
               height={190}
               width={320}
-              color={METRIC_COLORS[normalized[0]?.key] || "#FF3B30"}
-              color2={METRIC_COLORS[normalized[1]?.key] || "#5856D6"}
+              color={getColorForType(normalized[0]?.key ?? "heart_rate")}
+              color2={getColorForType(normalized[1]?.key ?? "sleep")}
               thickness={2.5}
               thickness2={2.5}
               curved
               hideDataPoints={false}
               dataPointsRadius={4}
-              dataPointsColor={METRIC_COLORS[normalized[0]?.key] || "#FF3B30"}
-              dataPointsColor2={METRIC_COLORS[normalized[1]?.key] || "#5856D6"}
+              dataPointsColor={getColorForType(normalized[0]?.key ?? "heart_rate")}
+              dataPointsColor2={getColorForType(normalized[1]?.key ?? "sleep")}
               hideRules
               hideYAxisText
               xAxisColor="#E5E5E5"
@@ -154,7 +149,7 @@ export default function CompareChartCard(props: {
                 <View 
                   style={[
                     styles.legendDot, 
-                    { backgroundColor: METRIC_COLORS[s.key] || "#111" }
+                    { backgroundColor: getColorForType(s.key) }
                   ]} 
                 />
                 <ThemedText style={styles.legendText}>{s.label}</ThemedText>

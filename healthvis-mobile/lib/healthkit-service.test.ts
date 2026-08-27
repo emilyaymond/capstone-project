@@ -469,7 +469,7 @@ describe('HealthKit Service - Vital Signs Fetching', () => {
       expect(results).toHaveLength(1);
       expect(results[0].type).toBe('respiratory_rate');
       expect(results[0].value).toBe(16);
-      expect(results[0].unit).toBe('breaths/min');
+      expect(results[0].unit).toBe('br/min');
     });
   });
 

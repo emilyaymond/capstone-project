@@ -45,18 +45,16 @@ import { SleepStageBreakdown } from "@/components/SleepStageBreakdown";
 import { AISummary } from "@/components/ai/aiSummary";
 import { TimeSliceRow } from "@/components/TimeSliceRow";
 
-import {
-  HealthMetric,
-  HealthMetricType,
-  classifyRange,
-  hasDefinedRange,
-} from "@/types/health-metric";
+import { HealthMetric, HealthMetricType } from "@/types/health-metric";
 import { DataPoint, DataRange } from "@/types";
 import {
-  getMetricConfig,
+  getMetric as getMetricConfig,
   getMetricChartKind,
   getMetricAggregation,
-} from "./metricConfig";
+  classifyRange,
+  hasDefinedRange,
+  normalRangeText,
+} from "@/lib/metric-registry";
 import { aggregateSleepByStage, formatSleepDuration } from "@/lib/sleep-utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -356,9 +354,11 @@ export default function MetricDetailScreen() {
   useEffect(() => {
     announceNavigation(
       `${cfg.label} detail`,
-      cfg.normalRange ? `Normal range: ${cfg.normalRange}` : undefined,
+      normalRangeText(metricType)
+        ? `Normal range: ${normalRangeText(metricType)}`
+        : undefined,
     );
-  }, [cfg.label, cfg.normalRange]);
+  }, [cfg.label, metricType]);
 
   // ── Collect raw data for this metric ─────────────────────────────────────
   const allRaw: HealthMetric[] = useMemo(
@@ -597,7 +597,8 @@ export default function MetricDetailScreen() {
     }
     // Previously an early return on normalRange meant outliers were never
     // announced for any metric that defines a normal range.
-    if (cfg.normalRange) parts.push(`Normal range: ${cfg.normalRange}.`);
+    const rangeText = normalRangeText(metricType);
+    if (rangeText) parts.push(`Normal range: ${rangeText}.`);
     if (keyStats?.outlierCount) {
       parts.push(
         `${keyStats.outlierCount} outlier${keyStats.outlierCount > 1 ? "s" : ""} detected.`,

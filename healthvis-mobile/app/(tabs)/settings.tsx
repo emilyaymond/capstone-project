@@ -836,6 +836,16 @@ export default function SettingsScreen() {
             Open Accessibility Test Screen →
           </ThemedText>
         </Link>
+        <Link href="/haptic-test" style={styles.testLink}>
+          <ThemedText
+            style={[
+              styles.linkText,
+              { fontSize: fontSize.body, color: colors.primary },
+            ]}
+          >
+            Open Haptic Test Screen →
+          </ThemedText>
+        </Link>
       </ThemedView>
     </ScrollView>
   );

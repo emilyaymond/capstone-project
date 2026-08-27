@@ -1,4 +1,12 @@
-import { HealthMetricType } from "@/types/health-metric";
+import type {
+  HealthCategory,
+  HealthMetricType,
+} from "@/types/health-metric";
+import {
+  getMetric,
+  TREND_METRIC_TYPES,
+  type MetricAggregation,
+} from "@/lib/metric-registry";
 
 export type TimeRangeKey = "H" | "D" | "W" | "M" | "6M" | "Y";
 
@@ -11,110 +19,41 @@ export const TIME_RANGES: { key: TimeRangeKey; label: string }[] = [
   { key: "Y", label: "Year" },
 ];
 
+/**
+ * A metric as offered on the Trends screen. Fields are projected from the
+ * registry so a chip can never disagree with the detail screen about a
+ * metric's label, unit, colour or aggregation.
+ */
 export type MetricChip = {
   key: HealthMetricType;
   label: string;
   unit: string;
   color: string;
-  /** "avg" | "sum" | "latest" – how to bucket this metric */
-  aggregation: "avg" | "sum" | "latest";
-  category: "vitals" | "activity" | "body" | "sleep" | "mindfulness";
+  aggregation: MetricAggregation;
+  category: HealthCategory;
 };
 
-export const METRIC_CHIPS: MetricChip[] = [
-  // ── Vitals ──────────────────────────────────────────────────────────────
-  {
-    key: "heart_rate",
-    label: "Heart Rate",
-    unit: "bpm",
-    color: "#FF3B30",
-    aggregation: "avg",
-    category: "vitals",
-  },
-  {
-    key: "respiratory_rate",
-    label: "Respiratory Rate",
-    unit: "br/min",
-    color: "#00b7ff",
-    aggregation: "avg",
-    category: "vitals",
-  },
-  {
-    key: "oxygen_saturation",
-    label: "Oxygen Saturation",
-    unit: "%",
-    color: "#5AC8FA",
-    aggregation: "avg",
-    category: "vitals",
-  },
-  {
-    key: "blood_glucose",
-    label: "Blood Glucose",
-    unit: "mg/dL",
-    color: "#FF9500",
-    aggregation: "avg",
-    category: "vitals",
-  },
-  // ── Activity ─────────────────────────────────────────────────────────────
-  {
-    key: "steps",
-    label: "Steps",
-    unit: "steps",
-    color: "#30B0C7",
-    aggregation: "sum",
-    category: "activity",
-  },
-  {
-    key: "active_energy",
-    label: "Active Calories",
-    unit: "kcal",
-    color: "#FF6B35",
-    aggregation: "sum",
-    category: "activity",
-  },
-  {
-    key: "exercise_minutes",
-    label: "Exercise",
-    unit: "min",
-    color: "#AF52DE",
-    aggregation: "sum",
-    category: "activity",
-  },
-  // ── Body ─────────────────────────────────────────────────────────────────
-  {
-    key: "weight",
-    label: "Weight",
-    unit: "lbs",
-    color: "#8E8E93",
-    aggregation: "avg",
-    category: "body",
-  },
-  // ── Sleep ────────────────────────────────────────────────────────────────
-  {
-    key: "sleep",
-    label: "Sleep",
-    unit: "hr",
-    color: "#5856D6",
-    aggregation: "sum",
-    category: "sleep",
-  },
-  // ── Mindfulness ──────────────────────────────────────────────────────────
-  {
-    key: "mindfulness",
-    label: "Mindfulness",
-    unit: "min",
-    color: "#32ADE6",
-    aggregation: "sum",
-    category: "mindfulness",
-  },
-];
+export const METRIC_CHIPS: MetricChip[] = TREND_METRIC_TYPES.map((type) => {
+  const metric = getMetric(type);
+  return {
+    key: type,
+    label: metric.label,
+    unit: metric.unit,
+    color: metric.color,
+    aggregation: metric.aggregation,
+    category: metric.category,
+  };
+});
 
-/** Lookup by key */
 export const METRIC_MAP = new Map<string, MetricChip>(
   METRIC_CHIPS.map((m) => [m.key, m]),
 );
 
-export const DEFAULT_COMPARE_METRICS = ["heart_rate", "steps", "sleep"];
+export const DEFAULT_COMPARE_METRICS: HealthMetricType[] = [
+  "heart_rate",
+  "steps",
+  "sleep",
+];
 
 // ── Time range → bucket size (ms) ──────────────────────────────────────────
 

@@ -37,6 +37,7 @@ import TrendsAISummary, {
 import ExploreModesCard from "@/features/trends/components/ExploreModesCard";
 import * as Haptics from "expo-haptics";
 
+import type { HealthMetricType } from "@/types/health-metric";
 import {
   DEFAULT_COMPARE_METRICS,
   getBucketMs,
@@ -111,7 +112,7 @@ export default function TrendsScreen() {
   const fontSize = FONT_SIZES[settings.fontSize];
 
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("W");
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(
+  const [selectedKeys, setSelectedKeys] = useState<HealthMetricType[]>(
     DEFAULT_COMPARE_METRICS
   );
 
@@ -133,7 +134,7 @@ export default function TrendsScreen() {
 
   // ── metric chip toggle ───────────────────────────────────────────────────────
 
-  const toggleMetric = useCallback((key: string) => {
+  const toggleMetric = useCallback((key: HealthMetricType) => {
     setSelectedKeys((prev) => {
       if (prev.includes(key)) {
         if (prev.length === 1) return prev; // must keep at least one

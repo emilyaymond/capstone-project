@@ -17,7 +17,8 @@ jest.mock('react-native-health', () => ({
 }));
 
 import { convertHealthKitSample } from './healthkit-service';
-import { HealthMetricType, getUnitForType, classifyRange, hasDefinedRange } from '../types/health-metric';
+import { HealthMetricType } from '../types/health-metric';
+import { getUnitForType, classifyRange, hasDefinedRange } from './metric-registry';
 
 describe('HealthKit Sample Conversion', () => {
   describe('convertHealthKitSample', () => {
@@ -83,7 +84,7 @@ describe('HealthKit Sample Conversion', () => {
       expect(metric.type).toBe('respiratory_rate');
       expect(metric.category).toBe('vitals');
       expect(metric.value).toBe(16);
-      expect(metric.unit).toBe('breaths/min');
+      expect(metric.unit).toBe('br/min');
       expect(metric.range).toBe('normal');
     });
 
@@ -375,7 +376,7 @@ describe('HealthKit Sample Conversion', () => {
       expect(metric.type).toBe('sleep');
       expect(metric.category).toBe('sleep');
       expect(metric.value).toBe(7.5);
-      expect(metric.unit).toBe('hours');
+      expect(metric.unit).toBe('hr');
       expect(metric.range).toBeUndefined();
     });
 

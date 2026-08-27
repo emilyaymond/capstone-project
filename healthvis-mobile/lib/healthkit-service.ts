@@ -14,15 +14,13 @@ import AppleHealthKit, {
   HealthValue,
   HealthKitPermissions,
 } from "react-native-health";
+import { HealthMetric, HealthMetricType, HealthCategory, CategorizedHealthData } from "../types/health-metric";
 import {
-  HealthMetric,
-  HealthMetricType,
-  HealthCategory,
-  CategorizedHealthData,
   getUnitForType,
   classifyRange,
   hasDefinedRange,
-} from "../types/health-metric";
+  METRIC_TYPE_TO_CATEGORY,
+} from "./metric-registry";
 import {
   HealthKitError,
   HealthKitErrorCode,
@@ -165,44 +163,6 @@ const HEALTHKIT_TO_METRIC_TYPE: Record<string, HealthMetricType> = {
   [HEALTHKIT_TYPES.FATS]: "fats",
   [HEALTHKIT_TYPES.SLEEP]: "sleep",
   [HEALTHKIT_TYPES.MINDFULNESS]: "mindfulness",
-};
-
-/**
- * Map HealthMetric type to HealthCategory
- */
-const METRIC_TYPE_TO_CATEGORY: Record<HealthMetricType, HealthCategory> = {
-  // Vitals
-  heart_rate: "vitals",
-  blood_pressure_systolic: "vitals",
-  blood_pressure_diastolic: "vitals",
-  respiratory_rate: "vitals",
-  body_temperature: "vitals",
-  oxygen_saturation: "vitals",
-  blood_glucose: "vitals",
-
-  // Activity
-  steps: "activity",
-  distance: "activity",
-  flights_climbed: "activity",
-  active_energy: "activity",
-  exercise_minutes: "activity",
-
-  // Body
-  weight: "body",
-  height: "body",
-  bmi: "body",
-  body_fat_percentage: "body",
-
-  // Nutrition
-  dietary_energy: "nutrition",
-  water: "nutrition",
-  protein: "nutrition",
-  carbohydrates: "nutrition",
-  fats: "nutrition",
-
-  // Sleep & Mindfulness
-  sleep: "sleep",
-  mindfulness: "mindfulness",
 };
 
 // Retry Configuration

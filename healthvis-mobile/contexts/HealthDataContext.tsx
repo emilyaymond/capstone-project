@@ -49,7 +49,7 @@ import {
   getMetricChartKind,
   MetricChartKind,
   MetricAggregation,
-} from "@/app/metric/metricConfig";
+} from "@/lib/metric-registry";
 
 // Set to true to always use mock data (useful for simulator / demo mode)
 const USE_MOCK_DATA = false;

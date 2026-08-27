@@ -5,7 +5,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useHealthData } from "@/contexts/HealthDataContext";
-import { getDisplayNameForType } from "@/types/health-metric";
+import { getDisplayNameForType } from "@/lib/metric-registry";
 
 const CATEGORY_LABELS: Record<string, string> = {
   activity: "Activity",

@@ -5,12 +5,8 @@
  * Covers 30 days of data across all metric types so every screen looks populated.
  */
 
-import {
-  HealthMetric,
-  CategorizedHealthData,
-  classifyRange,
-  hasDefinedRange,
-} from "../types/health-metric";
+import { HealthMetric, CategorizedHealthData } from "../types/health-metric";
+import { classifyRange, hasDefinedRange } from "./metric-registry";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

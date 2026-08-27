@@ -29,6 +29,7 @@ import {
 } from "@/lib/announcer";
 
 import { HealthMetric } from "@/types/health-metric";
+import { getColorForType } from "@/lib/metric-registry";
 import { SummaryStateGate } from "@/features/summary/components/SummaryStateGate";
 import * as Speech from "expo-speech";
 import { SummaryAISummary } from "@/features/summary/components/SummaryAISummary";
@@ -44,26 +45,9 @@ type SummaryCardData = {
   metric?: HealthMetric;
 };
 
-const CARD_ACCENTS: Record<SummaryMetricType, string> = {
-  sleep: "#4c17c5ff",
-  heart_rate: "rgba(233, 8, 53, 1)",
-  steps: "#52baffff",
-  respiratory_rate: "#34C759",
-};
-
-function prettyMetricName(type: string) {
-  switch (type) {
-    case "heart_rate":
-      return "Heart Rate";
-    case "steps":
-      return "Steps";
-    case "sleep":
-      return "Sleep";
-    case "respiratory_rate":
-      return "Respiratory Rate";
-    default:
-      return type.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }
+/** Accent colour for a summary card, taken from the metric registry. */
+function cardAccent(type: SummaryMetricType): string {
+  return getColorForType(type);
 }
 
 function formatNumber(value: number) {
@@ -193,7 +177,7 @@ function SummaryMetricCard({
   onPress: () => void;
   fontSize: { body: number; label: number; title?: number };
 }) {
-  const accent = CARD_ACCENTS[card.type];
+  const accent = cardAccent(card.type);
 
   return (
     <TouchableOpacity

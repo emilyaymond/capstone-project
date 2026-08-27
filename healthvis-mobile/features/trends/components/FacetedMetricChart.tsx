@@ -21,7 +21,7 @@ import { ScatterPlot } from "@/components/charts/scatter";
 import { SleepChart } from "@/components/charts/sleepChart";
 import { DataPoint } from "@/types";
 import { HealthMetric, HealthMetricType } from "@/types/health-metric";
-import { getMetricChartKind } from "@/app/metric/metricConfig";
+import { getMetricChartKind } from "@/lib/metric-registry";
 
 const SCREEN_W = Dimensions.get("window").width;
 const CHART_W = SCREEN_W - 64; // card padding × 2 + outer padding × 2
