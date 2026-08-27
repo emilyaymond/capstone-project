@@ -61,18 +61,21 @@ export function SleepStageBreakdown({
     },
   ].filter((stage) => stage.duration > 0);
 
-  const qualityColors = {
+  const qualityColors: Record<typeof quality, string> = {
     excellent: "#34C759",
     good: "#30D158",
     fair: "#FF9500",
     poor: "#FF3B30",
+    // Neutral grey: "no data" should not read as a bad result.
+    unknown: "#8E8E93",
   };
 
-  const qualityLabels = {
+  const qualityLabels: Record<typeof quality, string> = {
     excellent: "Excellent",
     good: "Good",
     fair: "Fair",
     poor: "Poor",
+    unknown: "No data",
   };
 
   return (

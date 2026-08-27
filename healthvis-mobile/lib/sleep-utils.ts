@@ -17,9 +17,17 @@ export interface SleepStageBreakdown {
   totalInBed: number; // hours (includes everything)
 }
 
+/** Sleep quality verdict, or "unknown" when there is no sleep to judge. */
+export type SleepQuality =
+  | "excellent"
+  | "good"
+  | "fair"
+  | "poor"
+  | "unknown";
+
 export interface SleepSummary {
   breakdown: SleepStageBreakdown;
-  sleepQuality: "excellent" | "good" | "fair" | "poor";
+  sleepQuality: SleepQuality;
   sleepEfficiency: number; // percentage (totalSleep / totalInBed * 100)
   samples: HealthMetric[];
 }
@@ -120,8 +128,13 @@ export function filterSleepForRange(
 export function calculateSleepQuality(
   breakdown: SleepStageBreakdown,
   nights: number = 1,
-): "excellent" | "good" | "fair" | "poor" {
+): SleepQuality {
   const { totalSleep, deepSleep, remSleep, awake } = breakdown;
+
+  // No recorded sleep is an absence of data, not bad sleep. Falling through to
+  // the "everything else" case below would grade a night the user simply did
+  // not wear their watch as "Poor".
+  if (totalSleep <= 0) return "unknown";
 
   // The duration thresholds below describe a single night, but a breakdown can
   // cover any range: on a month view totalSleep is ~190 hours, which failed

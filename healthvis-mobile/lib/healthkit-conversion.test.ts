@@ -671,3 +671,32 @@ describe('Sleep night boundary', () => {
     expect(filterSleepForRange([nap], midnightToday)).toHaveLength(1);
   });
 });
+
+describe('Sleep quality with no data', () => {
+  const { calculateSleepQuality } = require('./sleep-utils');
+
+  const empty = {
+    lightSleep: 0,
+    deepSleep: 0,
+    remSleep: 0,
+    awake: 0,
+    inBed: 0,
+    totalSleep: 0,
+    totalInBed: 0,
+  };
+
+  it('reports unknown rather than poor when nothing was recorded', () => {
+    // A night the user did not wear their watch is an absence of data, not
+    // bad sleep. This previously fell through to the catch-all and read "Poor".
+    expect(calculateSleepQuality(empty, 1)).toBe('unknown');
+  });
+
+  it('reports unknown across any range length', () => {
+    expect(calculateSleepQuality(empty, 30)).toBe('unknown');
+  });
+
+  it('still judges a night with only a little sleep', () => {
+    const barely = { ...empty, lightSleep: 1, totalSleep: 1, totalInBed: 1 };
+    expect(calculateSleepQuality(barely, 1)).toBe('poor');
+  });
+});
