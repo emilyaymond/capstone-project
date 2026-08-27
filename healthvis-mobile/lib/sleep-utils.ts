@@ -189,10 +189,13 @@ export function formatSleepDuration(hours: number): string {
  * @returns Hex color code
  */
 export function getSleepStageColor(stage: string): string {
-  if (stage.includes("Deep")) return "#5856D6"; // Purple
-  if (stage.includes("REM")) return "#007AFF"; // Blue
-  if (stage.includes("Light") || stage.includes("Core")) return "#34C759"; // Green
-  if (stage.includes("Awake")) return "#FF9500"; // Orange
-  if (stage.includes("In Bed")) return "#8E8E93"; // Gray
+  // Case-insensitive: HealthKit reports "DEEP" while the mapped label is
+  // "Deep Sleep", and a case-sensitive check silently returned the default.
+  const value = stage.toLowerCase();
+  if (value.includes("deep")) return "#5856D6"; // Purple
+  if (value.includes("rem")) return "#007AFF"; // Blue
+  if (value.includes("light") || value.includes("core")) return "#34C759"; // Green
+  if (value.includes("awake")) return "#FF9500"; // Orange
+  if (value.includes("in bed") || value.includes("inbed")) return "#8E8E93"; // Gray
   return "#34C759"; // Default to green
 }

@@ -1638,20 +1638,35 @@ export const healthKitService: HealthKitService = {
             const durationMs = end.getTime() - start.getTime();
             const durationHours = durationMs / (1000 * 60 * 60); // Convert to hours
 
-            // Map Apple's sleep stage values to readable names
+            // Map Apple's sleep stage values to readable names.
+            //
+            // react-native-health reports the short forms (CORE, DEEP, REM) on
+            // device, not the ASLEEP_* spellings. Only the long forms were
+            // mapped, so those three fell through unmapped and downstream code
+            // received "DEEP" where it expected "Deep Sleep" -- which rendered
+            // deep sleep in the default green rather than purple, and showed
+            // "CORE" to the user (and to VoiceOver) instead of "Light Sleep".
             const sleepStageMap: Record<string, string> = {
               INBED: "In Bed",
+              IN_BED: "In Bed",
               ASLEEP: "Asleep",
+              CORE: "Light Sleep",
               ASLEEP_CORE: "Light Sleep",
+              DEEP: "Deep Sleep",
               ASLEEP_DEEP: "Deep Sleep",
+              REM: "REM Sleep",
               ASLEEP_REM: "REM Sleep",
               ASLEEP_UNSPECIFIED: "Asleep",
               AWAKE: "Awake",
             };
 
-            const rawStage =
-              sample.value || sample.sleepStage || "ASLEEP_UNSPECIFIED";
-            const sleepStage = sleepStageMap[rawStage] || rawStage;
+            const rawStage = String(
+              sample.value || sample.sleepStage || "ASLEEP_UNSPECIFIED",
+            );
+            // Normalise case and separators so a spelling change upstream does
+            // not silently fall through again.
+            const stageKey = rawStage.toUpperCase().replace(/[\s-]+/g, "_");
+            const sleepStage = sleepStageMap[stageKey] || rawStage;
 
             // Create a HealthValue-compatible object with calculated duration
             const healthValue: HealthValue = {

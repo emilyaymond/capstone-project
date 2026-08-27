@@ -538,3 +538,34 @@ describe('HealthKit Sample Conversion', () => {
     });
   });
 });
+
+describe('Sleep stage mapping', () => {
+  // react-native-health reports the short forms on device. Only the ASLEEP_*
+  // spellings were mapped, so CORE/DEEP/REM fell through unmapped.
+  const { getSleepStageColor } = require('./sleep-utils');
+
+  it('colours deep sleep purple regardless of case', () => {
+    expect(getSleepStageColor('Deep Sleep')).toBe('#5856D6');
+    expect(getSleepStageColor('DEEP')).toBe('#5856D6');
+  });
+
+  it('colours light sleep green for both spellings', () => {
+    expect(getSleepStageColor('Light Sleep')).toBe('#34C759');
+    expect(getSleepStageColor('CORE')).toBe('#34C759');
+  });
+
+  it('colours REM blue regardless of case', () => {
+    expect(getSleepStageColor('REM Sleep')).toBe('#007AFF');
+    expect(getSleepStageColor('rem')).toBe('#007AFF');
+  });
+
+  it('colours awake orange regardless of case', () => {
+    expect(getSleepStageColor('Awake')).toBe('#FF9500');
+    expect(getSleepStageColor('AWAKE')).toBe('#FF9500');
+  });
+
+  it('colours in-bed grey for both spellings', () => {
+    expect(getSleepStageColor('In Bed')).toBe('#8E8E93');
+    expect(getSleepStageColor('INBED')).toBe('#8E8E93');
+  });
+});
