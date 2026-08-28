@@ -1,34 +1,28 @@
-/**
- * useHaptics Hook
- *
- * Provides haptic feedback functionality with intensity mapping for data ranges.
- * Integrates with AccessibilityContext to respect hapticsEnabled setting.
- * Includes graceful fallback for unsupported platforms (Web).
- *
- * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
- */
-
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo } from "react";
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 import { useAccessibility } from "../contexts/AccessibilityContext";
 import { DataRange } from "../types";
 
-// ============================================================================
 // Hook Return Interface
-// ============================================================================
-
 export interface UseHapticsReturn {
   triggerLight: () => void;
   triggerMedium: () => void;
   triggerHeavy: () => void;
+  triggerSoft: () => void;
+  triggerError: () => void;
+  triggerSelected: () => void;
   triggerForDataPoint: (range: DataRange) => void;
   isSupported: boolean;
 }
 
-// ============================================================================
+// Haptics are supported on iOS and Android, but not on Web. Platform.OS is
+// fixed for the lifetime of the process, so this is a constant rather than
+// state — deriving it in an effect left the first render reporting "false"
+// and silently dropped any haptic fired during mount.
+const HAPTICS_SUPPORTED = Platform.OS === "ios" || Platform.OS === "android";
+
 // useHaptics Hook
-// ============================================================================
 
 /**
  * Custom hook for haptic feedback
@@ -39,28 +33,9 @@ export interface UseHapticsReturn {
  */
 export function useHaptics(): UseHapticsReturn {
   const { settings } = useAccessibility();
-  const [isSupported, setIsSupported] = useState<boolean>(false);
-
-  // Check Platform Support
-
-  useEffect(() => {
-    // Haptics are supported on iOS and Android, but not on Web
-    const supported = Platform.OS === "ios" || Platform.OS === "android";
-    setIsSupported(supported);
-
-    if (!supported) {
-      console.warn("Haptic feedback is not supported on this platform");
-    }
-  }, []);
+  const isSupported = HAPTICS_SUPPORTED;
 
   // Trigger Light Haptic
-
-  /**
-   * Triggers a light haptic pulse
-   * Used for normal data points and subtle interactions
-   *
-   * Requirement 4.1: Light haptic for normal range data
-   */
   const triggerLight = useCallback(() => {
     // Check if haptics are enabled in settings
     if (!settings.hapticsEnabled) {
@@ -80,13 +55,6 @@ export function useHaptics(): UseHapticsReturn {
   }, [settings.hapticsEnabled, isSupported]);
 
   // Trigger Medium Haptic
-
-  /**
-   * Triggers a medium haptic pulse
-   * Used for warning data points and moderate interactions
-   *
-   * Requirement 4.2: Medium haptic for warning range data
-   */
   const triggerMedium = useCallback(() => {
     // Check if haptics are enabled in settings
     if (!settings.hapticsEnabled) {
@@ -106,13 +74,6 @@ export function useHaptics(): UseHapticsReturn {
   }, [settings.hapticsEnabled, isSupported]);
 
   // Trigger Heavy Haptic
-
-  /**
-   * Triggers a heavy haptic pulse with double pattern
-   * Used for danger data points and critical interactions
-   *
-   * Requirement 4.3: Heavy haptic with double pattern for danger range data
-   */
   const triggerHeavy = useCallback(async () => {
     // Check if haptics are enabled in settings
     if (!settings.hapticsEnabled) {
@@ -138,6 +99,63 @@ export function useHaptics(): UseHapticsReturn {
     }
   }, [settings.hapticsEnabled, isSupported]);
 
+  // Trigger soft
+  const triggerSoft = useCallback(() => {
+    // Check if haptics are enabled in settings
+    if (!settings.hapticsEnabled) {
+      return;
+    }
+
+    // Check if platform supports haptics
+    if (!isSupported) {
+      return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+    } catch (error) {
+      console.error("Error triggering light haptic:", error);
+    }
+  }, [settings.hapticsEnabled, isSupported]);
+
+  // Trigger Error Haptic
+  const triggerError = useCallback(() => {
+    // Check if haptics are enabled in settings
+    if (!settings.hapticsEnabled) {
+      return;
+    }
+
+    // Check if platform supports haptics
+    if (!isSupported) {
+      return;
+    }
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } catch (error) {
+      console.error("Error triggering light haptic:", error);
+    }
+  }, [settings.hapticsEnabled, isSupported]);
+
+  // Trigger Selected Haptic
+  const triggerSelected = useCallback(() => {
+    // Check if haptics are enabled in settings
+    if (!settings.hapticsEnabled) {
+      return;
+    }
+
+    // Check if platform supports haptics
+    if (!isSupported) {
+      return;
+    }
+
+    try {
+      Haptics.selectionAsync();
+    } catch (error) {
+      console.error("Error triggering light haptic:", error);
+    }
+  }, [settings.hapticsEnabled, isSupported]);
+
   // Trigger Haptic for Data Point
 
   /**
@@ -146,19 +164,16 @@ export function useHaptics(): UseHapticsReturn {
    * - normal -> light
    * - warning -> medium
    * - danger -> heavy (double pattern)
-   *
-   * Requirements 4.1, 4.2, 4.3: Range-based haptic mapping
-   *
    * @param range - The data range classification (normal, warning, danger)
    */
   const triggerForDataPoint = useCallback(
     (range: DataRange) => {
-      // Check if haptics are enabled in settings (Requirement 4.4)
+      // Check if haptics are enabled in settings
       if (!settings.hapticsEnabled) {
         return;
       }
 
-      // Check if platform supports haptics (Requirement 4.5)
+      // Check if platform supports haptics
       if (!isSupported) {
         return;
       }
@@ -184,16 +199,36 @@ export function useHaptics(): UseHapticsReturn {
       triggerLight,
       triggerMedium,
       triggerHeavy,
+      triggerSoft,
+      triggerError,
+      triggerSelected,
     ],
   );
 
   // Return Hook Interface
 
-  return {
-    triggerLight,
-    triggerMedium,
-    triggerHeavy,
-    triggerForDataPoint,
-    isSupported,
-  };
+  // Memoized so consumers can safely depend on this object; an unstable
+  // identity here re-ran every effect that listed it as a dependency.
+  return useMemo<UseHapticsReturn>(
+    () => ({
+      triggerLight,
+      triggerMedium,
+      triggerHeavy,
+      triggerSoft,
+      triggerError,
+      triggerSelected,
+      triggerForDataPoint,
+      isSupported,
+    }),
+    [
+      triggerLight,
+      triggerMedium,
+      triggerHeavy,
+      triggerSoft,
+      triggerError,
+      triggerSelected,
+      triggerForDataPoint,
+      isSupported,
+    ],
+  );
 }

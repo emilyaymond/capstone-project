@@ -11,7 +11,10 @@
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.healthvis-mobile"
+      "bundleIdentifier": "com.anonymous.healthvis-mobile",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "HealthVis reads your health data (heart rate, steps, sleep, and more) so it can present it as accessible charts, audio, and haptics."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,8 +45,24 @@
           }
         }
       ],
-      "react-native-health",
-      "expo-asset"
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "HealthVis reads your health data (heart rate, steps, sleep, and more) so it can present it as accessible charts, audio, and haptics.",
+          "healthUpdatePermission": "HealthVis does not write health data."
+        }
+      ],
+      "expo-asset",
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": false,
+          "androidForegroundService": false,
+          "androidPermissions": [],
+          "disableFFmpeg": true
+        }
+      ],
+      "./plugins/withScriptSandboxDisabled"
     ],
     "experiments": {
       "typedRoutes": true

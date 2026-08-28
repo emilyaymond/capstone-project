@@ -6,7 +6,6 @@
  * properly integrated.
  */
 
-import { describe, it, expect, jest } from '@jest/globals';
 import { HealthValue } from 'react-native-health';
 
 // Mock react-native-health before importing healthkit-service
@@ -18,7 +17,8 @@ jest.mock('react-native-health', () => ({
 }));
 
 import { convertHealthKitSample } from './healthkit-service';
-import { HealthMetricType, getUnitForType, classifyRange, hasDefinedRange } from '../types/health-metric';
+import { HealthMetricType } from '../types/health-metric';
+import { getUnitForType, classifyRange, hasDefinedRange } from './metric-registry';
 
 describe('HealthKit Sample Conversion', () => {
   describe('convertHealthKitSample', () => {
@@ -84,7 +84,7 @@ describe('HealthKit Sample Conversion', () => {
       expect(metric.type).toBe('respiratory_rate');
       expect(metric.category).toBe('vitals');
       expect(metric.value).toBe(16);
-      expect(metric.unit).toBe('breaths/min');
+      expect(metric.unit).toBe('br/min');
       expect(metric.range).toBe('normal');
     });
 
@@ -376,7 +376,7 @@ describe('HealthKit Sample Conversion', () => {
       expect(metric.type).toBe('sleep');
       expect(metric.category).toBe('sleep');
       expect(metric.value).toBe(7.5);
-      expect(metric.unit).toBe('hours');
+      expect(metric.unit).toBe('hr');
       expect(metric.range).toBeUndefined();
     });
 
@@ -397,9 +397,13 @@ describe('HealthKit Sample Conversion', () => {
     });
 
     // Test range classification integration
+    // NORMAL_RANGES.heart_rate is 40-120 bpm, deliberately wider than the
+    // clinical resting range of 60-100. HealthKit samples include exercise
+    // heart rate, and the app cannot yet tell resting from active, so a
+    // narrower band would fire warning haptics through every workout.
     it('should classify warning range correctly', () => {
       const sample: HealthValue = {
-        value: 55, // Below normal range for heart rate
+        value: 130, // Above normal max (120) but within the 20% danger margin
         startDate: '2024-01-15T10:00:00Z',
         endDate: '2024-01-15T10:00:00Z',
       };
@@ -411,7 +415,7 @@ describe('HealthKit Sample Conversion', () => {
 
     it('should classify danger range correctly', () => {
       const sample: HealthValue = {
-        value: 45, // Significantly below normal range for heart rate
+        value: 160, // More than 20% above the normal max (120 * 1.2 = 144)
         startDate: '2024-01-15T10:00:00Z',
         endDate: '2024-01-15T10:00:00Z',
       };
@@ -419,6 +423,18 @@ describe('HealthKit Sample Conversion', () => {
       const metric = convertHealthKitSample(sample, 'heart_rate');
 
       expect(metric.range).toBe('danger');
+    });
+
+    it('should classify a value inside the normal band as normal', () => {
+      const sample: HealthValue = {
+        value: 55, // Athlete resting heart rate: inside 40-120, not a warning
+        startDate: '2024-01-15T10:00:00Z',
+        endDate: '2024-01-15T10:00:00Z',
+      };
+
+      const metric = convertHealthKitSample(sample, 'heart_rate');
+
+      expect(metric.range).toBe('normal');
     });
 
     // Test metadata preservation
@@ -520,5 +536,229 @@ describe('HealthKit Sample Conversion', () => {
       // Steps don't have a defined range, so range should be undefined
       expect(metric.range).toBeUndefined();
     });
+  });
+});
+
+describe('Sleep stage mapping', () => {
+  // react-native-health reports the short forms on device. Only the ASLEEP_*
+  // spellings were mapped, so CORE/DEEP/REM fell through unmapped.
+  const { getSleepStageColor } = require('./sleep-utils');
+
+  it('colours deep sleep purple regardless of case', () => {
+    expect(getSleepStageColor('Deep Sleep')).toBe('#5856D6');
+    expect(getSleepStageColor('DEEP')).toBe('#5856D6');
+  });
+
+  it('colours light sleep green for both spellings', () => {
+    expect(getSleepStageColor('Light Sleep')).toBe('#34C759');
+    expect(getSleepStageColor('CORE')).toBe('#34C759');
+  });
+
+  it('colours REM blue regardless of case', () => {
+    expect(getSleepStageColor('REM Sleep')).toBe('#007AFF');
+    expect(getSleepStageColor('rem')).toBe('#007AFF');
+  });
+
+  it('colours awake orange regardless of case', () => {
+    expect(getSleepStageColor('Awake')).toBe('#FF9500');
+    expect(getSleepStageColor('AWAKE')).toBe('#FF9500');
+  });
+
+  it('colours in-bed grey for both spellings', () => {
+    expect(getSleepStageColor('In Bed')).toBe('#8E8E93');
+    expect(getSleepStageColor('INBED')).toBe('#8E8E93');
+  });
+});
+
+describe('Sleep quality across ranges', () => {
+  const { calculateSleepQuality } = require('./sleep-utils');
+
+  /** One night's worth of stages, scaled across `nights`. */
+  function breakdownFor(nights: number) {
+    return {
+      lightSleep: 3.94 * nights,
+      deepSleep: 0.6 * nights,
+      remSleep: 1.72 * nights,
+      awake: 0.22 * nights,
+      inBed: 0,
+      totalSleep: 6.26 * nights,
+      totalInBed: 6.48 * nights,
+    };
+  }
+
+  it('judges a single night on its own hours', () => {
+    expect(calculateSleepQuality(breakdownFor(1), 1)).toBe('fair');
+  });
+
+  it('gives the same verdict for a month of identical nights', () => {
+    // Duration thresholds describe one night. Passing a month's total without
+    // the night count failed every band and fell through to "poor".
+    expect(calculateSleepQuality(breakdownFor(30), 30)).toBe('fair');
+  });
+
+  it('is consistent across every range length', () => {
+    const verdicts = [1, 7, 30, 180, 365].map((n) =>
+      calculateSleepQuality(breakdownFor(n), n),
+    );
+    expect(new Set(verdicts).size).toBe(1);
+  });
+
+  it('still reports poor for genuinely poor sleep', () => {
+    const poor = {
+      lightSleep: 2,
+      deepSleep: 0,
+      remSleep: 0,
+      awake: 3,
+      inBed: 0,
+      totalSleep: 2,
+      totalInBed: 5,
+    };
+    expect(calculateSleepQuality(poor, 1)).toBe('poor');
+  });
+
+  it('defaults to a single night when no count is given', () => {
+    expect(calculateSleepQuality(breakdownFor(1))).toBe('fair');
+  });
+
+  it('treats a zero night count as one rather than dividing by zero', () => {
+    expect(calculateSleepQuality(breakdownFor(1), 0)).toBe('fair');
+  });
+});
+
+describe('Sleep night boundary', () => {
+  const { filterSleepForRange, getSleepSessionEnd } = require('./sleep-utils');
+
+  /** A sleep session starting at a given hour, lasting `hours`. */
+  function session(startHour: number, hours: number, dayOffset = 0) {
+    const start = new Date(2026, 7, 27 + dayOffset, startHour, 0, 0);
+    return {
+      id: `sleep-${dayOffset}-${startHour}`,
+      category: 'sleep' as const,
+      type: 'sleep' as const,
+      value: hours,
+      timestamp: start,
+      unit: 'hr',
+      metadata: { durationMinutes: hours * 60, sleepStage: 'Light Sleep' },
+    };
+  }
+
+  it('derives the session end from start plus duration', () => {
+    const end = getSleepSessionEnd(session(22, 8));
+    expect(end.getDate()).toBe(28);
+    expect(end.getHours()).toBe(6);
+  });
+
+  it('includes a night that began before midnight', () => {
+    // The reason this exists: going to bed at 22:00 previously put most of the
+    // night in the previous day, so "today" showed only the hours after 12am.
+    const midnightToday = new Date(2026, 7, 28, 0, 0, 0);
+    const lastNight = session(22, 8); // 22:00 the 27th -> 06:00 the 28th
+
+    expect(filterSleepForRange([lastNight], midnightToday)).toHaveLength(1);
+  });
+
+  it('excludes a night that ended before the range started', () => {
+    const midnightToday = new Date(2026, 7, 28, 0, 0, 0);
+    const twoNightsAgo = session(22, 8, -2); // ends 06:00 on the 26th
+
+    expect(filterSleepForRange([twoNightsAgo], midnightToday)).toHaveLength(0);
+  });
+
+  it('keeps an afternoon nap on the day it happened', () => {
+    const midnightToday = new Date(2026, 7, 27, 0, 0, 0);
+    const nap = session(15, 1);
+
+    expect(filterSleepForRange([nap], midnightToday)).toHaveLength(1);
+  });
+});
+
+describe('Sleep quality with no data', () => {
+  const { calculateSleepQuality } = require('./sleep-utils');
+
+  const empty = {
+    lightSleep: 0,
+    deepSleep: 0,
+    remSleep: 0,
+    awake: 0,
+    inBed: 0,
+    totalSleep: 0,
+    totalInBed: 0,
+  };
+
+  it('reports unknown rather than poor when nothing was recorded', () => {
+    // A night the user did not wear their watch is an absence of data, not
+    // bad sleep. This previously fell through to the catch-all and read "Poor".
+    expect(calculateSleepQuality(empty, 1)).toBe('unknown');
+  });
+
+  it('reports unknown across any range length', () => {
+    expect(calculateSleepQuality(empty, 30)).toBe('unknown');
+  });
+
+  it('still judges a night with only a little sleep', () => {
+    const barely = { ...empty, lightSleep: 1, totalSleep: 1, totalInBed: 1 };
+    expect(calculateSleepQuality(barely, 1)).toBe('poor');
+  });
+});
+
+describe('Counting nights with sleep data', () => {
+  const { countSleepNights } = require('./sleep-utils');
+
+  /** A session on a given day, ending the following morning. */
+  function night(day: number) {
+    return {
+      id: `night-${day}`,
+      category: 'sleep' as const,
+      type: 'sleep' as const,
+      value: 8,
+      timestamp: new Date(2026, 7, day, 22, 0, 0),
+      unit: 'hr',
+      metadata: { durationMinutes: 480, sleepStage: 'Light Sleep' },
+    };
+  }
+
+  it('counts nothing when there is no data', () => {
+    expect(countSleepNights([])).toBe(0);
+  });
+
+  it('counts each night once however many stage records it has', () => {
+    // A single night arrives as many stage samples; it is still one night.
+    const oneNight = [night(1), night(1), night(1)];
+    expect(countSleepNights(oneNight)).toBe(1);
+  });
+
+  it('counts only nights that were recorded, not calendar nights', () => {
+    // Three nights recorded inside a month-long range. Averages must divide by
+    // three, not thirty, or every per-night figure is understated.
+    const recorded = [night(1), night(5), night(20)];
+    expect(countSleepNights(recorded)).toBe(3);
+  });
+
+  it('groups a session by the day it ends on', () => {
+    // 22:00 on the 1st ends on the 2nd, so it is the 2nd's night -- the same
+    // rule the range filter uses.
+    expect(countSleepNights([night(1), night(2)])).toBe(2);
+  });
+});
+
+describe('Sleep values are stored in hours', () => {
+  const { aggregateSleepByStage } = require('./sleep-utils');
+
+  it('treats a metric value as hours, not seconds', () => {
+    // fetchSleep stores durationHours. Trends divided by 3600 again, turning a
+    // 6-hour night into 0.0017 hours.
+    const sixHourNight = [
+      {
+        id: 'n1',
+        category: 'sleep' as const,
+        type: 'sleep' as const,
+        value: 6,
+        timestamp: new Date(2026, 7, 27, 23, 0, 0),
+        unit: 'hr',
+        metadata: { durationMinutes: 360, sleepStage: 'Light Sleep' },
+      },
+    ];
+
+    expect(aggregateSleepByStage(sixHourNight).totalSleep).toBeCloseTo(6, 5);
   });
 });

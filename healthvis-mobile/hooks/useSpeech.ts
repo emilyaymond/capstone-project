@@ -11,11 +11,11 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import * as Speech from "expo-speech";
 import { usePathname } from "expo-router";
+import { HealthMetric, HealthCategory } from "../types/health-metric";
 import {
-  HealthMetric,
-  HealthCategory,
   getDisplayNameForType,
-} from "../types/health-metric";
+  getSpokenUnitForType,
+} from "../lib/metric-registry";
 
 // ============================================================================
 // Types
@@ -197,10 +197,10 @@ export function useSpeech(): UseSpeechReturn {
 
           if (rangeDescription) {
             summaryParts.push(
-              `${metricName}: ${metric.value} ${metric.unit}, ${rangeDescription}.`,
+              `${metricName}: ${metric.value} ${spokenUnit(metric)}, ${rangeDescription}.`,
             );
           } else {
-            summaryParts.push(`${metricName}: ${metric.value} ${metric.unit}.`);
+            summaryParts.push(`${metricName}: ${metric.value} ${spokenUnit(metric)}.`);
           }
         }
 
@@ -232,7 +232,7 @@ export function useSpeech(): UseSpeechReturn {
         const detailParts = [
           `${metricName} details:`,
           `Category: ${categoryName}.`,
-          `Current value: ${metric.value} ${metric.unit}.`,
+          `Current value: ${metric.value} ${spokenUnit(metric)}.`,
         ];
 
         if (rangeDescription) {
@@ -323,10 +323,10 @@ export function useSpeech(): UseSpeechReturn {
 
           if (rangeDescription) {
             summaryParts.push(
-              `${metricName}: ${metric.value} ${metric.unit}, ${rangeDescription}.`,
+              `${metricName}: ${metric.value} ${spokenUnit(metric)}, ${rangeDescription}.`,
             );
           } else {
-            summaryParts.push(`${metricName}: ${metric.value} ${metric.unit}.`);
+            summaryParts.push(`${metricName}: ${metric.value} ${spokenUnit(metric)}.`);
           }
         }
 
@@ -348,6 +348,11 @@ export function useSpeech(): UseSpeechReturn {
   /**
    * Formats health category for speech
    */
+  /** Returns a metric's unit in a form that reads well aloud. */
+  function spokenUnit(metric: HealthMetric): string {
+    return getSpokenUnitForType(metric.type) || metric.unit;
+  }
+
   function formatCategory(category: HealthCategory): string {
     const categoryMap: Record<HealthCategory, string> = {
       vitals: "Vitals",

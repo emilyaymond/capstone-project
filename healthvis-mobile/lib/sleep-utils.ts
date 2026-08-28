@@ -17,9 +17,17 @@ export interface SleepStageBreakdown {
   totalInBed: number; // hours (includes everything)
 }
 
+/** Sleep quality verdict, or "unknown" when there is no sleep to judge. */
+export type SleepQuality =
+  | "excellent"
+  | "good"
+  | "fair"
+  | "poor"
+  | "unknown";
+
 export interface SleepSummary {
   breakdown: SleepStageBreakdown;
-  sleepQuality: "excellent" | "good" | "fair" | "poor";
+  sleepQuality: SleepQuality;
   sleepEfficiency: number; // percentage (totalSleep / totalInBed * 100)
   samples: HealthMetric[];
 }
@@ -85,20 +93,91 @@ export function aggregateSleepByStage(
  * @param breakdown - Sleep stage breakdown
  * @returns Sleep quality rating
  */
+/**
+ * Returns when a sleep session ended.
+ *
+ * Metrics carry the session start as their timestamp and the length in
+ * metadata, so the end has to be derived.
+ */
+export function getSleepSessionEnd(metric: HealthMetric): Date {
+  const start = new Date(metric.timestamp).getTime();
+  const minutes =
+    metric.metadata?.durationMinutes != null
+      ? Number(metric.metadata.durationMinutes)
+      : Number(metric.value) * 60;
+
+  return new Date(start + (Number.isFinite(minutes) ? minutes : 0) * 60 * 1000);
+}
+
+/**
+ * Selects the sleep sessions belonging to a range.
+ *
+ * A night is attributed to the day it ends, not the day it starts. Filtering on
+ * start time meant going to bed at 22:00 put most of the night in the previous
+ * day, so "today" showed only the hours after midnight and under-reported every
+ * night that began before it.
+ */
+export function filterSleepForRange(
+  metrics: HealthMetric[],
+  rangeStart: Date,
+): HealthMetric[] {
+  const startMs = rangeStart.getTime();
+  return metrics.filter((metric) => getSleepSessionEnd(metric).getTime() >= startMs);
+}
+
+/**
+ * Counts the nights that actually have recorded sleep.
+ *
+ * Averages must divide by nights with data, not calendar nights. Dividing a
+ * month's sleep by 30 when the watch was worn for 20 understates every nightly
+ * average by a third, and penalises the user for nights they simply did not
+ * record.
+ *
+ * Nights are keyed by the local date a session ended, matching the rule that a
+ * night belongs to the day it ends on.
+ */
+export function countSleepNights(metrics: HealthMetric[]): number {
+  const nights = new Set<string>();
+
+  for (const metric of metrics) {
+    const end = getSleepSessionEnd(metric);
+    if (Number.isNaN(end.getTime())) continue;
+    nights.add(
+      `${end.getFullYear()}-${end.getMonth()}-${end.getDate()}`,
+    );
+  }
+
+  return nights.size;
+}
+
 export function calculateSleepQuality(
   breakdown: SleepStageBreakdown,
-): "excellent" | "good" | "fair" | "poor" {
+  nights: number = 1,
+): SleepQuality {
   const { totalSleep, deepSleep, remSleep, awake } = breakdown;
 
-  // Ideal sleep: 7-9 hours, with good deep and REM percentages
+  // No recorded sleep is an absence of data, not bad sleep. Falling through to
+  // the "everything else" case below would grade a night the user simply did
+  // not wear their watch as "Poor".
+  if (totalSleep <= 0) return "unknown";
+
+  // The duration thresholds below describe a single night, but a breakdown can
+  // cover any range: on a month view totalSleep is ~190 hours, which failed
+  // every band and fell through to "poor" regardless of how well the user
+  // actually slept. Average across the period before comparing.
+  const nightsInRange = nights > 0 ? nights : 1;
+  const sleepPerNight = totalSleep / nightsInRange;
+
+  // Stage percentages are ratios, so they hold at any range and need no
+  // adjustment.
   const deepPercentage = totalSleep > 0 ? (deepSleep / totalSleep) * 100 : 0;
   const remPercentage = totalSleep > 0 ? (remSleep / totalSleep) * 100 : 0;
   const awakePercentage = totalSleep > 0 ? (awake / totalSleep) * 100 : 0;
 
   // Excellent: 7-9 hours, 15-25% deep, 20-25% REM, <5% awake
   if (
-    totalSleep >= 7 &&
-    totalSleep <= 9 &&
+    sleepPerNight >= 7 &&
+    sleepPerNight <= 9 &&
     deepPercentage >= 15 &&
     deepPercentage <= 25 &&
     remPercentage >= 20 &&
@@ -110,8 +189,8 @@ export function calculateSleepQuality(
 
   // Good: 6-10 hours, 10-30% deep, 15-30% REM, <10% awake
   if (
-    totalSleep >= 6 &&
-    totalSleep <= 10 &&
+    sleepPerNight >= 6 &&
+    sleepPerNight <= 10 &&
     deepPercentage >= 10 &&
     deepPercentage <= 30 &&
     remPercentage >= 15 &&
@@ -123,8 +202,8 @@ export function calculateSleepQuality(
 
   // Fair: 5-11 hours, some deep/REM sleep
   if (
-    totalSleep >= 5 &&
-    totalSleep <= 11 &&
+    sleepPerNight >= 5 &&
+    sleepPerNight <= 11 &&
     (deepPercentage > 5 || remPercentage > 10)
   ) {
     return "fair";
@@ -189,10 +268,13 @@ export function formatSleepDuration(hours: number): string {
  * @returns Hex color code
  */
 export function getSleepStageColor(stage: string): string {
-  if (stage.includes("Deep")) return "#5856D6"; // Purple
-  if (stage.includes("REM")) return "#007AFF"; // Blue
-  if (stage.includes("Light") || stage.includes("Core")) return "#34C759"; // Green
-  if (stage.includes("Awake")) return "#FF9500"; // Orange
-  if (stage.includes("In Bed")) return "#8E8E93"; // Gray
+  // Case-insensitive: HealthKit reports "DEEP" while the mapped label is
+  // "Deep Sleep", and a case-sensitive check silently returned the default.
+  const value = stage.toLowerCase();
+  if (value.includes("deep")) return "#5856D6"; // Purple
+  if (value.includes("rem")) return "#007AFF"; // Blue
+  if (value.includes("light") || value.includes("core")) return "#34C759"; // Green
+  if (value.includes("awake")) return "#FF9500"; // Orange
+  if (value.includes("in bed") || value.includes("inbed")) return "#8E8E93"; // Gray
   return "#34C759"; // Default to green
 }

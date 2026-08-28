@@ -10,16 +10,13 @@
 
 import { useCallback, useRef, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS } from "../lib/storage-keys";
 import { AccessibilitySettings, AccessibilityMode } from "../types";
 
 // ============================================================================
 // Storage Keys
 // ============================================================================
 
-const STORAGE_KEYS = {
-  MODE: "accessibility_mode",
-  SETTINGS: "accessibility_settings",
-} as const;
 
 // ============================================================================
 // Hook Return Interface
@@ -125,8 +122,8 @@ export function useStorage(): UseStorageReturn {
 
             // Perform the actual save operation
             await AsyncStorage.multiSet([
-              [STORAGE_KEYS.MODE, dataToSave.mode],
-              [STORAGE_KEYS.SETTINGS, JSON.stringify(dataToSave.settings)],
+              [STORAGE_KEYS.ACCESSIBILITY_MODE, dataToSave.mode],
+              [STORAGE_KEYS.ACCESSIBILITY_SETTINGS, JSON.stringify(dataToSave.settings)],
             ]);
 
             // Clear pending save
@@ -175,8 +172,8 @@ export function useStorage(): UseStorageReturn {
     try {
       // Load both mode and settings in parallel
       const [[, modeValue], [, settingsValue]] = await AsyncStorage.multiGet([
-        STORAGE_KEYS.MODE,
-        STORAGE_KEYS.SETTINGS,
+        STORAGE_KEYS.ACCESSIBILITY_MODE,
+        STORAGE_KEYS.ACCESSIBILITY_SETTINGS,
       ]);
 
       // Parse mode
@@ -254,8 +251,8 @@ export function useStorage(): UseStorageReturn {
 
       // Remove both mode and settings from storage
       await AsyncStorage.multiRemove([
-        STORAGE_KEYS.MODE,
-        STORAGE_KEYS.SETTINGS,
+        STORAGE_KEYS.ACCESSIBILITY_MODE,
+        STORAGE_KEYS.ACCESSIBILITY_SETTINGS,
       ]);
     } catch (error) {
       // Handle storage clear errors

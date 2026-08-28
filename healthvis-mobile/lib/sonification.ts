@@ -1,356 +1,316 @@
 /**
- * Sonification Utility
- * 
- * Provides data sonification functionality using expo-av for audio playback.
- * Uses three discrete frequency bands (low, medium, high) for MVP implementation.
- * Backend returns band classification, frontend plays corresponding tones.
- * 
- * Note: expo-av is deprecated in SDK 54, will migrate to expo-audio in future update.
- * 
- * Requirements: 14.2, 14.3, 14.4, 14.5, 14.6
+ * Sonification
+ *
+ * Plays a series of health readings as sound, so a data trend can be heard
+ * rather than seen.
+ *
+ * The previous implementation mapped every value onto one of three
+ * pre-recorded WAV files, so "frequency" collapsed into three buckets: a
+ * gentle upward drift and a spike sounded identical. This synthesises tones
+ * instead, giving continuous pitch across the whole series.
+ *
+ * Three channels carry meaning at once:
+ *   - pitch  -> the value, mapped logarithmically across the series range
+ *   - stereo -> position in time, panning left to right as playback advances
+ *   - timbre -> clinical severity, so an out-of-range reading is audibly
+ *               different rather than merely higher or lower
  */
 
-import { Audio } from 'expo-av';
-import { FrequencyBand, DataPoint } from '../types';
+import { AudioContext } from "react-native-audio-api";
 
-// ============================================================================
-// Types
-// ============================================================================
+import type { DataPoint, DataRange } from "../types";
+import { ensureAudioSession } from "./audio-session";
 
-export interface SonificationOptions {
-  onComplete?: () => void;
-  onError?: (error: Error) => void;
-  onProgress?: (index: number, total: number) => void;
-}
+// ── Tuning ───────────────────────────────────────────────────────────────────
 
-export interface SonificationControl {
-  stop: () => Promise<void>;
-  isPlaying: boolean;
-}
+/**
+ * Pitch range, in Hz.
+ *
+ * Roughly C4 to C6. Kept inside the region where pitch differences are easiest
+ * to judge, and clear of the very low frequencies phone speakers cannot render.
+ */
+const MIN_FREQUENCY = 261.63;
+const MAX_FREQUENCY = 1046.5;
 
-// ============================================================================
-// Constants
-// ============================================================================
+/** How long each reading sounds for, and the gap between readings. */
+const DEFAULT_NOTE_MS = 180;
+const DEFAULT_GAP_MS = 40;
 
-// Frequency bands in Hz (Requirement 14.3, 14.4, 14.5)
-const FREQUENCY_BANDS = {
-  low: 300,      // 200-400 Hz range, using middle value
-  medium: 500,   // 400-600 Hz range, using middle value
-  high: 800,     // 600-1000 Hz range, using middle value
-} as const;
+/** Fade applied to each note's edges to avoid clicks. */
+const FADE_SECONDS = 0.012;
 
-// Audio file mapping - pre-generated tone files
-const TONE_FILES = {
-  low: require('../assets/audio/tone-low.wav'),
-  medium: require('../assets/audio/tone-medium.wav'),
-  high: require('../assets/audio/tone-high.wav'),
+/** Peak gain per note. Leaves headroom so a long series does not fatigue. */
+const NOTE_GAIN = 0.22;
+
+/** Waveform per severity: a rougher wave reads as more urgent. */
+const WAVEFORM_FOR_RANGE: Record<DataRange, OscillatorType> = {
+  normal: "sine",
+  warning: "triangle",
+  danger: "sawtooth",
 };
 
-// Duration for each tone in milliseconds
-const TONE_DURATION = 200;
+type OscillatorType = "sine" | "square" | "sawtooth" | "triangle";
 
-// Gap between tones in milliseconds
-const TONE_GAP = 50;
+// ── Types ────────────────────────────────────────────────────────────────────
 
-// ============================================================================
-// Sonification State
-// ============================================================================
-
-let currentPlayback: {
-  sounds: Audio.Sound[];
-  isPlaying: boolean;
-  shouldStop: boolean;
-} | null = null;
-
-// ============================================================================
-// Initialize Audio
-// ============================================================================
-
-let isAudioInitialized = false;
-
-async function initializeAudio(): Promise<void> {
-  if (isAudioInitialized) return;
-
-  try {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-    });
-    isAudioInitialized = true;
-  } catch (error) {
-    console.error('Failed to initialize audio for sonification:', error);
-    throw new Error('Audio initialization failed');
-  }
+export interface SonificationOptions {
+  /** Duration of each note in milliseconds. */
+  noteDurationMs?: number;
+  /** Silence between notes in milliseconds. */
+  gapMs?: number;
+  /** Pan across the stereo field as playback advances. Defaults to true. */
+  useStereoPanning?: boolean;
+  onProgress?: (index: number, total: number) => void;
+  onComplete?: () => void;
+  onError?: (error: Error) => void;
 }
 
-// ============================================================================
-// Tone Generation
-// ============================================================================
+// ── Engine state ─────────────────────────────────────────────────────────────
 
-/**
- * Generate a tone using pre-generated audio files
- * Maps frequency to the appropriate tone file (low, medium, or high)
- */
-async function generateTone(frequency: number, duration: number): Promise<Audio.Sound> {
-  try {
-    // Select the appropriate tone file based on frequency
-    const toneFile = selectToneFile(frequency);
-    
-    console.log(`🎵 Loading sonification tone: ${frequency}Hz → ${toneFile}`);
-    
-    // Load the pre-generated audio file
-    const { sound } = await Audio.Sound.createAsync(
-      TONE_FILES[toneFile],
-      { shouldPlay: false }
-    );
-    
-    return sound;
-  } catch (error) {
-    console.error(`Failed to load tone at ${frequency}Hz:`, error);
-    throw error;
+let audioContext: AudioContext | null = null;
+let activeToken = 0;
+let playing = false;
+
+/** Lazily creates the shared AudioContext, reused across playbacks. */
+function getContext(): AudioContext {
+  if (!audioContext) {
+    audioContext = new AudioContext();
   }
+  return audioContext;
 }
 
+// ── Mapping ──────────────────────────────────────────────────────────────────
+
 /**
- * Select the appropriate tone file based on frequency
- * Maps to low (300Hz), medium (500Hz), or high (800Hz)
+ * Maps a value to a pitch, logarithmically across the series' own range.
+ *
+ * Pitch is perceived logarithmically, so a linear mapping makes differences at
+ * the top of the range sound smaller than identical differences at the bottom.
+ * Scaling against the series rather than a fixed scale means a flat series
+ * still uses the full pitch range and stays audible.
  */
-function selectToneFile(frequency: number): 'low' | 'medium' | 'high' {
-  if (frequency <= 300) {
-    return 'low';
-  } else if (frequency <= 500) {
-    return 'medium';
-  } else {
-    return 'high';
-  }
+export function valueToFrequency(
+  value: number,
+  min: number,
+  max: number,
+): number {
+  if (!Number.isFinite(value)) return MIN_FREQUENCY;
+
+  const span = max - min;
+  // A flat series has no meaningful position; sound it in the middle.
+  const ratio = span === 0 ? 0.5 : (value - min) / span;
+  const clamped = Math.min(1, Math.max(0, ratio));
+
+  return (
+    MIN_FREQUENCY * Math.pow(MAX_FREQUENCY / MIN_FREQUENCY, clamped)
+  );
 }
 
-// ============================================================================
-// Frequency Band Mapping
-// ============================================================================
-
-/**
- * Map a data range to a frequency band
- * Requirement 14.3, 14.4, 14.5: Map data values to frequency bands
- */
-function mapRangeToFrequencyBand(range: 'normal' | 'warning' | 'danger'): FrequencyBand {
+/** Returns the representative pitch for a severity, for preview and legends. */
+export function getFrequencyForRange(range: DataRange): number {
   switch (range) {
-    case 'normal':
-      return 'medium';
-    case 'warning':
-      return 'high';
-    case 'danger':
-      return 'high';
+    case "danger":
+      return MAX_FREQUENCY;
+    case "warning":
+      return Math.sqrt(MIN_FREQUENCY * MAX_FREQUENCY);
     default:
-      return 'medium';
+      return MIN_FREQUENCY;
   }
 }
 
+// ── Playback ─────────────────────────────────────────────────────────────────
+
 /**
- * Get frequency for a given band
+ * Schedules one note: an oscillator through a gain envelope and a stereo pan.
  */
-function getFrequencyForBand(band: FrequencyBand): number {
-  return FREQUENCY_BANDS[band];
+function scheduleNote(
+  context: AudioContext,
+  frequency: number,
+  range: DataRange,
+  startTime: number,
+  durationSeconds: number,
+  pan: number,
+  peakGain: number = NOTE_GAIN,
+): void {
+  const oscillator = context.createOscillator();
+  oscillator.type = WAVEFORM_FOR_RANGE[range] ?? "sine";
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+
+  const gain = context.createGain();
+  // Fade in and out so notes do not click at their boundaries.
+  const fade = Math.min(FADE_SECONDS, durationSeconds / 3);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(peakGain, startTime + fade);
+  gain.gain.setValueAtTime(peakGain, startTime + durationSeconds - fade);
+  gain.gain.linearRampToValueAtTime(0, startTime + durationSeconds);
+
+  const panner = context.createStereoPanner();
+  panner.pan.setValueAtTime(pan, startTime);
+
+  oscillator.connect(gain);
+  gain.connect(panner);
+  panner.connect(context.destination);
+
+  oscillator.start(startTime);
+  oscillator.stop(startTime + durationSeconds);
 }
 
-// ============================================================================
-// Main Sonification Function
-// ============================================================================
+/** How long a single scrub tone sounds. Short enough to track a moving finger. */
+const SCRUB_NOTE_MS = 130;
+
+/** Scrub tones sit under the series notes so a fast drag does not become harsh. */
+const SCRUB_GAIN_SCALE = 0.75;
 
 /**
- * Play a data series as sonification
- * 
- * Requirement 14.2: Play data series using expo-av
- * Requirement 14.3, 14.4, 14.5: Use discrete frequency bands
- * Requirement 14.6: Provide stop functionality
- * 
- * @param data - Array of data points to sonify
- * @param options - Optional callbacks for completion, error, and progress
- * @returns Control object with stop function and isPlaying status
+ * Plays one tone for the reading under the user's finger.
+ *
+ * Used while scrubbing a chart, where the finger already conveys position, so
+ * this carries magnitude as pitch and severity as timbre. Fire-and-forget: a
+ * drag produces these in rapid succession and must not await anything.
+ */
+export function playScrubTone(
+  value: number,
+  min: number,
+  max: number,
+  range: DataRange = "normal",
+): void {
+  void ensureAudioSession()
+    .then(() => {
+      const context = getContext();
+      const startTime = context.currentTime;
+      const durationSeconds = SCRUB_NOTE_MS / 1000;
+
+      scheduleNote(
+        context,
+        valueToFrequency(value, min, max),
+        range,
+        startTime,
+        durationSeconds,
+        // No panning: the finger is already the position indicator.
+        0,
+        NOTE_GAIN * SCRUB_GAIN_SCALE,
+      );
+    })
+    .catch((error) => {
+      console.error("Failed to play scrub tone:", error);
+    });
+}
+
+/**
+ * Plays a series of readings as a sequence of tones.
+ *
+ * Resolves once the series has finished or has been stopped. Calling it again
+ * cancels any playback already in progress.
  */
 export async function playDataSeries(
   data: DataPoint[],
-  options: SonificationOptions = {}
-): Promise<SonificationControl> {
-  // Handle empty data gracefully (Requirement: Handle empty data)
-  if (!data || data.length === 0) {
-    const error = new Error('No data available for sonification');
-    if (options.onError) {
-      options.onError(error);
-    }
-    return {
-      stop: async () => {},
-      isPlaying: false,
-    };
-  }
-
-  // Stop any existing playback
-  if (currentPlayback?.isPlaying) {
-    await stopPlayback();
-  }
-
-  // Initialize audio
-  try {
-    await initializeAudio();
-  } catch (error) {
-    if (options.onError) {
-      options.onError(error as Error);
-    }
-    return {
-      stop: async () => {},
-      isPlaying: false,
-    };
-  }
-
-  // Initialize playback state
-  currentPlayback = {
-    sounds: [],
-    isPlaying: true,
-    shouldStop: false,
-  };
-
-  // Create control object
-  const control: SonificationControl = {
-    stop: stopPlayback,
-    isPlaying: true,
-  };
-
-  // Start playback asynchronously
-  playSequence(data, options).catch((error) => {
-    console.error('Error during sonification playback:', error);
-    if (options.onError) {
-      options.onError(error);
-    }
-  });
-
-  return control;
-}
-
-// ============================================================================
-// Playback Sequence
-// ============================================================================
-
-/**
- * Play the sequence of tones for the data series
- */
-async function playSequence(
-  data: DataPoint[],
-  options: SonificationOptions
+  options: SonificationOptions = {},
 ): Promise<void> {
-  if (!currentPlayback) return;
+  const {
+    noteDurationMs = DEFAULT_NOTE_MS,
+    gapMs = DEFAULT_GAP_MS,
+    useStereoPanning = true,
+    onProgress,
+    onComplete,
+    onError,
+  } = options;
 
-  try {
-    for (let i = 0; i < data.length; i++) {
-      // Check if we should stop
-      if (currentPlayback.shouldStop) {
-        break;
-      }
+  stop();
 
-      const point = data[i];
-      
-      // Map data range to frequency band
-      const band = mapRangeToFrequencyBand(point.range);
-      const frequency = getFrequencyForBand(band);
-
-      // Generate and play tone
-      const sound = await generateTone(frequency, TONE_DURATION);
-      
-      if (currentPlayback) {
-        currentPlayback.sounds.push(sound);
-      }
-
-      // Play the tone
-      await sound.playAsync();
-
-      // Report progress
-      if (options.onProgress) {
-        options.onProgress(i + 1, data.length);
-      }
-
-      // Wait for tone duration plus gap
-      await new Promise(resolve => setTimeout(resolve, TONE_DURATION + TONE_GAP));
-
-      // Cleanup the sound
-      await sound.unloadAsync();
-      if (currentPlayback) {
-        currentPlayback.sounds = currentPlayback.sounds.filter(s => s !== sound);
-      }
-    }
-
-    // Playback complete
-    if (currentPlayback && !currentPlayback.shouldStop) {
-      if (options.onComplete) {
-        options.onComplete();
-      }
-    }
-  } finally {
-    // Cleanup
-    await cleanupPlayback();
+  if (!data.length) {
+    onComplete?.();
+    return;
   }
-}
 
-// ============================================================================
-// Stop Playback
-// ============================================================================
-
-/**
- * Stop the current sonification playback
- * Requirement 14.6: Provide stop button functionality
- */
-async function stopPlayback(): Promise<void> {
-  if (!currentPlayback) return;
-
-  // Signal to stop
-  currentPlayback.shouldStop = true;
-  currentPlayback.isPlaying = false;
-
-  // Cleanup all sounds
-  await cleanupPlayback();
-}
-
-// ============================================================================
-// Cleanup
-// ============================================================================
-
-/**
- * Cleanup all sound objects and reset state
- */
-async function cleanupPlayback(): Promise<void> {
-  if (!currentPlayback) return;
+  const token = ++activeToken;
+  playing = true;
 
   try {
-    // Unload all sound objects
-    for (const sound of currentPlayback.sounds) {
-      try {
-        await sound.unloadAsync();
-      } catch (error) {
-        console.error('Error unloading sound during cleanup:', error);
-      }
+    // Without this the ringer switch silences playback entirely.
+    await ensureAudioSession();
+
+    const context = getContext();
+
+    const values = data
+      .map((point) => Number(point.value))
+      .filter(Number.isFinite);
+    if (!values.length) {
+      playing = false;
+      onComplete?.();
+      return;
     }
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    const noteSeconds = noteDurationMs / 1000;
+    const stepSeconds = (noteDurationMs + gapMs) / 1000;
+    // Small lead-in so the first note is not scheduled in the past.
+    const startAt = context.currentTime + 0.05;
+
+    data.forEach((point, index) => {
+      const frequency = valueToFrequency(Number(point.value), min, max);
+      // Sweep left to right so position in the series is audible on its own.
+      const pan =
+        useStereoPanning && data.length > 1
+          ? (index / (data.length - 1)) * 2 - 1
+          : 0;
+
+      scheduleNote(
+        context,
+        frequency,
+        point.range ?? "normal",
+        startAt + index * stepSeconds,
+        noteSeconds,
+        pan,
+      );
+    });
+
+    // Report progress on the JS side while the audio thread plays.
+    if (onProgress) {
+      for (let index = 0; index < data.length; index++) {
+        if (token !== activeToken) return;
+        onProgress(index, data.length);
+        await delay(stepSeconds * 1000);
+      }
+    } else {
+      await delay(data.length * stepSeconds * 1000);
+    }
+
+    if (token !== activeToken) return;
+
+    playing = false;
+    onComplete?.();
   } catch (error) {
-    console.error('Error during sonification cleanup:', error);
-  } finally {
-    currentPlayback = null;
+    playing = false;
+    const wrapped =
+      error instanceof Error ? error : new Error("Sonification failed");
+    console.error("Sonification failed:", wrapped);
+    onError?.(wrapped);
   }
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
+/** Stops playback immediately and silences anything already scheduled. */
+export function stop(): void {
+  activeToken++;
+  playing = false;
 
-/**
- * Check if sonification is currently playing
- */
-export function isSonificationPlaying(): boolean {
-  return currentPlayback?.isPlaying ?? false;
+  // Closing the context cancels every scheduled note. A fresh one is created
+  // on the next play, which is cheap next to leaving notes queued.
+  if (audioContext) {
+    audioContext.close().catch(() => {
+      // Already closed, or never opened; nothing to recover from.
+    });
+    audioContext = null;
+  }
 }
 
-/**
- * Get the frequency for a specific data range
- * Useful for testing or displaying frequency information
- */
-export function getFrequencyForRange(range: 'normal' | 'warning' | 'danger'): number {
-  const band = mapRangeToFrequencyBand(range);
-  return getFrequencyForBand(band);
+/** Reports whether a series is currently playing. */
+export function isSonificationPlaying(): boolean {
+  return playing;
+}
+
+/** Resolves after the given number of milliseconds. */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

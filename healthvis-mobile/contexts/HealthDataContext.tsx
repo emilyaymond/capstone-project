@@ -44,12 +44,7 @@ import {
   FetchOptions,
 } from "../lib/healthkit-service";
 import { buildMockHealthData, MOCK_PERMISSIONS } from "../lib/mock-data";
-import {
-  getMetricAggregation,
-  getMetricChartKind,
-  MetricChartKind,
-  MetricAggregation,
-} from "@/app/metric/metricConfig";
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from "../lib/storage-keys";
 
 // Set to true to always use mock data (useful for simulator / demo mode)
 const USE_MOCK_DATA = false;
@@ -58,11 +53,6 @@ const USE_MOCK_DATA = false;
 // Storage Keys
 // ============================================================================
 
-const CACHE_KEYS = {
-  HEALTH_METRICS: "health_data_metrics",
-  LAST_ANALYSIS: "health_data_last_analysis",
-  LAST_FETCH: "health_data_last_fetch",
-} as const;
 
 // Cache expiration time (5 minutes)
 const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
@@ -85,14 +75,6 @@ export interface HealthDataContextValue {
   getMetricsByCategory: (category: HealthCategory) => HealthMetric[];
   getMetricsByType: (type: HealthMetricType) => HealthMetric[];
   getMetricsByDateRange: (startDate: Date, endDate: Date) => HealthMetric[];
-  getMetricSeries: (
-    type: HealthMetricType,
-    range: "day" | "week" | "month",
-  ) => {
-    points: HealthMetric[];
-    chart: MetricChartKind;
-    aggregation: MetricAggregation;
-  };
 }
 
 // ============================================================================
@@ -109,78 +91,6 @@ const HealthDataContext = createContext<HealthDataContextValue | undefined>(
 
 interface HealthDataProviderProps {
   children: ReactNode;
-}
-
-type TimeRangeKey = "day" | "week" | "month";
-
-function getRangeCutoff(range: TimeRangeKey) {
-  const now = new Date();
-  const cutoff = new Date(now);
-  if (range === "day") cutoff.setDate(now.getDate() - 1);
-  if (range === "week") cutoff.setDate(now.getDate() - 7);
-  if (range === "month") cutoff.setMonth(now.getMonth() - 1);
-  return cutoff;
-}
-
-function getBucketSizeMs(range: TimeRangeKey) {
-  if (range === "day") return 60 * 60 * 1000; // hourly
-  return 24 * 60 * 60 * 1000; // daily for week/month
-}
-
-function aggregateBucket(
-  metrics: HealthMetric[],
-  aggregation: "avg" | "sum" | "latest",
-): number {
-  const values = metrics.map((m) => Number(m.value)).filter(Number.isFinite);
-  if (!values.length) return 0;
-
-  if (aggregation === "sum")
-    return Math.round(values.reduce((a, b) => a + b, 0));
-  if (aggregation === "latest")
-    return Math.round(Number(metrics[metrics.length - 1]?.value ?? 0));
-  return Math.round(values.reduce((a, b) => a + b, 0) / values.length); // avg
-}
-
-function bucketize(
-  data: HealthMetric[],
-  bucketSize: number,
-  aggregation: "avg" | "sum" | "latest",
-): HealthMetric[] {
-  const buckets = new Map<number, HealthMetric[]>();
-
-  for (const m of data) {
-    const t =
-      m.timestamp instanceof Date
-        ? m.timestamp.getTime()
-        : new Date(m.timestamp as any).getTime();
-    const key = Math.floor(t / bucketSize) * bucketSize;
-    const arr = buckets.get(key) ?? [];
-    arr.push(m);
-    buckets.set(key, arr);
-  }
-
-  const out: HealthMetric[] = [];
-  for (const [key, arr] of buckets.entries()) {
-    // keep deterministic ordering within bucket
-    arr.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-    const value = aggregateBucket(arr, aggregation);
-    const range = arr.some((x) => x.range === "danger")
-      ? "danger"
-      : arr.some((x) => x.range === "warning")
-        ? "warning"
-        : "normal";
-
-    out.push({
-      ...arr[0],
-      value: Math.round(value),
-      timestamp: new Date(key),
-      range,
-    });
-  }
-
-  out.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-  return out;
 }
 
 // ============================================================================
@@ -217,7 +127,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   ): Promise<void> {
     try {
       await AsyncStorage.setItem(
-        CACHE_KEYS.HEALTH_METRICS,
+        STORAGE_KEYS.HEALTH_METRICS,
         JSON.stringify({
           data: metrics,
           timestamp: Date.now(),
@@ -233,7 +143,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
    */
   async function loadHealthMetricsFromCache(): Promise<CategorizedHealthData | null> {
     try {
-      const cached = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
+      const cached = await AsyncStorage.getItem(STORAGE_KEYS.HEALTH_METRICS);
       if (!cached) {
         return null;
       }
@@ -279,15 +189,9 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
    */
   async function migrateVitalSignCache(): Promise<void> {
     try {
-      // Check if we have old VitalSign cache to clean up
-      const oldCache = await AsyncStorage.getItem("health_data_vitals");
-      if (oldCache) {
-        console.log("Removing old VitalSign cache...");
-        await AsyncStorage.removeItem("health_data_vitals");
-        console.log("✅ Old VitalSign cache removed");
-      }
+      await AsyncStorage.multiRemove([...LEGACY_STORAGE_KEYS]);
     } catch (error) {
-      console.error("Failed to clean up old VitalSign cache:", error);
+      console.error("Failed to clean up legacy cache keys:", error);
       // Don't throw - cleanup failure shouldn't break the app
     }
   }
@@ -300,7 +204,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   ): Promise<void> {
     try {
       await AsyncStorage.setItem(
-        CACHE_KEYS.LAST_ANALYSIS,
+        STORAGE_KEYS.LAST_ANALYSIS,
         JSON.stringify({
           data: analysis,
           timestamp: Date.now(),
@@ -345,6 +249,10 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
 
       // Initialize HealthKit if not already initialized
       if (!isInitialized) {
+        // Was defined but never called, so keys from the pre-HealthMetric
+        // cache format were left behind on every device that had them.
+        await migrateVitalSignCache();
+
         console.log("Initializing HealthKit...");
         announceHealthKitFetch(); // Announce we're fetching data
 
@@ -403,7 +311,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         console.log("✅ Loaded health metrics from cache");
 
         // Log cache age
-        const cacheInfo = await AsyncStorage.getItem(CACHE_KEYS.HEALTH_METRICS);
+        const cacheInfo = await AsyncStorage.getItem(STORAGE_KEYS.HEALTH_METRICS);
         if (cacheInfo) {
           const { timestamp } = JSON.parse(cacheInfo);
           const ageMinutes = Math.floor((Date.now() - timestamp) / (60 * 1000));
@@ -414,7 +322,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
       // Load data range preference (default to 30 days)
       let daysToFetch = 30;
       try {
-        const rangeStr = await AsyncStorage.getItem("health_data_range");
+        const rangeStr = await AsyncStorage.getItem(STORAGE_KEYS.DATA_RANGE);
         if (rangeStr) {
           daysToFetch = parseInt(rangeStr, 10);
         }
@@ -437,17 +345,34 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
         const freshMetrics =
           await healthKitService.fetchAllHealthData(fetchOptions);
 
-        // Update state with fresh data
-        setHealthMetrics(freshMetrics);
-
-        // Save to cache
-        await saveHealthMetricsToCache(freshMetrics);
-
         // Calculate total metrics fetched
         const totalMetrics = Object.values(freshMetrics).reduce(
           (sum, category) => sum + category.length,
           0,
         );
+
+        // Every per-category fetcher degrades to [] on failure, so a total
+        // HealthKit failure arrives here as a well-formed but empty result.
+        // Overwriting good cached data with it would blank the dashboard, so
+        // keep what we already showed and leave the cache untouched.
+        const hasCachedMetrics =
+          !!cachedMetrics &&
+          Object.values(cachedMetrics).some((cat) => cat.length > 0);
+
+        if (totalMetrics === 0 && hasCachedMetrics) {
+          console.warn(
+            "HealthKit returned no metrics; keeping cached data instead of clearing the dashboard",
+          );
+          announceSuccess("Using cached health data");
+          setIsLoading(false);
+          return;
+        }
+
+        // Update state with fresh data
+        setHealthMetrics(freshMetrics);
+
+        // Save to cache
+        await saveHealthMetricsToCache(freshMetrics);
 
         console.log(`✅ Fetched ${totalMetrics} health metrics from HealthKit`);
 
@@ -625,7 +550,7 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
   const refreshData = useCallback(async (): Promise<void> => {
     // Clear cache
     try {
-      await AsyncStorage.removeItem(CACHE_KEYS.HEALTH_METRICS);
+      await AsyncStorage.removeItem(STORAGE_KEYS.HEALTH_METRICS);
       console.log("✅ Cache cleared for refresh");
     } catch (error) {
       console.error("Failed to clear cache:", error);
@@ -715,29 +640,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     [healthMetrics],
   );
 
-  const getMetricSeries = useCallback(
-    (type: HealthMetricType, range: "day" | "week" | "month") => {
-      const chart = getMetricChartKind(type);
-      const aggregation = getMetricAggregation(type);
-
-      const cutoff = getRangeCutoff(range);
-      const bucketSize = getBucketSizeMs(range);
-
-      // Use your existing query method instead of a nonexistent `healthData`
-      const allOfType = getMetricsByType(type);
-
-      // getMetricsByType sorts newest-first; bucketize expects oldest-first
-      const filtered = allOfType
-        .filter((m) => m.timestamp >= cutoff)
-        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-      const points = bucketize(filtered, bucketSize, aggregation);
-
-      return { points, chart, aggregation };
-    },
-    [getMetricsByType],
-  );
-
   /**
    * Get all metrics within a specific date range
    *
@@ -790,7 +692,6 @@ export function HealthDataProvider({ children }: HealthDataProviderProps) {
     getMetricsByCategory,
     getMetricsByType,
     getMetricsByDateRange,
-    getMetricSeries,
   };
 
   return (

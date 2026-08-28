@@ -1,8 +1,11 @@
 /**
  * AISummary Component
  *
- * Generates AI-powered health metric summaries using OpenAI.
+ * Generates AI-powered health metric summaries via the HealthVis backend.
  * Provides coach/clinician-friendly narratives about health data trends.
+ *
+ * The model call happens server-side: the app posts precomputed statistics and
+ * never holds an API key.
  */
 
 import React, { useEffect, useState } from "react";
@@ -13,10 +16,13 @@ import {
   aggregateSleepByStage,
   calculateSleepEfficiency,
   calculateSleepQuality,
+  countSleepNights,
   formatSleepDuration,
 } from "@/lib/sleep-utils";
+import { rangeLabel, type TimeRangeKey } from "@/lib/time-range";
+import { generateSummary as requestSummary } from "@/lib/api-client";
 
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+
 
 interface AISummaryProps {
   data: HealthMetric[];
@@ -24,6 +30,61 @@ interface AISummaryProps {
   timeRange: string;
   min?: number;
   max?: number;
+}
+
+/** Phrases a time range for prose, from the shared range vocabulary. */
+function rangeText(timeRange: string, sleep = false): string {
+  if (timeRange === "D") return sleep ? "last night" : "today";
+  return rangeLabel(timeRange as TimeRangeKey);
+}
+
+/** Builds a readable summary from precomputed stats, with no model involved. */
+function buildMetricFallback(
+  metricName: string,
+  timeRangeText: string,
+  unit: string,
+  stats: {
+    min: number;
+    max: number;
+    avg: number;
+    outlierCount: number;
+    warningCount: number;
+    dangerCount: number;
+    totalReadings: number;
+  },
+): string {
+  const unitText = unit ? ` ${unit}` : "";
+  const parts = [
+    `${metricName} ${timeRangeText}: ${stats.totalReadings} reading${
+      stats.totalReadings === 1 ? "" : "s"
+    }, averaging ${Math.round(stats.avg)}${unitText}, ranging from ${Math.round(
+      stats.min,
+    )} to ${Math.round(stats.max)}${unitText}.`,
+  ];
+
+  const flagged = stats.warningCount + stats.dangerCount;
+  parts.push(
+    flagged === 0
+      ? "All readings were within the normal range."
+      : `${flagged} reading${flagged === 1 ? "" : "s"} fell outside the normal range.`,
+  );
+
+  return parts.join(" ");
+}
+
+/** Builds a readable sleep summary with no model involved. */
+function buildSleepFallback(
+  timeRangeText: string,
+  totalSleep: string,
+  efficiency: number,
+  quality: string,
+): string {
+  return `Sleep ${timeRangeText}: ${totalSleep} asleep, ${efficiency}% efficiency. Overall quality ${quality}.`;
+}
+
+/** Returns a stage's share of total sleep as a whole percentage. */
+function pctOfSleep(stage: number, totalSleep: number): number {
+  return totalSleep > 0 ? Math.round((stage / totalSleep) * 100) : 0;
 }
 
 export function AISummary({
@@ -35,7 +96,6 @@ export function AISummary({
 }: AISummaryProps) {
   const [summary, setSummary] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (data.length > 0) {
@@ -80,83 +140,78 @@ export function AISummary({
     };
   };
 
+  /** Summary built entirely on-device, for when the backend is unreachable. */
+  const buildLocalFallback = (): string => {
+    if (data[0]?.type === "sleep") {
+      const breakdown = aggregateSleepByStage(data);
+      return buildSleepFallback(
+        rangeText(timeRange, true),
+        formatSleepDuration(breakdown.totalSleep),
+        calculateSleepEfficiency(breakdown),
+        String(
+          calculateSleepQuality(breakdown, Math.max(1, countSleepNights(data))),
+        ),
+      );
+    }
+
+    const stats = calculateStats();
+    if (!stats) return "Not enough data to generate a summary.";
+
+    return buildMetricFallback(
+      metricName,
+      rangeText(timeRange),
+      data[0]?.unit || "",
+      stats,
+    );
+  };
+
   const generateSummary = async () => {
     setLoading(true);
-    setError("");
 
     try {
-      if (!OPENAI_API_KEY) {
-        setError(
-          "OpenAI API key not configured. Please add EXPO_PUBLIC_OPENAI_API_KEY to your .env file.",
-        );
-        setLoading(false);
-        return;
-      }
-
       const isSleep = data[0]?.type === "sleep";
 
       if (isSleep) {
         // Sleep-specific summary generation
         const sleepBreakdown = aggregateSleepByStage(data);
-        const sleepQuality = calculateSleepQuality(sleepBreakdown);
+        const recordedNights = Math.max(1, countSleepNights(data));
+        const sleepQuality = calculateSleepQuality(
+          sleepBreakdown,
+          recordedNights,
+        );
         const sleepEfficiency = calculateSleepEfficiency(sleepBreakdown);
 
-        const timeRangeText =
-          timeRange === "D"
-            ? "last night"
-            : timeRange === "W"
-              ? "this week"
-              : timeRange === "M"
-                ? "this month"
-                : timeRange === "6M"
-                  ? "last 6 months"
-                  : "this year";
+        const timeRangeText = rangeText(timeRange, true);
 
-        const prompt = `You are a sleep coach analyzing sleep data. Generate a 1-2 sentence summary.
-
-Sleep data for ${timeRangeText}:
-- Time in bed: ${formatSleepDuration(sleepBreakdown.totalInBed)}
-- Time asleep: ${formatSleepDuration(sleepBreakdown.totalSleep)}
-- Sleep efficiency: ${sleepEfficiency}%
-- Sleep quality: ${sleepQuality}
-- Deep sleep: ${formatSleepDuration(sleepBreakdown.deepSleep)} (${sleepBreakdown.totalSleep > 0 ? Math.round((sleepBreakdown.deepSleep / sleepBreakdown.totalSleep) * 100) : 0}%)
-- REM sleep: ${formatSleepDuration(sleepBreakdown.remSleep)} (${sleepBreakdown.totalSleep > 0 ? Math.round((sleepBreakdown.remSleep / sleepBreakdown.totalSleep) * 100) : 0}%)
-- Light sleep: ${formatSleepDuration(sleepBreakdown.lightSleep)} (${sleepBreakdown.totalSleep > 0 ? Math.round((sleepBreakdown.lightSleep / sleepBreakdown.totalSleep) * 100) : 0}%)
-- Awake time: ${formatSleepDuration(sleepBreakdown.awake)}
-- Total sessions: ${data.length}
-
-Focus on:
-1. Sleep quality and efficiency
-2. Balance of sleep stages (deep, REM, light)
-3. Brief, actionable insight or reassurance
-
-Keep it conversational and supportive. Don't use medical jargon.`;
-
-        const response = await fetch(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: "gpt-4o-mini",
-              messages: [{ role: "user", content: prompt }],
-              max_tokens: 150,
-              temperature: 0.7,
-            }),
+        const response = await requestSummary({
+          kind: "sleep",
+          time_range_text: timeRangeText,
+          sleep: {
+            total_in_bed: formatSleepDuration(sleepBreakdown.totalInBed),
+            total_sleep: formatSleepDuration(sleepBreakdown.totalSleep),
+            efficiency: sleepEfficiency,
+            quality: String(sleepQuality),
+            deep_sleep: formatSleepDuration(sleepBreakdown.deepSleep),
+            deep_pct: pctOfSleep(sleepBreakdown.deepSleep, sleepBreakdown.totalSleep),
+            rem_sleep: formatSleepDuration(sleepBreakdown.remSleep),
+            rem_pct: pctOfSleep(sleepBreakdown.remSleep, sleepBreakdown.totalSleep),
+            light_sleep: formatSleepDuration(sleepBreakdown.lightSleep),
+            light_pct: pctOfSleep(sleepBreakdown.lightSleep, sleepBreakdown.totalSleep),
+            awake: formatSleepDuration(sleepBreakdown.awake),
+            sessions: data.length,
           },
+        });
+
+        setSummary(
+          response.configured && response.summary
+            ? response.summary
+            : buildSleepFallback(
+                timeRangeText,
+                formatSleepDuration(sleepBreakdown.totalSleep),
+                sleepEfficiency,
+                String(sleepQuality),
+              ),
         );
-
-        if (!response.ok) {
-          throw new Error(`OpenAI API error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        const content =
-          result.choices[0]?.message?.content || "Unable to generate summary.";
-        setSummary(content);
       } else {
         // Regular metric summary generation
         const stats = calculateStats();
@@ -168,68 +223,38 @@ Keep it conversational and supportive. Don't use medical jargon.`;
         }
 
         const unit = data[0]?.unit || "";
-        const timeRangeText =
-          timeRange === "H"
-            ? "last hour"
-            : timeRange === "D"
-              ? "today"
-              : timeRange === "W"
-                ? "this week"
-                : timeRange === "M"
-                  ? "this month"
-                  : timeRange === "6M"
-                    ? "last 6 months"
-                    : "this year";
+        const timeRangeText = rangeText(timeRange);
 
-        const prompt = `You are a health coach analyzing ${metricName} data. Generate a 1 sentence summary.
-
-Data for ${timeRangeText}:
-- Range: ${stats.min}-${stats.max} ${unit}
-- Average: ${stats.avg} ${unit}
-- Median: ${stats.median} ${unit}
-- Variability: ${stats.stdDev} ${unit} (std dev)
-- Total readings: ${stats.totalReadings}
-- Normal readings: ${stats.normalCount}
-- Elevated readings: ${stats.warningCount}
-- High readings: ${stats.dangerCount}
-- Outliers: ${stats.outlierCount}
-
-Focus on:
-1. Overall stability or variability
-2. Any concerning patterns (spikes, elevated readings)
-3. Brief, actionable insight or reassurance
-
-Keep it conversational and supportive. Don't use medical jargon.`;
-
-        const response = await fetch(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: "gpt-4o-mini",
-              messages: [{ role: "user", content: prompt }],
-              max_tokens: 150,
-              temperature: 0.7,
-            }),
+        const response = await requestSummary({
+          kind: "metric",
+          time_range_text: timeRangeText,
+          metric: {
+            metric_name: metricName,
+            unit,
+            min: stats.min,
+            max: stats.max,
+            avg: stats.avg,
+            median: stats.median,
+            std_dev: stats.stdDev,
+            outlier_count: stats.outlierCount,
+            normal_count: stats.normalCount,
+            warning_count: stats.warningCount,
+            danger_count: stats.dangerCount,
+            total_readings: stats.totalReadings,
           },
+        });
+
+        setSummary(
+          response.configured && response.summary
+            ? response.summary
+            : buildMetricFallback(metricName, timeRangeText, unit, stats),
         );
-
-        if (!response.ok) {
-          throw new Error(`OpenAI API error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        const content =
-          result.choices[0]?.message?.content || "Unable to generate summary.";
-        setSummary(content);
       }
     } catch (err) {
-      console.error("AI Summary error:", err);
-      setError("Unable to generate AI summary at this time.");
+      // The backend may simply be unreachable. A locally computed summary is
+      // more use than a red error, and the other AI cards already do this.
+      console.warn("AI summary unavailable, using local summary:", err);
+      setSummary(buildLocalFallback());
     } finally {
       setLoading(false);
     }
@@ -242,14 +267,6 @@ Keep it conversational and supportive. Don't use medical jargon.`;
         <ThemedText style={styles.loadingText}>
           Generating AI summary...
         </ThemedText>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
       </View>
     );
   }

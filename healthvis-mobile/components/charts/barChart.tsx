@@ -99,6 +99,9 @@ export const SimpleBarChart: React.FC<SimpleBarChartProps> = ({
         {title ? <Text style={[styles.title, { fontSize: titleFontSize }]}>{title}</Text> : null}
         <View style={[styles.stateBox, { height }]}>
           <Text style={[styles.stateText, { fontSize }]}>No data available</Text>
+          <Text style={[styles.emptyHint, { fontSize: fontSize - 2 }]}>
+            Upload or sync data to view chart
+          </Text>
         </View>
       </View>
     );
@@ -122,7 +125,10 @@ export const SimpleBarChart: React.FC<SimpleBarChartProps> = ({
       style={[styles.container, { width, height: height + 60 }]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={accessibilityLabel || `${title || "Bar chart"} showing ${data.length} bars`}
+      accessibilityLabel={
+        accessibilityLabel ||
+        `${title || "Bar chart"} showing ${data.length} data points`
+      }
     >
       {title ? <Text style={[styles.title, { fontSize: titleFontSize }]}>{title}</Text> : null}
 
@@ -142,7 +148,8 @@ export const SimpleBarChart: React.FC<SimpleBarChartProps> = ({
 
       <View style={styles.summary}>
         <Text style={[styles.summaryText, { fontSize: fontSize - 2 }]}>
-          {data.length} bar{data.length !== 1 ? "s" : ""} • Range: {minValue}–{maxValue}
+          {data.length} data point{data.length !== 1 ? "s" : ""} • Range: {minValue}–
+          {maxValue}
           {unit ? ` ${unit}` : ""}
         </Text>
       </View>
@@ -162,6 +169,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   stateText: { marginTop: 12, color: "#666", textAlign: "center" },
+  emptyHint: { marginTop: 4, color: "#888", textAlign: "center" },
   summary: { marginTop: 8, paddingHorizontal: 16 },
   summaryText: { color: "#666", textAlign: "center" },
 });

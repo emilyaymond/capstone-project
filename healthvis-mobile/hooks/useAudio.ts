@@ -1,15 +1,16 @@
 /**
  * useAudio Hook
  *
- * Provides audio feedback functionality using expo-av for audio playback.
+ * Provides audio feedback by synthesising tones with react-native-audio-api.
  * Integrates with AccessibilityContext to respect audioEnabled setting.
  *
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
  */
 
-import { useEffect, useRef } from "react";
-import { Audio } from "expo-av";
+import { useEffect, useMemo, useRef } from "react";
+import { AudioContext } from "react-native-audio-api";
 import { useAccessibility } from "../contexts/AccessibilityContext";
+import { ensureAudioSession } from "../lib/audio-session";
 import { AccessibilityMode } from "../types";
 
 // ============================================================================
@@ -30,7 +31,6 @@ export interface UseAudioReturn {
   playHoverSound: () => Promise<void>;
 }
 
-// OscillatorType for Web Audio API compatibility
 type OscillatorType = "sine" | "square" | "sawtooth" | "triangle";
 
 // ============================================================================
@@ -45,26 +45,25 @@ const MODE_CHANGE_DURATION = 250;
 const FOCUS_DURATION = 80;
 const HOVER_DURATION = 60;
 
-// Frequency ranges in Hz
-const FREQUENCY_LOW = 300; // Maps to tone-low.wav
-const FREQUENCY_MID = 500; // Maps to tone-medium.wav
-const FREQUENCY_HIGH = 800; // Maps to tone-high.wav
-const FREQUENCY_VERY_HIGH = 800; // Also maps to tone-high.wav
+// Frequency landmarks in Hz
+const FREQUENCY_LOW = 300;
+const FREQUENCY_MID = 500;
+const FREQUENCY_HIGH = 800;
+const FREQUENCY_VERY_HIGH = 1100;
 
-// Mode-specific frequencies
+// Mode-specific signatures
 const MODE_FREQUENCIES: Record<AccessibilityMode, number> = {
-  visual: 500, // medium
-  audio: 800, // high
-  hybrid: 500, // medium
-  simplified: 300, // low
+  visual: 500,
+  audio: 800,
+  hybrid: 650,
+  simplified: 300,
 };
 
-// Audio file mapping
-const TONE_FILES = {
-  low: require("../assets/audio/tone-low.wav"),
-  medium: require("../assets/audio/tone-medium.wav"),
-  high: require("../assets/audio/tone-high.wav"),
-};
+/** Peak gain for UI feedback tones. Quieter than sonification notes. */
+const UI_GAIN = 0.14;
+
+/** Edge fade that keeps short tones from clicking. */
+const FADE_SECONDS = 0.008;
 
 // ============================================================================
 // Hook Implementation
@@ -72,144 +71,67 @@ const TONE_FILES = {
 
 export function useAudio(): UseAudioReturn {
   const { settings } = useAccessibility();
-  const soundObjectsRef = useRef<Audio.Sound[]>([]);
-  const isInitializedRef = useRef(false);
+  const contextRef = useRef<AudioContext | null>(null);
 
-  // Initialize Audio Mode
+  // Read settings through a ref so the returned API can stay referentially
+  // stable. Consumers put this object in useCallback/useEffect dependency
+  // arrays; a new object every render made those effects re-run every render.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
-    initializeAudio();
     return () => {
-      cleanup();
+      contextRef.current?.close().catch(() => {});
+      contextRef.current = null;
     };
   }, []);
 
-  /**
-   * Initialize audio mode for playback
-   */
-  async function initializeAudio() {
-    try {
-      if (isInitializedRef.current) return;
-
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      });
-
-      isInitializedRef.current = true;
-    } catch (error) {
-      console.error("Failed to initialize audio:", error);
+  /** Returns the shared AudioContext, creating it on first use. */
+  function getContext(): AudioContext {
+    if (!contextRef.current) {
+      contextRef.current = new AudioContext();
     }
+    return contextRef.current;
   }
 
-  // Cleanup Function
-
   /**
-   * Cleanup all active sound objects on unmount
-   */
-  async function cleanup() {
-    try {
-      // Unload all sound objects
-      for (const sound of soundObjectsRef.current) {
-        try {
-          await sound.unloadAsync();
-        } catch (error) {
-          console.error("Error unloading sound:", error);
-        }
-      }
-      soundObjectsRef.current = [];
-    } catch (error) {
-      console.error("Error during audio cleanup:", error);
-    }
-  }
-
-  // Base Sound Generation Function
-
-  /**
-   * Play a sound with specified frequency, duration, and waveform type
+   * Plays a tone at an exact frequency.
    *
-   * @param frequency - Frequency in Hz
-   * @param duration - Duration in milliseconds
-   * @param type - Waveform type (sine, square, sawtooth, triangle)
+   * Previously this mapped the requested frequency onto one of three recorded
+   * WAV files, so every distinct pitch collapsed into low, medium or high.
    */
   async function playSound(
     frequency: number,
     duration: number,
     type: OscillatorType = "sine",
   ): Promise<void> {
-    // Check if audio is enabled
-    if (!settings.audioEnabled) {
-      console.log("🔇 Audio is disabled in settings");
-      return;
-    }
-
-    console.log(`🔊 Playing sound: ${frequency}Hz, ${duration}ms, ${type}`);
+    if (!settingsRef.current.audioEnabled) return;
 
     try {
-      // Generate audio buffer using Web Audio API approach
-      // For React Native, we'll use a simple tone generation
-      const sound = await generateTone(frequency, duration, type);
+      await ensureAudioSession();
 
-      // Track sound object for cleanup
-      soundObjectsRef.current.push(sound);
+      const context = getContext();
+      const now = context.currentTime;
+      const seconds = duration / 1000;
+      const fade = Math.min(FADE_SECONDS, seconds / 3);
 
-      // Play the sound
-      await sound.playAsync();
-      console.log("✅ Sound played successfully");
+      const oscillator = context.createOscillator();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, now);
 
-      // Auto-cleanup after playback
-      setTimeout(async () => {
-        try {
-          await sound.unloadAsync();
-          soundObjectsRef.current = soundObjectsRef.current.filter(
-            (s) => s !== sound,
-          );
-        } catch (error) {
-          console.error("Error cleaning up sound:", error);
-        }
-      }, duration + 100);
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(UI_GAIN, now + fade);
+      gain.gain.setValueAtTime(UI_GAIN, now + seconds - fade);
+      gain.gain.linearRampToValueAtTime(0, now + seconds);
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + seconds);
     } catch (error) {
-      console.error("❌ Error playing sound:", error);
-    }
-  }
-
-  // Tone Generation Helper
-
-  /**
-   * Generate a tone using expo-av with pre-generated audio files
-   * Maps requested frequency to the closest available tone file
-   */
-  async function generateTone(
-    frequency: number,
-    duration: number,
-    type: OscillatorType,
-  ): Promise<Audio.Sound> {
-    // Map frequency to the closest available tone file
-    const toneFile = selectToneFile(frequency);
-
-    console.log(`🎵 Loading tone file for ${frequency}Hz (using ${toneFile})`);
-
-    // Load the pre-generated audio file
-    const { sound } = await Audio.Sound.createAsync(TONE_FILES[toneFile], {
-      shouldPlay: false,
-    });
-
-    return sound;
-  }
-
-  /**
-   * Select the appropriate tone file based on frequency
-   * Maps requested frequency to low (300Hz), medium (500Hz), or high (800Hz)
-   */
-  function selectToneFile(frequency: number): "low" | "medium" | "high" {
-    // Map frequency ranges to available files
-    if (frequency < 400) {
-      return "low"; // 300 Hz
-    } else if (frequency < 650) {
-      return "medium"; // 500 Hz
-    } else {
-      return "high"; // 800 Hz
+      console.error("Error playing sound:", error);
     }
   }
 
@@ -286,13 +208,19 @@ export function useAudio(): UseAudioReturn {
 
   // Return Hook Interface
 
-  return {
-    playSound,
-    playClickSound,
-    playSuccessSound,
-    playErrorSound,
-    playModeChangeSound,
-    playFocusSound,
-    playHoverSound,
-  };
+  // Memoized with an empty dependency list: every function above reads mutable
+  // state through refs, so the first render's closures stay correct forever.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo<UseAudioReturn>(
+    () => ({
+      playSound,
+      playClickSound,
+      playSuccessSound,
+      playErrorSound,
+      playModeChangeSound,
+      playFocusSound,
+      playHoverSound,
+    }),
+    [],
+  );
 }

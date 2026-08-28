@@ -1,5 +1,8 @@
 # HealthVis Mobile
 
+The Expo app half of [HealthVis](../README.md); the FastAPI service lives in
+`../backend/`.
+
 Accessible health data visualization app built with Expo and React Native. Integrates directly with Apple HealthKit to provide comprehensive health and fitness data visualization.
 
 ## Features
@@ -169,8 +172,6 @@ constants/        # App constants (theme, accessibility)
 
 - `INTEGRATION_TESTING_GUIDE.md` - Comprehensive integration testing procedures for physical devices
 - `INTEGRATION_TEST_CHECKLIST.md` - Quick reference checklist for integration testing
-- `TESTING_GUIDE.md` - Testing audio and haptic features
-- `CODE_REVIEW.md` - Current implementation status
 - `.kiro/specs/apple-healthkit-migration/` - Apple HealthKit migration spec
 - `.kiro/specs/expo-accessibility-migration/` - Accessibility features spec
 

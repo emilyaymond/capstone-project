@@ -1,205 +1,120 @@
-# HealthVis Mobile
+# HealthVis
 
-Accessible health data visualization app built with Expo and React Native. Integrates directly with Apple HealthKit to provide comprehensive health and fitness data visualization.
+An accessibility-first iOS health app. The premise is that health data shouldn't
+require sight: the same dataset is delivered through four parallel channels —
+visual charts, sonification, haptics, and speech — and the user picks how they
+want to receive it.
 
-## Features
+## Repository layout
 
-- 🏥 **Direct HealthKit Integration**: Access comprehensive health data including vitals, activity, body measurements, nutrition, sleep, and mindfulness
-- 🎯 **4 Accessibility Modes**: Visual, Audio, Hybrid, Simplified
-- 🔊 **Audio Feedback**: Button clicks, mode changes, data sonification
-- 📳 **Haptic Feedback**: Touch-based feedback for data exploration
-- 🗣️ **Text-to-Speech**: Spoken summaries of health data
-- 👆 **Touch-to-Explore**: Interactive charts with audio/haptic feedback
-- 📊 **Data Visualization**: Line and bar charts with accessibility features
-- ⚙️ **Customizable Settings**: Font size, contrast, audio/haptic toggles
-- 💾 **Offline Support**: Cached data for offline viewing
+This repo holds two separate components that deploy independently:
 
-## Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# iOS Setup (Required for HealthKit)
-cd ios && pod install && cd ..
-
-# Start the development server with Expo Dev Client
-npx expo start --dev-client
-
-# Press 'i' for iOS simulator (limited HealthKit support)
-# Or scan QR code with Expo Go on physical iOS device for full HealthKit access
+```
+HealthVis/
+├── healthvis-mobile/   Expo / React Native app — builds to an iOS binary
+└── backend/            FastAPI service — runs as a server process
 ```
 
-### Running on Physical Device (Recommended for HealthKit)
+They are deliberately siblings, not nested. `healthvis-mobile/` is the Expo
+project root: Metro watches that whole tree and EAS uploads it as build context,
+so the backend's Python environment does not belong inside it. More importantly,
+`backend/.env` holds the OpenAI credential and must stay out of the mobile
+source tree.
 
-Since HealthKit requires a physical iOS device, use one of these methods:
+## How they fit together
 
-**Option 1: Expo Dev Client (Easiest - No Code Signing)**
-
-```bash
-npx expo start --dev-client
-# Scan QR code with camera or Expo Go app
+```
+Apple HealthKit
+      │
+      ▼
+lib/healthkit-service.ts ──► contexts/HealthDataContext.tsx ──► screens
+                                          │
+                                          ▼
+                              lib/api-client.ts
+                                          │
+                                    POST /api/summary
+                                          ▼
+                            backend ──► OpenAI ──► summary text
 ```
 
-**Option 2: Build with Xcode (Requires Apple Developer Account)**
+The app never calls a model provider directly and holds no API key. It posts
+precomputed statistics to the backend, which owns both the credential and the
+prompt wording.
+
+## Running it
+
+Both components are usually needed: the app works without the backend, but AI
+summaries fall back to deterministic local text.
+
+### Backend
 
 ```bash
-# Open in Xcode
-open ios/healthvismobile.xcworkspace
-
-# In Xcode:
-# 1. Select healthvismobile target
-# 2. Go to Signing & Capabilities
-# 3. Enable "Automatically manage signing"
-# 4. Select your development team
-# 5. Build and run (Cmd+R)
+cd backend
+python3 -m venv .hvenv && source .hvenv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Option 3: Expo Build**
+Run it **from inside `backend/`**. The modules use flat imports
+(`from config import settings`), so `uvicorn backend.main:app` from the repo
+root fails with `ModuleNotFoundError: No module named 'config'`.
 
-```bash
-# Build for iOS device
-npx expo run:ios --device
-```
+`--host 0.0.0.0` matters when testing on a physical device — bound to localhost,
+your phone cannot reach it.
 
-## HealthKit Setup
+Configuration lives in `backend/.env` (gitignored):
 
-### Prerequisites
+| Variable | Purpose |
+| --- | --- |
+| `AI_SERVICE` | `openai` or `perplexity` — selects the client |
+| `OPENAI_API_KEY` | Used when `AI_SERVICE=openai` |
+| `PPX_API_KEY` | Used when `AI_SERVICE=perplexity` |
+| `MAX_FILE_SIZE` | Upload limit in bytes |
+| `CORS_ORIGINS` | JSON array of allowed origins |
 
-- Physical iOS device (HealthKit is not fully supported in simulator)
-- iOS 13.0 or later
-- For Xcode builds: Xcode 12.0 or later and Apple Developer account
-- For Expo Dev Client: No code signing required
+Never put a credential in `healthvis-mobile/.env`. Expo inlines every
+`EXPO_PUBLIC_*` value into the JS bundle at build time, so anything there ships
+inside the app and is extractable from any installed build.
 
-### Running Without Code Signing Issues
-
-The easiest way to run the app is using Expo Dev Client:
+### Mobile
 
 ```bash
 cd healthvis-mobile
-npx expo start --dev-client
+npm install
+npm start
 ```
 
-This bypasses code signing requirements and works on both simulator and physical devices.
+Set `EXPO_PUBLIC_API_URL` in `healthvis-mobile/.env` to a backend address your
+device can reach — your machine's LAN IP, not `localhost`, when running on a
+physical phone. Environment variables are read at bundle time, so restart Metro
+after changing it.
 
-### Permissions
+HealthKit requires a **physical iOS device**. On the simulator, HealthKit
+initialisation fails and the app falls back to mock data, which means the
+simulator cannot verify anything in `lib/healthkit-service.ts`.
 
-On first launch, the app will request permissions to access the following HealthKit data:
+See [healthvis-mobile/README.md](healthvis-mobile/README.md) for HealthKit
+permissions, device builds, and the accessibility feature set.
 
-**Vitals:**
-
-- Heart Rate
-- Blood Pressure
-- Respiratory Rate
-- Body Temperature
-- Oxygen Saturation
-- Blood Glucose
-
-**Activity:**
-
-- Steps
-- Distance
-- Flights Climbed
-- Active Energy
-- Exercise Minutes
-
-**Body Measurements:**
-
-- Weight
-- Height
-- BMI
-- Body Fat Percentage
-
-**Nutrition:**
-
-- Dietary Energy (Calories)
-- Water Intake
-- Protein, Carbohydrates, Fats
-
-**Sleep & Mindfulness:**
-
-- Sleep Analysis
-- Mindfulness Minutes
-
-### Enabling Permissions
-
-If you deny permissions initially, you can enable them later:
-
-1. Open iOS Settings
-2. Navigate to Privacy & Security → Health
-3. Select HealthVis
-4. Enable the data types you want to share
-
-## Testing
-
-### Unit & Integration Tests
+## Checks
 
 ```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm test -- --watch
-
-# Run specific test file
-npm test -- healthkit-service.test.ts
+cd healthvis-mobile && npm run check
 ```
 
-### Integration Testing
+Runs TypeScript, ESLint, and Jest together. Individually: `npm run typecheck`,
+`npm run lint`, `npm test`.
 
-For comprehensive integration testing on physical devices:
+## API
 
-- **Detailed Guide**: See `INTEGRATION_TESTING_GUIDE.md` for complete test procedures
-- **Quick Checklist**: See `INTEGRATION_TEST_CHECKLIST.md` for quick reference
-- **Feature Testing**: Navigate to `/test-feedback` in the app to test audio and haptic features
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Service status and whether an AI key is configured |
+| `POST /api/summary` | Health summary from precomputed stats (`metric`, `sleep`, `dashboard`, `trends`) |
+| `POST /api/chat` | Conversational analysis |
+| `POST /api/analyze` | Analysis plus chart suggestions |
+| `POST /api/upload-data` | CSV/JSON upload and analysis |
 
-## Project Structure
-
-```
-app/              # Screens (file-based routing)
-components/       # Reusable components
-contexts/         # React contexts (Accessibility, HealthData)
-hooks/            # Custom hooks (useAudio, useHaptics, useSpeech)
-lib/              # Utilities (API client, announcer, sonification)
-types/            # TypeScript type definitions
-constants/        # App constants (theme, accessibility)
-```
-
-## Documentation
-
-- `INTEGRATION_TESTING_GUIDE.md` - Comprehensive integration testing procedures for physical devices
-- `INTEGRATION_TEST_CHECKLIST.md` - Quick reference checklist for integration testing
-- `TESTING_GUIDE.md` - Testing audio and haptic features
-- `CODE_REVIEW.md` - Current implementation status
-- `.kiro/specs/apple-healthkit-migration/` - Apple HealthKit migration spec
-- `.kiro/specs/expo-accessibility-migration/` - Accessibility features spec
-
-## Tech Stack
-
-- Expo SDK 54
-- React Native 0.81
-- TypeScript
-- Expo Router (file-based routing)
-- react-native-health (HealthKit integration)
-- expo-av (audio)
-- expo-haptics (haptic feedback)
-- expo-speech (text-to-speech)
-- AsyncStorage (persistence)
-
-## Health Data Categories
-
-The app organizes health data into six main categories:
-
-1. **Vitals**: Heart rate, blood pressure, respiratory rate, body temperature, oxygen saturation, blood glucose
-2. **Activity**: Steps, distance, flights climbed, active energy, exercise minutes
-3. **Body**: Weight, height, BMI, body fat percentage
-4. **Nutrition**: Dietary energy, water, protein, carbohydrates, fats
-5. **Sleep**: Sleep analysis with sleep stages
-6. **Mindfulness**: Mindfulness session minutes
-
-## Data Synchronization
-
-- **Automatic Sync**: Data refreshes when app comes to foreground
-- **Manual Sync**: Pull-to-refresh on home screen
-- **Offline Access**: Cached data available when offline
-- **Time Range**: Configurable in settings (7/30/90 days)
+`/api/summary` accepts statistics rather than prose, and builds prompts
+server-side in `backend/services/prompts.py`. An endpoint that forwarded
+arbitrary prompt text would be an open model proxy on the project's key.

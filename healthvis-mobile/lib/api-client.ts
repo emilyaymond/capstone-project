@@ -67,8 +67,11 @@ async function fetchWithTimeout(
     if (error.name === 'AbortError') {
       throw new APIError('Request timeout', undefined, false, true);
     }
+    // Name the address that failed. "Unable to reach server" alone gives no
+    // way to tell a sleeping laptop from a wrong EXPO_PUBLIC_API_URL, and that
+    // variable is inlined at bundle time so a stale value is easy to miss.
     throw new APIError(
-      'Network error: Unable to reach server',
+      `Network error: unable to reach ${API_BASE_URL}`,
       undefined,
       true,
       false
@@ -288,4 +291,103 @@ export async function checkBackendHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ============================================================================
+// Health Summaries
+// ============================================================================
+
+/**
+ * AI summaries take several seconds. The 2s REQUEST_TIMEOUT used for the rest
+ * of the API would abort every one of them before the model replied.
+ */
+const AI_REQUEST_TIMEOUT = 30000;
+
+export interface MetricSummaryPayload {
+  metric_name: string;
+  unit: string;
+  min: number;
+  max: number;
+  avg: number;
+  median: number;
+  std_dev: number;
+  outlier_count: number;
+  normal_count: number;
+  warning_count: number;
+  danger_count: number;
+  total_readings: number;
+}
+
+export interface SleepSummaryPayload {
+  total_in_bed: string;
+  total_sleep: string;
+  efficiency: number;
+  quality: string;
+  deep_sleep: string;
+  deep_pct: number;
+  rem_sleep: string;
+  rem_pct: number;
+  light_sleep: string;
+  light_pct: number;
+  awake: string;
+  sessions: number;
+}
+
+export interface DashboardSummaryPayload {
+  cards: { title: string; value_text: string; subtitle: string }[];
+  normal_count: number;
+  warning_count: number;
+  danger_count: number;
+}
+
+export interface TrendsSummaryPayload {
+  series: {
+    label: string;
+    unit: string;
+    min: number;
+    max: number;
+    avg: number;
+    count: number;
+    outlier_count: number;
+  }[];
+}
+
+export interface SummaryRequest {
+  kind: 'metric' | 'sleep' | 'dashboard' | 'trends';
+  time_range_text?: string;
+  metric?: MetricSummaryPayload;
+  sleep?: SleepSummaryPayload;
+  dashboard?: DashboardSummaryPayload;
+  trends?: TrendsSummaryPayload;
+}
+
+export interface SummaryResponse {
+  summary: string;
+  model_used: string;
+  configured: boolean;
+}
+
+/**
+ * Requests an AI health summary from the backend.
+ *
+ * The app posts precomputed statistics and the server owns both the API key
+ * and the prompt wording; the key used to ship inside the app bundle via an
+ * EXPO_PUBLIC_ variable.
+ *
+ * Not retried: callers all render a deterministic local fallback, and retrying
+ * a 30s model call three times would leave the card spinning for 90 seconds.
+ */
+export async function generateSummary(
+  request: SummaryRequest
+): Promise<SummaryResponse> {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/summary`,
+    {
+      method: 'POST',
+      body: JSON.stringify(request),
+    },
+    AI_REQUEST_TIMEOUT
+  );
+
+  return parseResponse<SummaryResponse>(response);
 }

@@ -19,14 +19,20 @@ import {
 
 interface SleepStageBreakdownProps {
   sleepMetrics: HealthMetric[];
+  /**
+   * Nights covered by these metrics. Quality thresholds describe one night, so
+   * a multi-night range has to be averaged before it can be judged.
+   */
+  nights?: number;
 }
 
 export function SleepStageBreakdown({
   sleepMetrics,
+  nights = 1,
 }: SleepStageBreakdownProps) {
   const breakdown = aggregateSleepByStage(sleepMetrics);
   const efficiency = calculateSleepEfficiency(breakdown);
-  const quality = calculateSleepQuality(breakdown);
+  const quality = calculateSleepQuality(breakdown, nights);
 
   const stages = [
     {
@@ -55,18 +61,21 @@ export function SleepStageBreakdown({
     },
   ].filter((stage) => stage.duration > 0);
 
-  const qualityColors = {
+  const qualityColors: Record<typeof quality, string> = {
     excellent: "#34C759",
     good: "#30D158",
     fair: "#FF9500",
     poor: "#FF3B30",
+    // Neutral grey: "no data" should not read as a bad result.
+    unknown: "#8E8E93",
   };
 
-  const qualityLabels = {
+  const qualityLabels: Record<typeof quality, string> = {
     excellent: "Excellent",
     good: "Good",
     fair: "Fair",
     poor: "Poor",
+    unknown: "No data",
   };
 
   return (
@@ -95,18 +104,32 @@ export function SleepStageBreakdown({
       </View>
 
       <View style={styles.stagesContainer}>
-        <ThemedText style={styles.stagesTitle}>Sleep Stages</ThemedText>
+        <ThemedText style={styles.stagesTitle}>
+          Sleep Stages{"  "}
+          <ThemedText style={styles.stagesSubtitle}>
+            (% of time asleep)
+          </ThemedText>
+        </ThemedText>
         {stages.map((stage, index) => {
+          // Deep, REM and Light are shares of time *asleep* -- that is how
+          // sleep trackers report stages, and it is the comparison that means
+          // something ("a fifth of my sleep was deep"). Measuring them against
+          // time in bed silently shrank every stage by the awake time.
+          //
+          // Awake is the exception: it is only meaningful against time in bed,
+          // since it is by definition not part of sleep.
+          const isAwake = stage.label === "Awake";
+          const denominator = isAwake
+            ? breakdown.totalInBed
+            : breakdown.totalSleep;
           const percentage =
-            breakdown.totalInBed > 0
-              ? (stage.duration / breakdown.totalInBed) * 100
-              : 0;
+            denominator > 0 ? (stage.duration / denominator) * 100 : 0;
 
           return (
             <View
               key={stage.label}
               style={styles.stageRow}
-              accessibilityLabel={`${stage.label}: ${formatSleepDuration(stage.duration)}, ${Math.round(percentage)}% of time in bed`}
+              accessibilityLabel={`${stage.label}: ${formatSleepDuration(stage.duration)}, ${Math.round(percentage)}% of ${isAwake ? "time in bed" : "time asleep"}`}
             >
               <View style={styles.stageInfo}>
                 <ThemedText style={[styles.stageIcon, { color: stage.color }]}>
@@ -199,6 +222,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
+  stagesSubtitle: { fontSize: 12, fontWeight: "400", opacity: 0.55 },
   stagePercentage: {
     fontSize: 13,
     opacity: 0.6,

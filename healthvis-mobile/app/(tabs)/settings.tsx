@@ -40,6 +40,7 @@ import {
   announceError,
 } from "@/lib/announcer";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
 
 // ============================================================================
 // Helper Components
@@ -116,7 +117,7 @@ export default function SettingsScreen() {
 
   async function loadLastSyncTime() {
     try {
-      const timestamp = await AsyncStorage.getItem("health_data_last_fetch");
+      const timestamp = await AsyncStorage.getItem(STORAGE_KEYS.LAST_FETCH);
       if (timestamp) {
         setLastSyncTime(new Date(parseInt(timestamp, 10)));
       }
@@ -127,7 +128,7 @@ export default function SettingsScreen() {
 
   async function loadDataRange() {
     try {
-      const range = await AsyncStorage.getItem("health_data_range");
+      const range = await AsyncStorage.getItem(STORAGE_KEYS.DATA_RANGE);
       if (range) {
         setDataRange(parseInt(range, 10) as 7 | 30 | 90);
       }
@@ -152,7 +153,7 @@ export default function SettingsScreen() {
       const now = new Date();
       setLastSyncTime(now);
       await AsyncStorage.setItem(
-        "health_data_last_fetch",
+        STORAGE_KEYS.LAST_FETCH,
         now.getTime().toString(),
       );
 
@@ -181,7 +182,7 @@ export default function SettingsScreen() {
   const handleDataRangeChange = async (range: 7 | 30 | 90) => {
     try {
       setDataRange(range);
-      await AsyncStorage.setItem("health_data_range", range.toString());
+      await AsyncStorage.setItem(STORAGE_KEYS.DATA_RANGE, range.toString());
       announceSettingsChange("data range", `${range} days`);
 
       // Trigger a refresh with the new range
@@ -191,7 +192,7 @@ export default function SettingsScreen() {
       const now = new Date();
       setLastSyncTime(now);
       await AsyncStorage.setItem(
-        "health_data_last_fetch",
+        STORAGE_KEYS.LAST_FETCH,
         now.getTime().toString(),
       );
 
@@ -834,6 +835,16 @@ export default function SettingsScreen() {
             ]}
           >
             Open Accessibility Test Screen →
+          </ThemedText>
+        </Link>
+        <Link href="/haptic-test" style={styles.testLink}>
+          <ThemedText
+            style={[
+              styles.linkText,
+              { fontSize: fontSize.body, color: colors.primary },
+            ]}
+          >
+            Open Haptic Test Screen →
           </ThemedText>
         </Link>
       </ThemedView>

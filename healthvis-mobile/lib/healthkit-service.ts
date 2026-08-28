@@ -14,15 +14,13 @@ import AppleHealthKit, {
   HealthValue,
   HealthKitPermissions,
 } from "react-native-health";
+import { HealthMetric, HealthMetricType, HealthCategory, CategorizedHealthData } from "../types/health-metric";
 import {
-  HealthMetric,
-  HealthMetricType,
-  HealthCategory,
-  CategorizedHealthData,
   getUnitForType,
   classifyRange,
   hasDefinedRange,
-} from "../types/health-metric";
+  METRIC_TYPE_TO_CATEGORY,
+} from "./metric-registry";
 import {
   HealthKitError,
   HealthKitErrorCode,
@@ -165,44 +163,6 @@ const HEALTHKIT_TO_METRIC_TYPE: Record<string, HealthMetricType> = {
   [HEALTHKIT_TYPES.FATS]: "fats",
   [HEALTHKIT_TYPES.SLEEP]: "sleep",
   [HEALTHKIT_TYPES.MINDFULNESS]: "mindfulness",
-};
-
-/**
- * Map HealthMetric type to HealthCategory
- */
-const METRIC_TYPE_TO_CATEGORY: Record<HealthMetricType, HealthCategory> = {
-  // Vitals
-  heart_rate: "vitals",
-  blood_pressure_systolic: "vitals",
-  blood_pressure_diastolic: "vitals",
-  respiratory_rate: "vitals",
-  body_temperature: "vitals",
-  oxygen_saturation: "vitals",
-  blood_glucose: "vitals",
-
-  // Activity
-  steps: "activity",
-  distance: "activity",
-  flights_climbed: "activity",
-  active_energy: "activity",
-  exercise_minutes: "activity",
-
-  // Body
-  weight: "body",
-  height: "body",
-  bmi: "body",
-  body_fat_percentage: "body",
-
-  // Nutrition
-  dietary_energy: "nutrition",
-  water: "nutrition",
-  protein: "nutrition",
-  carbohydrates: "nutrition",
-  fats: "nutrition",
-
-  // Sleep & Mindfulness
-  sleep: "sleep",
-  mindfulness: "mindfulness",
 };
 
 // Retry Configuration
@@ -445,6 +405,65 @@ function createDefaultPermissionStatus(): PermissionStatus {
   };
 }
 
+
+/**
+ * Signature of a react-native-health query that calls back with an array of samples.
+ */
+type HealthKitArrayQuery = (
+  queryOptions: Record<string, unknown>,
+  callback: (err: string, results: HealthValue[]) => void,
+) => void;
+
+/**
+ * Runs a HealthKit query that returns an array of samples and converts each one to a HealthMetric.
+ */
+function fetchSampleArray(
+  query: HealthKitArrayQuery,
+  type: HealthMetricType,
+  operationName: string,
+  options: FetchOptions,
+): Promise<HealthMetric[]> {
+  return healthKitService.fetchWithErrorHandling(
+    () =>
+      new Promise<HealthMetric[]>((resolve, reject) => {
+        if (typeof query !== "function") {
+          resolve([]);
+          return;
+        }
+
+        query(
+          {
+            startDate: options.startDate.toISOString(),
+            endDate: options.endDate.toISOString(),
+            limit: options.limit,
+          },
+          (err: string, results: HealthValue[]) => {
+            if (err) {
+              reject(HealthKitError.fetchFailed(operationName, err));
+              return;
+            }
+
+            if (!Array.isArray(results) || results.length === 0) {
+              resolve([]);
+              return;
+            }
+
+            try {
+              resolve(
+                results.map((sample) => convertHealthKitSample(sample, type)),
+              );
+            } catch (conversionError) {
+              reject(
+                HealthKitError.conversionFailed(operationName, conversionError),
+              );
+            }
+          },
+        );
+      }),
+    operationName,
+    options,
+  );
+}
 // Service Implementation
 
 /**
@@ -1081,118 +1100,67 @@ export const healthKitService: HealthKitService = {
 
   // Activity
   /**
-   * Fetch step count samples from HealthKit
+   * Fetch daily step count samples from HealthKit
+   *
+   * Uses getDailyStepCountSamples, which returns one sample per day. getStepCount
+   * returns a single aggregate for the entire range and cannot drive a trend chart.
    *
    * @param options - Fetch options including date range and limit
-   * @returns Promise resolving to array of step count metrics
+   * @returns Promise resolving to array of step count metrics, one per day
    *
    * Requirements: 2.2
    */
   async fetchSteps(options: FetchOptions): Promise<HealthMetric[]> {
-    return new Promise((resolve, reject) => {
-      const healthKitOptions = {
-        startDate: options.startDate.toISOString(),
-        endDate: options.endDate.toISOString(),
-      };
-
-      AppleHealthKit.getStepCount(
-        healthKitOptions,
-        (err: string, results: HealthValue) => {
-          if (err) {
-            console.error("Error fetching steps:", err);
-            resolve([]); // Return empty array on error
-            return;
-          }
-
-          if (!results || results.value === undefined) {
-            resolve([]);
-            return;
-          }
-
-          // getStepCount returns a single aggregated value, not an array
-          const metric = convertHealthKitSample(results, "steps");
-          resolve([metric]);
-        },
-      );
-    });
+    return fetchSampleArray(
+      AppleHealthKit.getDailyStepCountSamples,
+      "steps",
+      "fetchSteps",
+      options,
+    );
   },
 
   /**
-   * Fetch distance walking/running samples from HealthKit
+   * Fetch daily walking/running distance samples from HealthKit
+   *
+   * Uses getDailyDistanceWalkingRunningSamples so each day is its own data point.
    *
    * @param options - Fetch options including date range and limit
-   * @returns Promise resolving to array of distance metrics
+   * @returns Promise resolving to array of distance metrics, one per day
    *
    * Requirements: 2.2
    */
   async fetchDistance(options: FetchOptions): Promise<HealthMetric[]> {
-    return new Promise((resolve, reject) => {
-      const healthKitOptions = {
-        startDate: options.startDate.toISOString(),
-        endDate: options.endDate.toISOString(),
-      };
-
-      AppleHealthKit.getDistanceWalkingRunning(
-        healthKitOptions,
-        (err: string, results: HealthValue) => {
-          if (err) {
-            console.error("Error fetching distance:", err);
-            resolve([]); // Return empty array on error
-            return;
-          }
-
-          if (!results || results.value === undefined) {
-            resolve([]);
-            return;
-          }
-
-          // getDistanceWalkingRunning returns a single aggregated value, not an array
-          const metric = convertHealthKitSample(results, "distance");
-          resolve([metric]);
-        },
-      );
-    });
+    return fetchSampleArray(
+      AppleHealthKit.getDailyDistanceWalkingRunningSamples,
+      "distance",
+      "fetchDistance",
+      options,
+    );
   },
 
   /**
-   * Fetch flights climbed samples from HealthKit
+   * Fetch daily flights climbed samples from HealthKit
+   *
+   * Uses getDailyFlightsClimbedSamples so each day is its own data point.
    *
    * @param options - Fetch options including date range and limit
-   * @returns Promise resolving to array of flights climbed metrics
+   * @returns Promise resolving to array of flights climbed metrics, one per day
    *
    * Requirements: 2.2
    */
   async fetchFlightsClimbed(options: FetchOptions): Promise<HealthMetric[]> {
-    return new Promise((resolve, reject) => {
-      const healthKitOptions = {
-        startDate: options.startDate.toISOString(),
-        endDate: options.endDate.toISOString(),
-      };
-
-      AppleHealthKit.getFlightsClimbed(
-        healthKitOptions,
-        (err: string, results: HealthValue) => {
-          if (err) {
-            console.error("Error fetching flights climbed:", err);
-            resolve([]); // Return empty array on error
-            return;
-          }
-
-          if (!results || results.value === undefined) {
-            resolve([]);
-            return;
-          }
-
-          // getFlightsClimbed returns a single aggregated value, not an array
-          const metric = convertHealthKitSample(results, "flights_climbed");
-          resolve([metric]);
-        },
-      );
-    });
+    return fetchSampleArray(
+      AppleHealthKit.getDailyFlightsClimbedSamples,
+      "flights_climbed",
+      "fetchFlightsClimbed",
+      options,
+    );
   },
 
   /**
    * Fetch active energy burned samples from HealthKit
+   *
+   * getActiveEnergyBurned returns an array of samples, not a single aggregate value.
    *
    * @param options - Fetch options including date range and limit
    * @returns Promise resolving to array of active energy metrics
@@ -1200,39 +1168,18 @@ export const healthKitService: HealthKitService = {
    * Requirements: 2.2
    */
   async fetchActiveEnergy(options: FetchOptions): Promise<HealthMetric[]> {
-    return new Promise((resolve, reject) => {
-      const healthKitOptions = {
-        startDate: options.startDate.toISOString(),
-        endDate: options.endDate.toISOString(),
-      };
-
-      AppleHealthKit.getActiveEnergyBurned(
-        healthKitOptions,
-        (err: string, results: any) => {
-          if (err) {
-            console.error("Error fetching active energy:", err);
-            resolve([]); // Return empty array on error
-            return;
-          }
-
-          if (!results || results.value === undefined) {
-            resolve([]);
-            return;
-          }
-
-          // getActiveEnergyBurned returns a single aggregated value
-          const metric = convertHealthKitSample(
-            results as HealthValue,
-            "active_energy",
-          );
-          resolve([metric]);
-        },
-      );
-    });
+    return fetchSampleArray(
+      AppleHealthKit.getActiveEnergyBurned,
+      "active_energy",
+      "fetchActiveEnergy",
+      options,
+    );
   },
 
   /**
    * Fetch Apple Exercise Time (exercise minutes) samples from HealthKit
+   *
+   * getAppleExerciseTime returns an array of samples, not a single aggregate value.
    *
    * @param options - Fetch options including date range and limit
    * @returns Promise resolving to array of exercise minutes metrics
@@ -1240,35 +1187,12 @@ export const healthKitService: HealthKitService = {
    * Requirements: 2.2
    */
   async fetchExerciseMinutes(options: FetchOptions): Promise<HealthMetric[]> {
-    return new Promise((resolve, reject) => {
-      const healthKitOptions = {
-        startDate: options.startDate.toISOString(),
-        endDate: options.endDate.toISOString(),
-      };
-
-      AppleHealthKit.getAppleExerciseTime(
-        healthKitOptions,
-        (err: string, results: any) => {
-          if (err) {
-            console.error("Error fetching exercise minutes:", err);
-            resolve([]); // Return empty array on error
-            return;
-          }
-
-          if (!results || results.value === undefined) {
-            resolve([]);
-            return;
-          }
-
-          // getAppleExerciseTime returns a single aggregated value
-          const metric = convertHealthKitSample(
-            results as HealthValue,
-            "exercise_minutes",
-          );
-          resolve([metric]);
-        },
-      );
-    });
+    return fetchSampleArray(
+      AppleHealthKit.getAppleExerciseTime,
+      "exercise_minutes",
+      "fetchExerciseMinutes",
+      options,
+    );
   },
 
   // Body
@@ -1714,20 +1638,35 @@ export const healthKitService: HealthKitService = {
             const durationMs = end.getTime() - start.getTime();
             const durationHours = durationMs / (1000 * 60 * 60); // Convert to hours
 
-            // Map Apple's sleep stage values to readable names
+            // Map Apple's sleep stage values to readable names.
+            //
+            // react-native-health reports the short forms (CORE, DEEP, REM) on
+            // device, not the ASLEEP_* spellings. Only the long forms were
+            // mapped, so those three fell through unmapped and downstream code
+            // received "DEEP" where it expected "Deep Sleep" -- which rendered
+            // deep sleep in the default green rather than purple, and showed
+            // "CORE" to the user (and to VoiceOver) instead of "Light Sleep".
             const sleepStageMap: Record<string, string> = {
               INBED: "In Bed",
+              IN_BED: "In Bed",
               ASLEEP: "Asleep",
+              CORE: "Light Sleep",
               ASLEEP_CORE: "Light Sleep",
+              DEEP: "Deep Sleep",
               ASLEEP_DEEP: "Deep Sleep",
+              REM: "REM Sleep",
               ASLEEP_REM: "REM Sleep",
               ASLEEP_UNSPECIFIED: "Asleep",
               AWAKE: "Awake",
             };
 
-            const rawStage =
-              sample.value || sample.sleepStage || "ASLEEP_UNSPECIFIED";
-            const sleepStage = sleepStageMap[rawStage] || rawStage;
+            const rawStage = String(
+              sample.value || sample.sleepStage || "ASLEEP_UNSPECIFIED",
+            );
+            // Normalise case and separators so a spelling change upstream does
+            // not silently fall through again.
+            const stageKey = rawStage.toUpperCase().replace(/[\s-]+/g, "_");
+            const sleepStage = sleepStageMap[stageKey] || rawStage;
 
             // Create a HealthValue-compatible object with calculated duration
             const healthValue: HealthValue = {
@@ -2097,16 +2036,10 @@ export const healthKitService: HealthKitService = {
       // Log the error
       console.error("Error fetching all health data:", healthKitError.toJSON());
 
-      // Return empty categorized data structure
-      // This allows the app to continue functioning even if all fetches fail
-      return {
-        vitals: [],
-        activity: [],
-        body: [],
-        nutrition: [],
-        sleep: [],
-        mindfulness: [],
-      };
+      // Rethrow so the caller can fall back to cached or demo data.
+      // Returning an empty structure here would look like "you have no health
+      // data" and would silently bypass HealthDataContext's cache fallback.
+      throw healthKitError;
     }
   },
 };
