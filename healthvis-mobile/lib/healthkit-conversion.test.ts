@@ -740,3 +740,25 @@ describe('Counting nights with sleep data', () => {
     expect(countSleepNights([night(1), night(2)])).toBe(2);
   });
 });
+
+describe('Sleep values are stored in hours', () => {
+  const { aggregateSleepByStage } = require('./sleep-utils');
+
+  it('treats a metric value as hours, not seconds', () => {
+    // fetchSleep stores durationHours. Trends divided by 3600 again, turning a
+    // 6-hour night into 0.0017 hours.
+    const sixHourNight = [
+      {
+        id: 'n1',
+        category: 'sleep' as const,
+        type: 'sleep' as const,
+        value: 6,
+        timestamp: new Date(2026, 7, 27, 23, 0, 0),
+        unit: 'hr',
+        metadata: { durationMinutes: 360, sleepStage: 'Light Sleep' },
+      },
+    ];
+
+    expect(aggregateSleepByStage(sixHourNight).totalSleep).toBeCloseTo(6, 5);
+  });
+});

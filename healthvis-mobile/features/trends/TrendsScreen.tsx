@@ -42,6 +42,7 @@ import {
   stop as stopSonification,
 } from "@/lib/sonification";
 import { classifyRange } from "@/lib/metric-registry";
+import { filterSleepForRange } from "@/lib/sleep-utils";
 import type { DataPoint, DataRange } from "@/types";
 
 import type { HealthMetricType } from "@/types/health-metric";
@@ -194,18 +195,24 @@ export default function TrendsScreen() {
           new Date(m.timestamp).getTime() >= start.getTime()
       );
 
-      // Sleep: drop "Awake" / "In Bed" stage entries so we only count actual
-      // sleep duration, convert seconds→hours
       if (key === "sleep") {
+        // Sleep is selected by session end, so a night beginning before
+        // midnight counts toward the day it ends on -- the same rule the
+        // detail screen uses.
+        filtered = filterSleepForRange(
+          allRaw.filter((m) => m.type === key),
+          start,
+        );
+
+        // Drop Awake / In Bed so only actual sleep is counted.
         filtered = filtered.filter((m) => {
           const stage: string = (m.metadata as any)?.sleepStage ?? "";
           return !stage.includes("Awake") && !stage.includes("In Bed");
         });
-        // HealthKit sleep entries are in seconds — convert to hours
-        filtered = filtered.map((m) => ({
-          ...m,
-          value: typeof m.value === "number" ? m.value / 3600 : parseFloat(String(m.value)) / 3600,
-        }));
+
+        // No unit conversion: fetchSleep already stores hours. This previously
+        // divided by 3600 as if the values were seconds, reporting a 6 hour
+        // night as 0.0017 hours.
       }
 
       const rawPoints: { value: number; timestamp: Date }[] = filtered

@@ -29,6 +29,7 @@ import {
 } from "@/lib/announcer";
 
 import { HealthMetric } from "@/types/health-metric";
+import { filterSleepForRange } from "@/lib/sleep-utils";
 import { getColorForType } from "@/lib/metric-registry";
 import { SummaryStateGate } from "@/features/summary/components/SummaryStateGate";
 import * as Speech from "expo-speech";
@@ -70,12 +71,19 @@ function isActualSleepStage(metric: HealthMetric) {
   return !stage.includes("Awake") && !stage.includes("In Bed");
 }
 
+/**
+ * Hours slept during the night that ended today.
+ *
+ * Selected by session end rather than start: a night beginning at 22:00 starts
+ * on the previous calendar day, so filtering on start time dropped every hour
+ * before midnight and under-reported the night. Matches the rule the metric
+ * detail screen uses, so the two screens agree on what "today" means.
+ */
 function getTodaySleepHours(metrics: HealthMetric[]) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  return metrics
-    .filter((m) => new Date(m.timestamp).getTime() >= todayStart.getTime())
+  return filterSleepForRange(metrics, todayStart)
     .filter(isActualSleepStage)
     .reduce((sum, metric) => sum + Number(metric.value || 0), 0);
 }
