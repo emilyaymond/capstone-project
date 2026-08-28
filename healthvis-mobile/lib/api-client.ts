@@ -67,8 +67,11 @@ async function fetchWithTimeout(
     if (error.name === 'AbortError') {
       throw new APIError('Request timeout', undefined, false, true);
     }
+    // Name the address that failed. "Unable to reach server" alone gives no
+    // way to tell a sleeping laptop from a wrong EXPO_PUBLIC_API_URL, and that
+    // variable is inlined at bundle time so a stale value is easy to miss.
     throw new APIError(
-      'Network error: Unable to reach server',
+      `Network error: unable to reach ${API_BASE_URL}`,
       undefined,
       true,
       false
